@@ -5,9 +5,9 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc && copyfiles \"config/**/*\" dist",
-    "start": "node dist/OrchestratorService.js",
+    "start": "node dist/orchestrator/OrchestratorService.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "lint": "eslint --ext ts src/ --fix"
+    "lint": "eslint --ext ts --fix src/"
   },
   "repository": {
     "type": "git",
@@ -42,8 +42,13 @@
     "typescript": "^4.6.2"
   },
   "dependencies": {
+    "body-parser": "^1.19.2",
     "config": "^3.3.7",
     "express": "^4.17.3",
-    "toml": "^3.0.0"
+    "express-winston": "^4.2.0",
+    "mongodb-memory-server": "^8.4.1",
+    "mongoose": "^6.2.7",
+    "toml": "^3.0.0",
+    "winston": "^3.6.0"
   }
 }

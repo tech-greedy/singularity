@@ -2,3 +2,10 @@
 enabled = true
 bind = "127.0.0.1"
 port = 7001
+
+[orchestrator.database]
+use_local = true
+local_path = "~/.singularity/orchestrator/database"
+local_bind = "127.0.0.1"
+local_port = 27017
+remote_uri = "mongodb://127.0.0.1:27017"
