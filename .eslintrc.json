@@ -1,0 +1,32 @@
+{
+  "env": {
+    "es2020": true,
+    "node": true,
+    "jasmine": true,
+    "mongo": true
+  },
+  "extends": [
+    "standard",
+    "plugin:@typescript-eslint/recommended"
+  ],
+  "globals": {
+    "Atomics": "readonly",
+    "SharedArrayBuffer": "readonly"
+  },
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "ecmaVersion": 2020,
+    "sourceType": "module"
+  },
+  "plugins": [
+    "@typescript-eslint"
+  ],
+  "rules": {
+    "max-len": ["error", { "code": 160, "ignoreStrings": true }],
+    "no-multi-spaces":  ["error", { "ignoreEOLComments": true }],
+    "quotes": ["error", "single", { "avoidEscape": true, "allowTemplateLiterals": true} ],
+    "semi": ["off"],
+    "@typescript-eslint/semi": ["error", "always"],
+    "sort-imports": "error"
+  }
+}
