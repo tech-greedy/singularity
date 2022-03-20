@@ -2,7 +2,9 @@ import expressWinston from 'express-winston';
 import winston from 'winston';
 
 export enum Category {
-  Orchestrator = 'Orchestrator'
+  Orchestrator = 'orchestrator',
+  Database = 'database',
+  DealPreparationWorker = 'deal_preparation_worker',
 }
 
 const container = new winston.Container();
@@ -15,7 +17,7 @@ const loggerFormat = (category: string) => winston.format.combine(
   winston.format.printf(({ level, message, label, timestamp }) => {
     return `${timestamp} [${label}] ${level}: ${message}`;
   }));
-Object.keys(Category).forEach(category => {
+Object.values(Category).forEach(category => {
   container.add(category, {
     level: 'info',
     format: loggerFormat(category),
@@ -24,11 +26,11 @@ Object.keys(Category).forEach(category => {
 });
 
 export default class Logger {
-  public static GetLogger (category: Category) {
+  public static getLogger (category: Category) {
     return container.get(category);
   }
 
-  public static GetExpressLogger (category: Category) {
+  public static getExpressLogger (category: Category) {
     return expressWinston.logger({
       transports: [new winston.transports.Console()],
       format: loggerFormat(category),

@@ -105,3 +105,10 @@ dist
 
 # Jetbrain IntelliJ
 .idea/
+
+# Go binaries
+.exe
+go-bodyshop/bodyshop.exe
+
+# temporary data
+.singularity
