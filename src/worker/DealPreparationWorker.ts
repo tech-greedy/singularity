@@ -6,6 +6,7 @@ import ScanningRequest from '../common/model/ScanningRequest';
 
 export default class DealPreparationWorker extends BaseService {
   private readonly workerId: string;
+
   public constructor () {
     super(Category.DealPreparationWorker);
     this.workerId = uuid();
@@ -22,7 +23,9 @@ export default class DealPreparationWorker extends BaseService {
     this.startPollWork();
   }
 
-  private async startScanning (_request: ScanningRequest) : Promise<void> {
+  private async startScanning (_request: ScanningRequest): Promise<void> {
+    // const datasetPath = path.normalize(request.datasetPath);
+
     this.logger.info('finished scanning');
   }
 
