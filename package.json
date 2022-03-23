@@ -1,8 +1,9 @@
 {
-  "name": "singularity",
+  "name": "@techgreedy/singularity",
   "version": "0.0.1",
   "description": "Large scale client tool with capabilities on onboard PB-scale data to Filecoin network",
-  "main": "index.js",
+  "main": "dist/source/start.js",
+  "types": "dist/source/start.d.ts",
   "scripts": {
     "build": "tsc && copyfiles \"config/**/*\" dist",
     "start": "node dist/src/start.js",
@@ -18,12 +19,11 @@
     "filecoin",
     "singularity"
   ],
-  "author": "Xinan Xu",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/tech-greedy/singularity/issues"
   },
-  "homepage": "https://github.com/tech-greedy/singularity#readme",
+  "homepage": "https://github.com/tech-greedy/singularity",
   "devDependencies": {
     "@istanbuljs/nyc-config-typescript": "^1.0.2",
     "@types/config": "^0.0.41",
@@ -63,5 +63,12 @@
     "toml": "^3.0.0",
     "winston": "^3.6.0",
     "minimist": "^1.2.6"
-  }
+  },
+  "directories": {
+    "test": "tests"
+  },
+  "author": "",
+  "files": [
+    "dist"
+  ]
 }
