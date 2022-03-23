@@ -1,0 +1,18 @@
+[connection]
+database = "mongodb://127.0.0.1:27017"
+
+[orchestrator]
+enabled = true
+bind = "127.0.0.1"
+port = 7001
+
+[database]
+start_local = true
+local_path = "./.singularity/orchestrator/database"
+local_bind = "127.0.0.1"
+local_port = 27017
+
+[deal_preparation_worker]
+enabled = true
+parallelism = 2
+out_dir = "./.singularity/cars"

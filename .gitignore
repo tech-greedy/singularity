@@ -102,3 +102,16 @@ dist
 
 # TernJS port file
 .tern-port
+
+# Jetbrain IntelliJ
+.idea/
+
+# Go binaries
+.exe
+go-bodyshop/bodyshop.exe
+
+# temporary data
+.singularity
+
+# Unit test results
+nunitresults.xml
