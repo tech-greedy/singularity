@@ -2,7 +2,9 @@ import config from 'config';
 import fs from 'fs';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import mongoose, { Schema } from 'mongoose';
+import { FileInfo } from '../worker/Scanner';
 import Logger, { Category } from './Logger';
+import GenerationRequest from './model/GenerationRequest';
 import HealthCheck from './model/HealthCheck';
 import ScanningRequest from './model/ScanningRequest';
 
@@ -12,6 +14,7 @@ export default class Datastore {
   // eslint-disable-next-line @typescript-eslint/ban-types
   public static HealthCheckModel : mongoose.Model<HealthCheck, {}, {}, {}>;
   public static ScanningRequestModel : mongoose.Model<ScanningRequest, {}, {}, {}>;
+  public static GenerationRequestModel : mongoose.Model<GenerationRequest, {}, {}, {}>;
 
   private static DB_NAME = 'singularity';
 
@@ -68,6 +71,23 @@ export default class Datastore {
       completed: Schema.Types.Boolean
     });
     Datastore.ScanningRequestModel = mongoose.model<ScanningRequest>('ScanningRequest', scanningRequestSchema);
+
+    const fileInfoSchema = new Schema<FileInfo>({
+      path: Schema.Types.String,
+      name: Schema.Types.String,
+      size: Schema.Types.Number,
+      start: Schema.Types.Number,
+      end: Schema.Types.Number,
+    });
+    const generationRequestSchema = new Schema<GenerationRequest>({
+      datasetName: Schema.Types.String,
+      datasetPath: Schema.Types.String,
+      datasetIndex: Schema.Types.Number,
+      fileList: [fileInfoSchema],
+      workerId: Schema.Types.String,
+      completed: Schema.Types.Boolean
+    });
+    Datastore.GenerationRequestModel = mongoose.model<GenerationRequest>('GenerationRequest', generationRequestSchema);
   }
 
   public static async init () : Promise<void> {

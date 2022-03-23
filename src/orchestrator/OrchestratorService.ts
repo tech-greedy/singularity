@@ -10,6 +10,7 @@ export default class OrchestratorService extends BaseService {
   public constructor () {
     super(Category.Orchestrator);
     this.handlePrepareRequest = this.handlePrepareRequest.bind(this);
+    // TODO database maintenance to update workerId to undefined if it is no longer active
   }
 
   public start (): void {
@@ -40,8 +41,9 @@ export default class OrchestratorService extends BaseService {
     // TODO validate minSize, maxSize, path
     const scanningRequest = new Datastore.ScanningRequestModel();
     scanningRequest.datasetName = name;
-    scanningRequest.minSize = minSize;
-    scanningRequest.maxSize = maxSize;
+    // TODO allow GiB
+    scanningRequest.minSize = Number(minSize);
+    scanningRequest.maxSize = Number(maxSize);
     scanningRequest.datasetPath = path;
     scanningRequest.completed = false;
     // TODO Handle name conflict

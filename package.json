@@ -25,12 +25,13 @@
   "homepage": "https://github.com/tech-greedy/singularity#readme",
   "devDependencies": {
     "@types/config": "^0.0.41",
+    "@types/express": "^4.17.13",
     "@types/glob": "^7.2.0",
     "@types/node": "^17.0.21",
+    "@types/rrdir": "^8.2.3",
     "@types/typescript": "^2.0.0",
     "@typescript-eslint/eslint-plugin": "^5.15.0",
     "@typescript-eslint/parser": "^5.15.0",
-    "@types/express": "^4.17.13",
     "copyfiles": "^2.4.1",
     "eslint": "^7.32.0",
     "eslint-config-standard": "^16.0.3",
@@ -43,6 +44,7 @@
     "typescript": "^4.6.2"
   },
   "dependencies": {
+    "@rauschma/stringio": "^1.4.0",
     "@types/uuid": "^8.3.4",
     "body-parser": "^1.19.2",
     "config": "^3.3.7",
@@ -52,6 +54,7 @@
     "glob": "^7.2.0",
     "mongodb-memory-server": "^8.4.1",
     "mongoose": "^6.2.7",
+    "rrdir": "^8.2.2",
     "toml": "^3.0.0",
     "uuid": "^8.3.2",
     "winston": "^3.6.0"
