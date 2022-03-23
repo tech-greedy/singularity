@@ -7,7 +7,8 @@
     "build": "tsc && copyfiles \"config/**/*\" dist",
     "start": "node dist/src/start.js",
     "test": "nyc -r lcov -r text jasmine-ts --config=./tests/jasmine.json",
-    "lint": "eslint --ext ts --fix src/"
+    "lint": "eslint --ext ts --fix src/",
+    "lint:nofix": "eslint --ext ts src/"
   },
   "repository": {
     "type": "git",
