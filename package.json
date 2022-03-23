@@ -5,8 +5,8 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc && copyfiles \"config/**/*\" dist",
-    "start": "node dist/start.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node dist/src/start.js",
+    "test": "nyc -r lcov -r text jasmine-ts --config=./tests/jasmine.json",
     "lint": "eslint --ext ts --fix src/"
   },
   "repository": {
@@ -24,10 +24,11 @@
   },
   "homepage": "https://github.com/tech-greedy/singularity#readme",
   "devDependencies": {
+    "@istanbuljs/nyc-config-typescript": "^1.0.2",
     "@types/config": "^0.0.41",
     "@types/express": "^4.17.13",
-    "@types/glob": "^7.2.0",
-    "@types/node": "^17.0.21",
+    "@types/jasmine": "^4.0.0",
+    "@types/node": "^14.17.6",
     "@types/rrdir": "^8.2.3",
     "@types/typescript": "^2.0.0",
     "@typescript-eslint/eslint-plugin": "^5.15.0",
@@ -40,23 +41,26 @@
     "eslint-plugin-prefer-arrow": "^1.2.3",
     "eslint-plugin-promise": "^6.0.0",
     "eslint-plugin-standard": "^5.0.0",
+    "jasmine": "^3.99.0",
+    "jasmine-reporters": "^2.5.0",
+    "jasmine-spec-reporter": "^7.0.0",
+    "jasmine-ts": "^0.4.0",
+    "nyc": "^15.1.0",
     "ts-node": "^10.7.0",
     "typescript": "^4.6.2"
   },
   "dependencies": {
     "@rauschma/stringio": "^1.4.0",
-    "@types/uuid": "^8.3.4",
     "body-parser": "^1.19.2",
     "config": "^3.3.7",
     "express": "^5.0.0-beta.1",
     "express-winston": "^4.2.0",
-    "fast-glob": "^3.2.11",
     "glob": "^7.2.0",
     "mongodb-memory-server": "^8.4.1",
     "mongoose": "^6.2.7",
     "rrdir": "^8.2.2",
     "toml": "^3.0.0",
-    "uuid": "^8.3.2",
-    "winston": "^3.6.0"
+    "winston": "^3.6.0",
+    "minimist": "^1.2.6"
   }
 }

@@ -40,12 +40,12 @@ export default class OrchestratorService extends BaseService {
     this.logger.info(`Received request to prepare dataset "${name}" from "${path}". Min size - ${minSize}, Max size - ${maxSize}.`);
     // TODO validate minSize, maxSize, path
     const scanningRequest = new Datastore.ScanningRequestModel();
-    scanningRequest.datasetName = name;
+    scanningRequest.name = name;
     // TODO allow GiB
     scanningRequest.minSize = Number(minSize);
     scanningRequest.maxSize = Number(maxSize);
-    scanningRequest.datasetPath = path;
-    scanningRequest.completed = false;
+    scanningRequest.path = path;
+    scanningRequest.status = 'active';
     // TODO Handle name conflict
     await scanningRequest.save();
     response.setHeader('Content-Type', 'application/json');

@@ -1,9 +1,10 @@
 export default interface ScanningRequest {
   id: string,
-  datasetName: string,
-  datasetPath: string,
+  name: string,
+  path: string,
   minSize: number,
   maxSize: number,
   workerId?: string,
-  completed: boolean,
+  status: 'active' | 'paused' | 'removed' | 'completed' | 'error',
+  errorMessage: string
 }

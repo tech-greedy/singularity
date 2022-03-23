@@ -1,7 +1,7 @@
 import { readableToString, streamEnd, streamWrite } from '@rauschma/stringio';
 import { spawn } from 'child_process';
+import { randomUUID } from 'crypto';
 import path from 'path';
-import { v4 as uuid } from 'uuid';
 import BaseService from '../common/BaseService';
 import Datastore from '../common/Datastore';
 import { Category } from '../common/Logger';
@@ -27,7 +27,7 @@ export default class DealPreparationWorker extends BaseService {
 
   public constructor () {
     super(Category.DealPreparationWorker);
-    this.workerId = uuid();
+    this.workerId = randomUUID();
     this.startHealthCheck = this.startHealthCheck.bind(this);
     this.startPollWork = this.startPollWork.bind(this);
   }
@@ -42,13 +42,13 @@ export default class DealPreparationWorker extends BaseService {
   }
 
   private async scan (request: ScanningRequest): Promise<void> {
-    const fileLists = await Scanner.scan(request.datasetPath, request.minSize, request.maxSize);
+    const fileLists = await Scanner.scan(request.path, request.minSize, request.maxSize);
     const fileListsToInsert = fileLists.map((fileList, index) => {
       const generationRequest = new Datastore.GenerationRequestModel();
-      generationRequest.completed = false;
-      generationRequest.datasetName = request.datasetName;
-      generationRequest.datasetPath = request.datasetPath;
-      generationRequest.datasetIndex = index;
+      generationRequest.status = 'completed';
+      generationRequest.name = request.name;
+      generationRequest.path = request.path;
+      generationRequest.index = index;
       generationRequest.fileList = fileList;
       return generationRequest;
     });
@@ -81,7 +81,7 @@ export default class DealPreparationWorker extends BaseService {
       workerId: this.workerId
     });
     if (newScanningWork) {
-      this.logger.info(`${this.workerId} - Received a new request - dataset: ${newScanningWork.datasetName}`);
+      this.logger.info(`${this.workerId} - Received a new request - dataset: ${newScanningWork.name}`);
       await this.scan(newScanningWork);
       await Datastore.ScanningRequestModel.findByIdAndUpdate(newScanningWork.id, { completed: true });
     }
@@ -93,7 +93,7 @@ export default class DealPreparationWorker extends BaseService {
       workerId: this.workerId
     });
     if (newGenerationWork) {
-      this.logger.info(`${this.workerId} - Received a new request - dataset: ${newGenerationWork.datasetName} [${newGenerationWork.datasetIndex}]`);
+      this.logger.info(`${this.workerId} - Received a new request - dataset: ${newGenerationWork.name} [${newGenerationWork.index}]`);
       await this.generate(newGenerationWork);
       await Datastore.GenerationRequestModel.findByIdAndUpdate(newGenerationWork.id, { completed: true });
     }

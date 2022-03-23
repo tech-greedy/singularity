@@ -1,10 +1,23 @@
-import { FileList } from '../../worker/Scanner';
+export interface FileInfo {
+  path: string,
+  name: string,
+  size: number,
+  start: number,
+  end: number,
+}
+
+export type FileList = FileInfo[];
 
 export default interface GenerationRequest {
-  datasetName: string,
-  datasetPath: string,
-  datasetIndex: number,
+  id: string
+  name: string,
+  path: string,
+  index: number,
   fileList: FileList
   workerId?: string,
-  completed: boolean,
+  status: 'active' | 'paused' | 'removed' | 'completed' | 'error',
+  errorMessage: string,
+  dataCid: string,
+  pieceCid: string,
+  pieceSize: number
 }

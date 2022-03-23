@@ -1,15 +1,6 @@
 import glob from 'fast-glob';
 import path from 'path';
-
-export interface FileInfo {
-  path: string,
-  name: string,
-  size: number,
-  start: number,
-  end: number,
-}
-
-export type FileList = FileInfo[];
+import { FileList } from '../common/model/GenerationRequest';
 
 export default class Scanner {
   public static async scan (root: string, minSize: number, maxSize: number): Promise<FileList[]> {

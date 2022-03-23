@@ -112,3 +112,6 @@ go-bodyshop/bodyshop.exe
 
 # temporary data
 .singularity
+
+# Unit test results
+nunitresults.xml
