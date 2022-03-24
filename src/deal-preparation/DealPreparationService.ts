@@ -1,8 +1,9 @@
 import bodyParser from 'body-parser';
 import config from 'config';
-import express, { Request, Response } from 'express';
+import express, { Express, Request, Response } from 'express';
 import { constants } from 'fs';
 import fs from 'fs/promises';
+import { MongoServerError } from 'mongodb';
 import xbytes from 'xbytes';
 import BaseService from '../common/BaseService';
 import Datastore from '../common/Datastore';
@@ -15,6 +16,7 @@ import UpdatePreparationRequest from './UpdatePreparationRequest';
 
 export default class DealPreparationService extends BaseService {
   private static AllowedDealSizes: number[] = DealPreparationService.initAllowedDealSizes();
+  private app: Express = express();
 
   public constructor () {
     super(Category.DealPreparationService);
@@ -23,29 +25,28 @@ export default class DealPreparationService extends BaseService {
     this.handleListPreparationRequests = this.handleListPreparationRequests.bind(this);
     this.handleGetPreparationRequest = this.handleGetPreparationRequest.bind(this);
     this.handleGetGenerationRequest = this.handleGetGenerationRequest.bind(this);
-  }
-
-  public start (): void {
     if (!this.enabled) {
       this.logger.warn('Orchestrator is not enabled. Exit now...');
       return;
     }
-    const bind = config.get<string>('orchestrator.bind');
-    const port = config.get<number>('orchestrator.port');
-    const app = express();
-    app.use(Logger.getExpressLogger(Category.DealPreparationService));
-    app.use(bodyParser.urlencoded({ extended: false }));
-    app.use(bodyParser.json());
-    app.use(function (_req, res, next) {
+    this.app.use(Logger.getExpressLogger(Category.DealPreparationService));
+    this.app.use(bodyParser.urlencoded({ extended: false }));
+    this.app.use(bodyParser.json());
+    this.app.use(function (_req, res, next) {
       res.setHeader('Content-Type', 'application/json');
       next();
     });
-    app.post('/preparation', this.handleCreatePreparationRequest);
-    app.post('/preparation/:id', this.handleUpdatePrepararationRequest);
-    app.get('/preparations', this.handleListPreparationRequests);
-    app.get('/preparation/:id', this.handleGetPreparationRequest);
-    app.get('/generation/:id', this.handleGetGenerationRequest);
-    app.listen(port, bind, () => {
+    this.app.post('/preparation', this.handleCreatePreparationRequest);
+    this.app.post('/preparation/:id', this.handleUpdatePrepararationRequest);
+    this.app.get('/preparations', this.handleListPreparationRequests);
+    this.app.get('/preparation/:id', this.handleGetPreparationRequest);
+    this.app.get('/generation/:id', this.handleGetGenerationRequest);
+  }
+
+  public start (): void {
+    const bind = config.get<string>('orchestrator.bind');
+    const port = config.get<number>('orchestrator.port');
+    this.app!.listen(port, bind, () => {
       this.logger.info(`Orchestrator started listening at http://${bind}:${port}`);
     });
   }
@@ -98,12 +99,12 @@ export default class DealPreparationService extends BaseService {
   private async handleListPreparationRequests (_request: Request, response: Response) {
     this.logger.info('Received request to list all preparation requests.');
     const scanningRequests = await Datastore.ScanningRequestModel.find();
-    const aggregate = async (match: any) => Datastore.GenerationRequestModel.aggregate([{
+    const aggregate = async (match: { status?: string }) => Datastore.GenerationRequestModel.aggregate([{
       $match: match
     }, {
       $group: {
         _id: '$datasetId',
-        count: { }
+        count: {}
       }
     }]);
     const total = await aggregate({});
@@ -175,7 +176,7 @@ export default class DealPreparationService extends BaseService {
     this.logger.info(`Received request to prepare dataset "${name}" from "${path}". Target Deal Size - ${dealSize}.`);
     const dealSizeNumber = xbytes.parseSize(dealSize);
     // Validate dealSize
-    if (DealPreparationService.AllowedDealSizes.includes(dealSizeNumber)) {
+    if (!DealPreparationService.AllowedDealSizes.includes(dealSizeNumber)) {
       this.sendError(response, ErrorCode.DEAL_SIZE_NOT_ALLOWED);
       return;
     }
@@ -197,8 +198,8 @@ export default class DealPreparationService extends BaseService {
     scanningRequest.status = 'active';
     try {
       await scanningRequest.save();
-    } catch (e: any) {
-      if (e.code === 11000) {
+    } catch (e) {
+      if (e instanceof MongoServerError && e.code === 11000) {
         this.sendError(response, ErrorCode.DATASET_NAME_CONFLICT);
         return;
       }
