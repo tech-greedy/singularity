@@ -39,7 +39,6 @@ describe('DealPreparationService', () => {
         error: ErrorCode.PATH_NOT_ACCESSIBLE
       });
     })
-
     it('should create scanning request', async () => {
       const response = await supertest(service['app'])
         .post('/preparation').send({
