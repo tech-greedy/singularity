@@ -56,13 +56,13 @@
     "config": "^3.3.7",
     "express": "^5.0.0-beta.1",
     "express-winston": "^4.2.0",
-    "glob": "^7.2.0",
+    "minimist": "^1.2.6",
     "mongodb-memory-server": "^8.4.1",
     "mongoose": "^6.2.7",
     "rrdir": "^8.2.2",
     "toml": "^3.0.0",
     "winston": "^3.6.0",
-    "minimist": "^1.2.6"
+    "xbytes": "^1.7.0"
   },
   "directories": {
     "test": "tests"

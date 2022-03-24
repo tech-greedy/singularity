@@ -9,13 +9,14 @@ export interface FileInfo {
 export type FileList = FileInfo[];
 
 export default interface GenerationRequest {
-  id: string
-  name: string,
+  id: string,
+  datasetId: string
+  datasetName: string,
   path: string,
   index: number,
   fileList: FileList
   workerId?: string,
-  status: 'active' | 'paused' | 'removed' | 'completed' | 'error',
+  status: 'active' | 'paused' | 'completed' | 'error',
   errorMessage: string,
   dataCid: string,
   pieceCid: string,
