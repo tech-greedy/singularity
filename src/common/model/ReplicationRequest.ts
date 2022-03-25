@@ -4,5 +4,5 @@ export default interface ReplicationRequest {
   minReplicas: number,
   criteria: string,
   client: string,
-  status: 'active' | 'paused' | 'removed' | 'completed',
+  status: 'active' | 'paused' | 'completed',
 }

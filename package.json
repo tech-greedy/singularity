@@ -7,7 +7,8 @@
   "scripts": {
     "build": "tsc && copyfiles \"config/**/*\" dist",
     "start": "node dist/src/start.js",
-    "test": "nyc -r lcov -r text jasmine-ts --config=./tests/jasmine.json",
+    "test": "jasmine-ts --config=./tests/jasmine.json",
+    "coverage": "nyc jasmine-ts --config=./tests/jasmine.json",
     "lint": "eslint --ext ts --fix src/",
     "lint:nofix": "eslint --ext ts src/"
   },
@@ -31,6 +32,7 @@
     "@types/jasmine": "^4.0.0",
     "@types/node": "^14.17.6",
     "@types/rrdir": "^8.2.3",
+    "@types/supertest": "^2.0.12",
     "@types/typescript": "^2.0.0",
     "@typescript-eslint/eslint-plugin": "^5.15.0",
     "@typescript-eslint/parser": "^5.15.0",
@@ -47,6 +49,7 @@
     "jasmine-spec-reporter": "^7.0.0",
     "jasmine-ts": "^0.4.0",
     "nyc": "^15.1.0",
+    "supertest": "^6.2.2",
     "ts-node": "^10.7.0",
     "typescript": "^4.6.2"
   },
@@ -56,13 +59,14 @@
     "config": "^3.3.7",
     "express": "^5.0.0-beta.1",
     "express-winston": "^4.2.0",
-    "glob": "^7.2.0",
+    "minimist": "^1.2.6",
     "mongodb-memory-server": "^8.4.1",
     "mongoose": "^6.2.7",
+    "mongodb": "^4.3.1",
     "rrdir": "^8.2.2",
     "toml": "^3.0.0",
     "winston": "^3.6.0",
-    "minimist": "^1.2.6"
+    "xbytes": "^1.7.0"
   },
   "directories": {
     "test": "tests"
@@ -70,5 +74,23 @@
   "author": "",
   "files": [
     "dist"
-  ]
+  ],
+  "nyc": {
+    "extends": "@istanbuljs/nyc-config-typescript",
+    "check-coverage": true,
+    "extension": [
+      ".ts",
+      ".tsx"
+    ],
+    "include": [
+      "src/**"
+    ],
+    "reporter": [
+      "text",
+      "html"
+    ],
+    "lines": 80,
+    "functions": 80,
+    "statements": 80
+  }
 }

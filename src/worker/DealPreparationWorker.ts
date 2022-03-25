@@ -46,7 +46,7 @@ export default class DealPreparationWorker extends BaseService {
     const fileListsToInsert = fileLists.map((fileList, index) => {
       const generationRequest = new Datastore.GenerationRequestModel();
       generationRequest.status = 'completed';
-      generationRequest.name = request.name;
+      generationRequest.datasetName = request.name;
       generationRequest.path = request.path;
       generationRequest.index = index;
       generationRequest.fileList = fileList;
@@ -93,7 +93,7 @@ export default class DealPreparationWorker extends BaseService {
       workerId: this.workerId
     });
     if (newGenerationWork) {
-      this.logger.info(`${this.workerId} - Received a new request - dataset: ${newGenerationWork.name} [${newGenerationWork.index}]`);
+      this.logger.info(`${this.workerId} - Received a new request - dataset: ${newGenerationWork.datasetName} [${newGenerationWork.index}]`);
       await this.generate(newGenerationWork);
       await Datastore.GenerationRequestModel.findByIdAndUpdate(newGenerationWork.id, { completed: true });
     }

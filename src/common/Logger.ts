@@ -2,7 +2,7 @@ import expressWinston from 'express-winston';
 import winston from 'winston';
 
 export enum Category {
-  Orchestrator = 'orchestrator',
+  DealPreparationService = 'deal_preparation_service',
   Database = 'database',
   DealPreparationWorker = 'deal_preparation_worker',
 }

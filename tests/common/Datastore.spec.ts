@@ -1,12 +1,9 @@
 import { randomUUID } from 'crypto';
 import Datastore from '../../src/common/Datastore';
+import Utils from '../Utils';
 
 describe('Datastore', () => {
-  beforeAll(async () => {
-    await Datastore['setupLocalMongoDb']('127.0.0.1', 26999);
-    await Datastore['connectMongoDb']('mongodb://127.0.0.1:26999');
-    Datastore['setupDataModels']();
-  })
+  beforeAll(Utils.initDatabase)
 
   describe('HealthCheckModel', () => {
     it('should be able to create and fetch entries', async () => {
@@ -23,16 +20,16 @@ describe('Datastore', () => {
   describe('GenerationRequestModel', () => {
     it('should be able to create and fetch entries', async () => {
       const model = new Datastore.GenerationRequestModel();
-      model.name = 'name';
+      model.datasetName = 'name';
       const fileInfo1 = {name: 'name2', path: 'path', start: 0, end: 0 , size: 1024}
       const fileInfo2 = {name: 'name1', path: 'path', start: 0, end: 0 , size: 1024}
       const fileInfo3 = {name: 'name3', path: 'path', start: 0, end: 0 , size: 1024}
       model.fileList = [fileInfo1, fileInfo2, fileInfo3];
       await model.save();
 
-      const found = await Datastore.GenerationRequestModel.findOne({ name: model.name });
+      const found = await Datastore.GenerationRequestModel.findOne({ name: model.datasetName });
       expect(found).not.toBeNull();
-      expect(found!.name).toEqual(model.name);
+      expect(found!.datasetName).toEqual(model.datasetName);
       expect(found!.fileList.length).toEqual(3);
       // Make sure the order is preserved
       expect(found!.fileList[0]).toEqual(jasmine.objectContaining(fileInfo1));

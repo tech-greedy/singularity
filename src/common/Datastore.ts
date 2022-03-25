@@ -130,7 +130,8 @@ export default class Datastore {
       end: Schema.Types.Number
     });
     const generationRequestSchema = new Schema<GenerationRequest>({
-      name: Schema.Types.String,
+      datasetId: Schema.Types.String,
+      datasetName: Schema.Types.String,
       path: Schema.Types.String,
       index: Schema.Types.Number,
       fileList: [fileInfoSchema],
