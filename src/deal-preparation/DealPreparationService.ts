@@ -3,7 +3,6 @@ import config from 'config';
 import express, { Express, Request, Response } from 'express';
 import { constants } from 'fs';
 import fs from 'fs/promises';
-import { MongoServerError } from 'mongodb';
 import xbytes from 'xbytes';
 import BaseService from '../common/BaseService';
 import Datastore from '../common/Datastore';
@@ -21,7 +20,7 @@ export default class DealPreparationService extends BaseService {
   public constructor () {
     super(Category.DealPreparationService);
     this.handleCreatePreparationRequest = this.handleCreatePreparationRequest.bind(this);
-    this.handleUpdatePrepararationRequest = this.handleUpdatePrepararationRequest.bind(this);
+    this.handleUpdatePreparationRequest = this.handleUpdatePreparationRequest.bind(this);
     this.handleListPreparationRequests = this.handleListPreparationRequests.bind(this);
     this.handleGetPreparationRequest = this.handleGetPreparationRequest.bind(this);
     this.handleGetGenerationRequest = this.handleGetGenerationRequest.bind(this);
@@ -37,7 +36,7 @@ export default class DealPreparationService extends BaseService {
       next();
     });
     this.app.post('/preparation', this.handleCreatePreparationRequest);
-    this.app.post('/preparation/:id', this.handleUpdatePrepararationRequest);
+    this.app.post('/preparation/:id', this.handleUpdatePreparationRequest);
     this.app.get('/preparations', this.handleListPreparationRequests);
     this.app.get('/preparation/:id', this.handleGetPreparationRequest);
     this.app.get('/generation/:id', this.handleGetGenerationRequest);
@@ -104,7 +103,7 @@ export default class DealPreparationService extends BaseService {
     }, {
       $group: {
         _id: '$datasetId',
-        count: {}
+        count: { $count: {} }
       }
     }]);
     const total = await aggregate({});
@@ -132,19 +131,23 @@ export default class DealPreparationService extends BaseService {
     response.end(JSON.stringify(result));
   }
 
-  private async handleUpdatePrepararationRequest (request: Request, response: Response) {
+  private async handleUpdatePreparationRequest (request: Request, response: Response) {
     const id = request.params['id'];
     const { status } = <UpdatePreparationRequest>request.body;
     this.logger.info(`Received request to change status of dataset "${id}" to "${status}".`);
+    if (!['active', 'paused'].includes(status)) {
+      this.sendError(response, ErrorCode.CHANGE_STATE_INVALID);
+      return;
+    }
     const found = await Datastore.ScanningRequestModel.findOne({ id });
     if (!found) {
       this.sendError(response, ErrorCode.DATASET_NOT_FOUND);
       return;
     }
-
     // Only allow making change to the request if the scanning has completed
     if (found.status !== 'completed') {
       this.sendError(response, ErrorCode.CANNOT_CHANGE_STATE_IF_SCANNING_NOT_COMPLETE);
+      return;
     }
 
     await Datastore.GenerationRequestModel.updateMany({
@@ -198,8 +201,8 @@ export default class DealPreparationService extends BaseService {
     scanningRequest.status = 'active';
     try {
       await scanningRequest.save();
-    } catch (e) {
-      if (e instanceof MongoServerError && e.code === 11000) {
+    } catch (e: any) {
+      if (e.name === 'MongoServerError' && e.code === 11000) {
         this.sendError(response, ErrorCode.DATASET_NAME_CONFLICT);
         return;
       }
