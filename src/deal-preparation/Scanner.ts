@@ -12,6 +12,9 @@ export default class Scanner {
       if (entry.directory) {
         continue;
       }
+      if (entry.err) {
+        throw entry.err;
+      }
       const newSize = currentSize + entry.stats!.size;
       if (newSize <= maxSize) {
         currentList.push({

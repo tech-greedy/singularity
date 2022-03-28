@@ -80,7 +80,7 @@ export default class Datastore {
       datasetName: Schema.Types.String,
       filePath: Schema.Types.String,
       rootCid: Schema.Types.String,
-      selector: Schema.Types.String
+      selector: [Schema.Types.Number]
     });
     Datastore.DatasetFileMappingModel = mongoose.model<DatasetFileMapping>('DatasetFileMapping', datasetFileMappingSchema);
   }
