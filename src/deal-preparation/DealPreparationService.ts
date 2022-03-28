@@ -45,9 +45,29 @@ export default class DealPreparationService extends BaseService {
   public start (): void {
     const bind = config.get<string>('orchestrator.bind');
     const port = config.get<number>('orchestrator.port');
+    this.startCleanupHealthCheck();
     this.app!.listen(port, bind, () => {
       this.logger.info(`Orchestrator started listening at http://${bind}:${port}`);
     });
+  }
+
+  private async startCleanupHealthCheck (): Promise<void> {
+    await this.cleanupHealthCheck();
+    setTimeout(this.startCleanupHealthCheck, 5000);
+  }
+
+  private async cleanupHealthCheck (): Promise<void> {
+    this.logger.info(`Cleaning up health check table`);
+    // Find all active workerId
+    const workerIds = (await Datastore.HealthCheckModel.find()).map(worker => worker.workerId);
+    let modified = (await Datastore.ScanningRequestModel.updateMany({ workerId: { $nin: workerIds } }, { workerId: null })).modifiedCount;
+    if (modified > 0) {
+      this.logger.info(`Reset ${modified} tasks from Scanning Request table`);
+    }
+    modified = (await Datastore.GenerationRequestModel.updateMany({ workerId: { $nin: workerIds } }, { workerId: null })).modifiedCount;
+    if (modified > 0) {
+      this.logger.info(`Reset ${modified} tasks from Generation Request table`);
+    }
   }
 
   private async handleGetGenerationRequest (request: Request, response: Response) {

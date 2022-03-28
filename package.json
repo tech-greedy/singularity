@@ -56,7 +56,7 @@
   },
   "dependencies": {
     "@rauschma/stringio": "^1.4.0",
-    "@techgreedy/generate-car": "^0.1.4",
+    "@techgreedy/generate-car": "^0.1.5",
     "body-parser": "^1.19.2",
     "config": "^3.3.7",
     "express": "^5.0.0-beta.1",

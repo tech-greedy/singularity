@@ -17,8 +17,8 @@ export default interface GenerationRequest {
   fileList: FileList
   workerId?: string,
   status: 'active' | 'paused' | 'completed' | 'error',
-  errorMessage: string,
-  dataCid: string,
-  pieceCid: string,
-  pieceSize: number
+  errorMessage?: string,
+  dataCid?: string,
+  pieceCid?: string,
+  pieceSize?: number
 }

@@ -42,18 +42,19 @@ export default class DealPreparationWorker extends BaseService {
   }
 
   private async scan (request: ScanningRequest): Promise<void> {
-    const fileLists = await Scanner.scan(request.path, request.minSize, request.maxSize);
-    const fileListsToInsert = fileLists.map((fileList, index) => {
-      const generationRequest = new Datastore.GenerationRequestModel();
-      generationRequest.status = 'completed';
-      generationRequest.datasetName = request.name;
-      generationRequest.path = request.path;
-      generationRequest.index = index;
-      generationRequest.fileList = fileList;
-      return generationRequest;
-    });
-    await Datastore.GenerationRequestModel.collection.insertMany(fileListsToInsert);
-    this.logger.info('finished scanning');
+    let index = 0;
+    for await (const fileList of Scanner.scan(request.path, request.minSize, request.maxSize)) {
+      await Datastore.GenerationRequestModel.create({
+        datasetId: request.id,
+        datasetName: request.name,
+        path: request.path,
+        index,
+        fileList,
+        status: 'active'
+      });
+      index++;
+    }
+    this.logger.info(`Finished scanning. Inserted ${index} tasks.`);
   }
 
   private async generate (request: GenerationRequest): Promise<void> {
@@ -72,36 +73,63 @@ export default class DealPreparationWorker extends BaseService {
     this.logger.info('finished generation');
   }
 
-  private async startPollWork (): Promise<void> {
-    this.logger.info(`${this.workerId} - Polling for work`);
+  private async pollScanningWork (): Promise<boolean> {
     const newScanningWork = await Datastore.ScanningRequestModel.findOneAndUpdate({
       workerId: null,
-      completed: false
+      status: 'active'
     }, {
       workerId: this.workerId
     });
     if (newScanningWork) {
       this.logger.info(`${this.workerId} - Received a new request - dataset: ${newScanningWork.name}`);
       await this.scan(newScanningWork);
-      await Datastore.ScanningRequestModel.findByIdAndUpdate(newScanningWork.id, { completed: true });
+      await Datastore.ScanningRequestModel.findByIdAndUpdate(newScanningWork.id, { status: 'completed' });
     }
 
+    return newScanningWork != null;
+  }
+
+  private async pollGenerationWork (): Promise<boolean> {
     const newGenerationWork = await Datastore.GenerationRequestModel.findOneAndUpdate({
       workerId: null,
-      completed: false
+      status: 'active'
     }, {
       workerId: this.workerId
     });
     if (newGenerationWork) {
       this.logger.info(`${this.workerId} - Received a new request - dataset: ${newGenerationWork.datasetName} [${newGenerationWork.index}]`);
       await this.generate(newGenerationWork);
-      await Datastore.GenerationRequestModel.findByIdAndUpdate(newGenerationWork.id, { completed: true });
+      await Datastore.GenerationRequestModel.findByIdAndUpdate(newGenerationWork.id, { status: 'completed' });
     }
 
-    setTimeout(this.startPollWork, 5000);
+    return newGenerationWork != null;
+  }
+
+  private async startPollWork (): Promise<void> {
+    const hasDoneWork = await this.pollWork();
+    if (hasDoneWork) {
+      setTimeout(this.startPollWork, 1);
+    } else {
+      setTimeout(this.startPollWork, 5000);
+    }
+  }
+
+  private async pollWork (): Promise<boolean> {
+    this.logger.info(`${this.workerId} - Polling for work`);
+    let hasDoneWork = await this.pollScanningWork();
+    if (!hasDoneWork) {
+      hasDoneWork = await this.pollGenerationWork();
+    }
+
+    return hasDoneWork;
   }
 
   private async startHealthCheck (): Promise<void> {
+    await this.healthCheck();
+    setTimeout(this.startHealthCheck, 5000);
+  }
+
+  private async healthCheck (): Promise<void> {
     this.logger.info(`${this.workerId} - Sending HealthCheck`);
     await Datastore.HealthCheckModel.findOneAndUpdate(
       {
@@ -112,7 +140,5 @@ export default class DealPreparationWorker extends BaseService {
         upsert: true
       }
     );
-
-    setTimeout(this.startHealthCheck, 5000);
   }
 }

@@ -2,10 +2,10 @@ export interface GenerationRequestSummary {
   id: string,
   index: number,
   status: 'active' | 'paused' | 'completed' | 'error',
-  errorMessage: string,
-  dataCid: string,
-  pieceCid: string,
-  pieceSize: number
+  errorMessage?: string,
+  dataCid?: string,
+  pieceCid?: string,
+  pieceSize?: number
 }
 
 export default interface GetPreparationDetailsResponse {
@@ -15,6 +15,6 @@ export default interface GetPreparationDetailsResponse {
   minSize: number,
   maxSize: number,
   scanningStatus: 'active' | 'error' | 'completed',
-  errorMessage: string,
+  errorMessage?: string,
   generationRequests: GenerationRequestSummary[]
 }

@@ -5,7 +5,7 @@ export interface GetPreparationsResponseItem {
   minSize: number,
   maxSize: number,
   scanningStatus: 'active' | 'error' | 'completed',
-  errorMessage: string,
+  errorMessage?: string,
   generationCompleted: number,
   generationActive: number,
   generationPaused: number,
