@@ -4,13 +4,13 @@ deal_preparation_service = 'http://127.0.0.1:7001'
 
 [deal_preparation_service]
 enabled = true
-bind = "127.0.0.1"
+bind = "0.0.0.0"
 port = 7001
 
 [database]
 start_local = true
 local_path = "./.singularity/database"
-local_bind = "127.0.0.1"
+local_bind = "0.0.0.0"
 local_port = 37000
 
 [deal_preparation_worker]
@@ -19,5 +19,11 @@ out_dir = "./.singularity/cars"
 
 [index_service]
 enabled = true
-bind = "127.0.0.1"
+bind = "0.0.0.0"
 port = 7003
+
+[http_hosting_service]
+enabled = true
+bind = "0.0.0.0"
+port = 8088
+static_path = "./.singularity/cars"

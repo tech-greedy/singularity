@@ -9,6 +9,7 @@ import ScanningRequest from '../common/model/ScanningRequest';
 import Scanner from './Scanner';
 import config from 'config';
 import fs from 'fs';
+import path from 'path';
 
 interface IpldNode {
   Name: string,
@@ -33,7 +34,7 @@ export default class DealPreparationWorker extends BaseService {
     this.workerId = randomUUID();
     this.startHealthCheck = this.startHealthCheck.bind(this);
     this.startPollWork = this.startPollWork.bind(this);
-    this.outPath = config.get('deal_preparation_worker.out_dir');
+    this.outPath = path.resolve(config.get('deal_preparation_worker.out_dir'));
     fs.mkdirSync(this.outPath, { recursive: true });
   }
 
