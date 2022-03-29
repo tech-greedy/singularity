@@ -1,5 +1,6 @@
 [connection]
 database = "mongodb://127.0.0.1:37000"
+deal_preparation_service = 'http://127.0.0.1:7001'
 
 [deal_preparation_service]
 enabled = true
@@ -8,7 +9,7 @@ port = 7001
 
 [database]
 start_local = true
-local_path = "./.singularity/orchestrator/database"
+local_path = "./.singularity/database"
 local_bind = "127.0.0.1"
 local_port = 37000
 
