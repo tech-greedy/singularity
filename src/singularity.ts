@@ -8,6 +8,7 @@ import DealPreparationWorker from './deal-preparation/DealPreparationWorker';
 import axios from 'axios';
 import config from 'config';
 import path from 'path';
+import CidUtil from './cli-util';
 
 const version = packageJson.version;
 const program = new Command();
@@ -59,16 +60,41 @@ preparation.command('start')
       name: name,
       path: path.resolve(p),
       dealSize: dealSize
-    }).then(response => {
-      console.log(response.data);
-    }).catch(error => {
-      if (error instanceof Error) {
-        console.error(error.message);
-      } else {
-        console.error(error);
-      }
-      process.exit(1);
-    });
+    }).then(CidUtil.renderResponse).catch(CidUtil.renderErrorAndExit);
+  });
+
+preparation.command('status')
+  .argument('<id>', 'A unique id of the dataset')
+  .action((id) => {
+    const url: string = config.get('connection.deal_preparation_service');
+    axios.get(`${url}/preparation/${id}`).then(CidUtil.renderResponse).catch(CidUtil.renderErrorAndExit);
+  });
+
+preparation.command('list')
+  .action(() => {
+    const url: string = config.get('connection.deal_preparation_service');
+    axios.get(`${url}/preparations`).then(CidUtil.renderResponse).catch(CidUtil.renderErrorAndExit);
+  });
+
+preparation.command('generation-status')
+  .argument('<id>', 'A unique id of the generation request')
+  .action((id) => {
+    const url: string = config.get('connection.deal_preparation_service');
+    axios.get(`${url}/generation/${id}`).then(CidUtil.renderResponse).catch(CidUtil.renderErrorAndExit);
+  });
+
+preparation.command('pause')
+  .argument('<id>', 'A unique id of the dataset')
+  .action((id) => {
+    const url: string = config.get('connection.deal_preparation_service');
+    axios.post(`${url}/preparation/${id}`, { status: 'paused' }).then(CidUtil.renderResponse).catch(CidUtil.renderErrorAndExit);
+  });
+
+preparation.command('resume')
+  .argument('<id>', 'A unique id of the dataset')
+  .action((id) => {
+    const url: string = config.get('connection.deal_preparation_service');
+    axios.post(`${url}/preparation/${id}`, { status: 'active' }).then(CidUtil.renderResponse).catch(CidUtil.renderErrorAndExit);
   });
 
 program.parse();

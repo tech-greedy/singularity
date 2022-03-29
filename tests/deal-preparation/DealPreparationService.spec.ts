@@ -6,6 +6,7 @@ import Utils from '../Utils';
 
 describe('DealPreparationService', () => {
   let service: DealPreparationService;
+  const fakeId = '62429da5002efca9dd13d380';
   beforeAll(async () => {
     await Utils.initDatabase();
     service = new DealPreparationService();
@@ -46,10 +47,18 @@ describe('DealPreparationService', () => {
   describe('GET /generation/:id', () => {
     it('should return error if the id cannot be found', async () => {
       const response = await (supertest(service['app']))
-        .get('/generation/fakeid');
+        .get(`/generation/${fakeId}`);
       expect(response.status).toEqual(400);
       expect(response.body).toEqual({
         error: ErrorCode.DATASET_GENERATION_REQUEST_NOT_FOUND
+      });
+    })
+    it('should return error if the id is not valid', async () => {
+      const response = await (supertest(service['app']))
+        .get('/generation/fakeid');
+      expect(response.status).toEqual(400);
+      expect(response.body).toEqual({
+        error: ErrorCode.INVALID_OBJECT_ID
       });
     })
     it('should return file list of a specific generation request', async () => {
@@ -92,10 +101,18 @@ describe('DealPreparationService', () => {
   describe('GET /preparation/:id', () => {
     it('should return error if the id cannot be found', async () => {
       const response = await (supertest(service['app']))
-        .get('/preparation/fakeid');
+        .get(`/preparation/${fakeId}`);
       expect(response.status).toEqual(400);
       expect(response.body).toEqual({
         error: ErrorCode.DATASET_NOT_FOUND
+      });
+    })
+    it('should return error if the id cannot be found', async () => {
+      const response = await (supertest(service['app']))
+        .get('/preparation/fakeid');
+      expect(response.status).toEqual(400);
+      expect(response.body).toEqual({
+        error: ErrorCode.INVALID_OBJECT_ID
       });
     })
     it('should return all generation requests', async () => {
@@ -195,7 +212,7 @@ describe('DealPreparationService', () => {
   describe('POST /preparation/:id', () => {
     it('should return error if status is not valid', async () => {
       const response = await supertest(service['app'])
-        .post('/preparation/id')
+        .post(`/preparation/${fakeId}`)
         .send({ status: 'wrong_state' }).set('Accept', 'application/json');
       expect(response.status).toEqual(400);
       expect(response.body).toEqual({
@@ -204,7 +221,7 @@ describe('DealPreparationService', () => {
     });
     it('should return error if database does not exist', async () => {
       const response = await supertest(service['app'])
-        .post('/preparation/fakeid')
+        .post(`/preparation/${fakeId}`)
         .send({ status: 'active' }).set('Accept', 'application/json');
       expect(response.status).toEqual(400);
       expect(response.body).toEqual({
