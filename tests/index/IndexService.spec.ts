@@ -41,7 +41,7 @@ describe('IndexService', () => {
     it('should start the service', () => {
       const listen = spyOn(service['app'], 'listen');
       service.start();
-      expect<any>(listen).toHaveBeenCalledWith(7003, '127.0.0.1', jasmine.anything());
+      expect<any>(listen).toHaveBeenCalledWith(7003, '0.0.0.0', jasmine.anything());
     })
   })
   describe('POST /lookup', () => {

@@ -11,6 +11,7 @@ import HealthCheck from './model/HealthCheck';
 import ProviderMetric from './model/ProviderMetric';
 import ReplicationRequest from './model/ReplicationRequest';
 import ScanningRequest from './model/ScanningRequest';
+import path from 'path';
 
 export default class Datastore {
   private static logger = Logger.getLogger(Category.Database);
@@ -197,7 +198,7 @@ export default class Datastore {
 
   public static async init (): Promise<void> {
     if (config.has('database.start_local') && config.get('database.start_local')) {
-      await Datastore.setupLocalMongoDb(config.get('database.local_bind'), config.get('database.local_port'), config.get<string>('database.local_path'));
+      await Datastore.setupLocalMongoDb(config.get('database.local_bind'), config.get('database.local_port'), path.resolve(config.get<string>('database.local_path')));
     }
 
     if (config.has('connection.database')) {

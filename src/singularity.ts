@@ -10,6 +10,7 @@ import config from 'config';
 import path from 'path';
 import CidUtil from './cli-util';
 import IndexService from './index/IndexService';
+import HttpHostingService from './hosting/HttpHostingService';
 
 const version = packageJson.version;
 const program = new Command();
@@ -41,6 +42,9 @@ program.command('daemon')
       }
       if (config.get('index_service.enabled')) {
         new IndexService().start();
+      }
+      if (config.get('http_hosting_service.enabled')) {
+        new HttpHostingService().start();
       }
     })();
   });
