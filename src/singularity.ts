@@ -9,6 +9,7 @@ import axios from 'axios';
 import config from 'config';
 import path from 'path';
 import CidUtil from './cli-util';
+import IndexService from './index/IndexService';
 
 const version = packageJson.version;
 const program = new Command();
@@ -37,6 +38,9 @@ program.command('daemon')
       }
       if (config.get('deal_preparation_worker.enabled')) {
         new DealPreparationWorker().start();
+      }
+      if (config.get('index_service.enabled')) {
+        new IndexService().start();
       }
     })();
   });

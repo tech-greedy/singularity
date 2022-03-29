@@ -120,6 +120,7 @@ export default class DealPreparationWorker extends BaseService {
     await Datastore.DatasetFileMappingModel.create({
       datasetId: generationRequest.datasetId,
       datasetName: generationRequest.datasetName,
+      index: generationRequest.index,
       filePath: nameStack.join('/'),
       rootCid: dataCid,
       selector: selectorStack
