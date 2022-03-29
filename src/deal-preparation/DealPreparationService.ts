@@ -24,8 +24,9 @@ export default class DealPreparationService extends BaseService {
     this.handleListPreparationRequests = this.handleListPreparationRequests.bind(this);
     this.handleGetPreparationRequest = this.handleGetPreparationRequest.bind(this);
     this.handleGetGenerationRequest = this.handleGetGenerationRequest.bind(this);
+    this.startCleanupHealthCheck = this.startCleanupHealthCheck.bind(this);
     if (!this.enabled) {
-      this.logger.warn('Orchestrator is not enabled. Exit now...');
+      this.logger.warn('Deal Preparation Service is not enabled. Exit now...');
       return;
     }
     this.app.use(Logger.getExpressLogger(Category.DealPreparationService));
@@ -43,17 +44,12 @@ export default class DealPreparationService extends BaseService {
   }
 
   public start (): void {
-    const bind = config.get<string>('orchestrator.bind');
-    const port = config.get<number>('orchestrator.port');
+    const bind = config.get<string>('deal_preparation_service.bind');
+    const port = config.get<number>('deal_preparation_service.port');
     this.startCleanupHealthCheck();
     this.app!.listen(port, bind, () => {
-      this.logger.info(`Orchestrator started listening at http://${bind}:${port}`);
+      this.logger.info(`Deal Preparation Service started listening at http://${bind}:${port}`);
     });
-  }
-
-  private async startCleanupHealthCheck (): Promise<void> {
-    await this.cleanupHealthCheck();
-    setTimeout(this.startCleanupHealthCheck, 5000);
   }
 
   private async cleanupHealthCheck (): Promise<void> {
@@ -68,6 +64,11 @@ export default class DealPreparationService extends BaseService {
     if (modified > 0) {
       this.logger.info(`Reset ${modified} tasks from Generation Request table`);
     }
+  }
+
+  private async startCleanupHealthCheck (): Promise<void> {
+    await this.cleanupHealthCheck();
+    setTimeout(this.startCleanupHealthCheck, 5000);
   }
 
   private async handleGetGenerationRequest (request: Request, response: Response) {
