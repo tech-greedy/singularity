@@ -37,6 +37,13 @@ describe('IndexService', () => {
       selector: [2]
     });
   });
+  describe('start', () => {
+    it('should start the service', () => {
+      const listen = spyOn(service['app'], 'listen');
+      service.start();
+      expect<any>(listen).toHaveBeenCalledWith(7003, '127.0.0.1', jasmine.anything());
+    })
+  })
   describe('POST /lookup', () => {
     it('should throw error if no dataset is provided', async () => {
       const response = await (supertest(service['app']))
