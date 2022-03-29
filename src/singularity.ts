@@ -6,17 +6,25 @@ import Datastore from './common/Datastore';
 import DealPreparationService from './deal-preparation/DealPreparationService';
 import DealPreparationWorker from './deal-preparation/DealPreparationWorker';
 import axios from 'axios';
-import { NODE_CONFIG_DIR } from './env';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const config = require('config');
+import config from 'config';
+import path from 'path';
 
-console.log(`Using Singularity config directory ${config.util.getEnv('NODE_CONFIG_DIR')}`);
-console.log(`Was set to ${NODE_CONFIG_DIR}`);
 const version = packageJson.version;
 const program = new Command();
 program.name('singularity')
   .version(version)
   .description('A tool for large-scale clients with PB-scale data onboarding to Filecoin network');
+
+program.command('init')
+  .description('Initialize the configuration directory')
+  .action(() => {
+    const configDir = config.util.getEnv('NODE_CONFIG_DIR');
+    fs.mkdirSync(configDir, { recursive: true });
+    if (!fs.existsSync(path.join(configDir, 'default.toml'))) {
+      console.info(`Initializing at ${configDir} ...`);
+      fs.copyFileSync(path.join(__dirname, '../config/default.toml'), path.join(configDir, 'default.toml'));
+    }
+  });
 
 program.command('daemon')
   .description('Start a daemon process for deal preparation and deal making')
@@ -40,8 +48,8 @@ preparation.command('start')
   .argument('<name>', 'A unique name of the dataset')
   .argument('<path>', 'Directory path to the dataset')
   .option('-s, --deal-size <deal_size>', 'Target deal size, i.e. 16GiB', '32 GiB')
-  .action((name, path, options) => {
-    if (!fs.existsSync(path)) {
+  .action((name, p, options) => {
+    if (!fs.existsSync(p)) {
       console.error(`Dataset path "${path}" does not exist.`);
       process.exit(1);
     }
@@ -49,12 +57,16 @@ preparation.command('start')
     const url: string = config.get('connection.deal_preparation_service');
     axios.post(`${url}/preparation`, {
       name: name,
-      path: path,
+      path: path.resolve(p),
       dealSize: dealSize
-    }).then(_response => {
-      console.log('response');
-    }).catch(_error => {
-      console.error('error');
+    }).then(response => {
+      console.log(response.data);
+    }).catch(error => {
+      if (error instanceof Error) {
+        console.error(error.message);
+      } else {
+        console.error(error);
+      }
       process.exit(1);
     });
   });

@@ -9,7 +9,7 @@ port = 7001
 
 [database]
 start_local = true
-local_path = "./.singularity/orchestrator/database"
+local_path = "./.singularity/database"
 local_bind = "127.0.0.1"
 local_port = 37000
 
