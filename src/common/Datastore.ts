@@ -78,9 +78,18 @@ export default class Datastore {
     const datasetFileMappingSchema = new Schema<DatasetFileMapping>({
       datasetId: Schema.Types.String,
       datasetName: Schema.Types.String,
+      index: Schema.Types.Number,
       filePath: Schema.Types.String,
       rootCid: Schema.Types.String,
       selector: [Schema.Types.Number]
+    });
+    datasetFileMappingSchema.index({
+      datasetId: 1,
+      filePath: 1
+    });
+    datasetFileMappingSchema.index({
+      datasetName: 1,
+      filePath: 1
     });
     Datastore.DatasetFileMappingModel = mongoose.model<DatasetFileMapping>('DatasetFileMapping', datasetFileMappingSchema);
   }
@@ -186,7 +195,7 @@ export default class Datastore {
     Datastore.HealthCheckModel = mongoose.model<HealthCheck>('HealthCheck', healthCheckSchema);
   }
 
-  public static async init () : Promise<void> {
+  public static async init (): Promise<void> {
     if (config.has('database.start_local') && config.get('database.start_local')) {
       await Datastore.setupLocalMongoDb(config.get('database.local_bind'), config.get('database.local_port'), config.get<string>('database.local_path'));
     }

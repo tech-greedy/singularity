@@ -246,20 +246,24 @@ describe('DealPreparationService', () => {
         name: 'name',
         status: 'completed'
       });
-      await Datastore.GenerationRequestModel.create({
+      const r1 = await Datastore.GenerationRequestModel.create({
         datasetId: scanning.id,
         status: 'active'
+      });
+      const r2 = await Datastore.GenerationRequestModel.create({
+        datasetId: scanning.id,
+        status: 'completed'
       });
       const response = await supertest(service['app'])
         .post('/preparation/' + scanning.id)
         .send({ status: 'paused' }).set('Accept', 'application/json');
       expect(response.status).toEqual(200);
-      const generations = await Datastore.GenerationRequestModel.find({
-        datasetId: scanning.id
-      });
-      generations.forEach((generation) => {
-        expect(generation.status).toEqual('paused');
-      });
+      expect(await Datastore.GenerationRequestModel.findById(r1.id)).toEqual(jasmine.objectContaining({
+        status: 'paused'
+      }));
+      expect(await Datastore.GenerationRequestModel.findById(r2.id)).toEqual(jasmine.objectContaining({
+        status: 'completed'
+      }));
     });
   });
   describe('POST /preparation', () => {

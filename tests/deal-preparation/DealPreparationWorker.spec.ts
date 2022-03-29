@@ -11,6 +11,7 @@ describe('DealPreparationWorker', () => {
   beforeEach(async () => {
     await Datastore.ScanningRequestModel.remove();
     await Datastore.GenerationRequestModel.remove();
+    await Datastore.DatasetFileMappingModel.remove();
   });
   describe('startPollWork', () => {
     it('should immediately start next job if Scan work finishes', async () => {
@@ -106,6 +107,34 @@ describe('DealPreparationWorker', () => {
         pieceCid: 'baga6ea4seaqaxateytw36jy72arp4lrxktajs3y5xs2fd7o2xe4cwbvk36b4mpy',
         pieceSize: 512
       }));
+      const indexes = await Datastore.DatasetFileMappingModel.find({
+        datasetId: 'id'
+      });
+      expect(indexes).toEqual([
+        jasmine.objectContaining({
+          datasetId: 'id',
+          datasetName: 'name',
+          index: 0,
+          filePath: '',
+          selector: []
+        }),
+        jasmine.objectContaining({
+          filePath: 'a',
+          selector: [0]
+        }),
+        jasmine.objectContaining({
+          filePath: 'a/1.txt',
+          selector: [0, 0]
+        }),
+        jasmine.objectContaining({
+          filePath: 'b',
+          selector: [1]
+        }),
+        jasmine.objectContaining({
+          filePath: 'b/2.txt',
+          selector: [1, 0]
+        }),
+      ]);
     })
     it('should insert the database with fileLists', async () => {
       const created = await Datastore.ScanningRequestModel.create({

@@ -16,3 +16,8 @@ local_port = 37000
 [deal_preparation_worker]
 enabled = true
 out_dir = "./.singularity/cars"
+
+[index_service]
+enabled = true
+bind = "127.0.0.1"
+port = 7003

@@ -185,10 +185,9 @@ export default class DealPreparationService extends BaseService {
     }
 
     await Datastore.GenerationRequestModel.updateMany({
-      $not: {
-        $or: [
-          { status: 'completed' },
-          { status: 'error' }
+      status: {
+        $nin: [
+          'completed', 'error'
         ]
       }
     }, {
