@@ -1,34 +1,36 @@
-import glob from 'fast-glob';
+import rrdir from 'rrdir';
 import path from 'path';
 import { FileList } from '../common/model/GenerationRequest';
 
 export default class Scanner {
-  public static async scan (root: string, minSize: number, maxSize: number): Promise<FileList[]> {
-    // Get all files
-    let entries = await glob(path.join(root, '**', '*'), {
-      onlyFiles: true,
-      stats: true
-    });
-    // By default it is unordered so sort by path name
-    entries = entries.sort((a, b) => a.path.localeCompare(b.path));
-    // Iterating through entries
-    const result: FileList[] = [];
+  public static async * scan (root: string, minSize: number, maxSize: number): AsyncGenerator<FileList> {
     let currentList: FileList = [];
     let currentSize = 0;
-    for (const entry of entries) {
+    for await (const entry of rrdir(root, {
+      stats: true, followSymlinks: true
+    })) {
+      if (entry.directory) {
+        continue;
+      }
+      if (entry.err) {
+        throw entry.err;
+      }
       const newSize = currentSize + entry.stats!.size;
-      if (newSize >= minSize && newSize <= maxSize) {
+      if (newSize <= maxSize) {
         currentList.push({
           size: entry.stats!.size,
           start: 0,
           end: 0,
           path: entry.path,
-          name: entry.name
+          name: path.basename(entry.path)
         });
-        result.push(currentList);
-        currentList = [];
-        currentSize = 0;
-      } else if (newSize > maxSize) {
+        currentSize = newSize;
+        if (newSize >= minSize) {
+          yield currentList;
+          currentList = [];
+          currentSize = 0;
+        }
+      } else {
         let remaining = entry.stats!.size;
         do {
           let splitSize = minSize - currentSize;
@@ -40,12 +42,12 @@ export default class Scanner {
             start: entry.stats!.size - remaining,
             end: entry.stats!.size - remaining + splitSize,
             path: entry.path,
-            name: entry.name
+            name: path.basename(entry.path)
           });
           currentSize += splitSize;
           remaining -= splitSize;
           if (currentSize >= minSize) {
-            result.push(currentList);
+            yield currentList;
             currentList = [];
             currentSize = 0;
           }
@@ -53,9 +55,7 @@ export default class Scanner {
       }
     }
     if (currentList.length > 0) {
-      result.push(currentList);
+      yield currentList;
     }
-
-    return result;
   }
 }

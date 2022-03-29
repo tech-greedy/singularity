@@ -1,7 +1,7 @@
 import config from 'config';
 import Datastore from './common/Datastore';
 import DealPreparationService from './deal-preparation/DealPreparationService';
-import DealPreparationWorker from './worker/DealPreparationWorker';
+import DealPreparationWorker from './deal-preparation/DealPreparationWorker';
 
 async function start () {
   await Datastore.init();

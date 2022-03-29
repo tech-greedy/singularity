@@ -80,7 +80,7 @@ export default class Datastore {
       datasetName: Schema.Types.String,
       filePath: Schema.Types.String,
       rootCid: Schema.Types.String,
-      selector: Schema.Types.String
+      selector: [Schema.Types.Number]
     });
     Datastore.DatasetFileMappingModel = mongoose.model<DatasetFileMapping>('DatasetFileMapping', datasetFileMappingSchema);
   }
@@ -135,7 +135,10 @@ export default class Datastore {
       path: Schema.Types.String,
       index: Schema.Types.Number,
       fileList: [fileInfoSchema],
-      workerId: Schema.Types.String,
+      workerId: {
+        type: Schema.Types.String,
+        index: 1
+      },
       status: Schema.Types.String,
       errorMessage: Schema.Types.String,
       dataCid: Schema.Types.String,
@@ -154,7 +157,10 @@ export default class Datastore {
       path: Schema.Types.String,
       minSize: Schema.Types.Number,
       maxSize: Schema.Types.Number,
-      workerId: Schema.Types.String,
+      workerId: {
+        type: Schema.Types.String,
+        index: 1
+      },
       status: Schema.Types.String,
       errorMessage: Schema.Types.String
     });

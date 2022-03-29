@@ -3,5 +3,5 @@ export default interface DatasetFileMapping {
   datasetName: string,
   filePath: string,
   rootCid: string,
-  selector: string
+  selector: number[]
 }

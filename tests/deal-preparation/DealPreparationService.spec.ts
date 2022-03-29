@@ -14,6 +14,35 @@ describe('DealPreparationService', () => {
     await Datastore.ScanningRequestModel.remove();
     await Datastore.GenerationRequestModel.remove();
   });
+  describe('cleanupHealthCheck', () => {
+    it('should clean up scanningrequest and generationrequest table', async () => {
+      await Datastore.ScanningRequestModel.create({
+        workerId: 'a',
+        name: 'a',
+      })
+      await Datastore.ScanningRequestModel.create({
+        workerId: 'b',
+        name: 'b',
+      })
+      await Datastore.GenerationRequestModel.create({
+        workerId: 'c'
+      })
+      await Datastore.GenerationRequestModel.create({
+        workerId: 'd'
+      })
+      await Datastore.HealthCheckModel.create({
+        workerId: 'a'
+      })
+      await Datastore.HealthCheckModel.create({
+        workerId: 'c'
+      })
+      await service['cleanupHealthCheck']();
+      expect(await Datastore.ScanningRequestModel.findOne({ workerId: 'a' })).not.toBeNull();
+      expect(await Datastore.ScanningRequestModel.findOne({ workerId: 'b' })).toBeNull();
+      expect(await Datastore.GenerationRequestModel.findOne({ workerId: 'c' })).not.toBeNull();
+      expect(await Datastore.GenerationRequestModel.findOne({ workerId: 'd' })).toBeNull();
+    })
+  })
   describe('GET /generation/:id', () => {
     it('should return error if the id cannot be found', async () => {
       const response = await (supertest(service['app']))

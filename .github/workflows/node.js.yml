@@ -22,8 +22,9 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
+    - name: Install FFI dependencies
+      run: sudo apt-get update && sudo apt-get install -y libhwloc-dev ocl-icd-opencl-dev
     - run: npm ci
     - run: npm run build
     - run: npm run lint:nofix
     - run: npm run coverage
-    - run: npm test

@@ -14,5 +14,4 @@ local_port = 37000
 
 [deal_preparation_worker]
 enabled = true
-parallelism = 2
 out_dir = "./.singularity/cars"
