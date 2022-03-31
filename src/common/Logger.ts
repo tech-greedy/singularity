@@ -7,6 +7,7 @@ export enum Category {
   DealPreparationWorker = 'deal_preparation_worker',
   IndexService = 'index_service',
   HttpHostingService = 'http_hosting_service',
+  DealTrackingService = 'deal_tracking_service',
 }
 
 const container = new winston.Container();

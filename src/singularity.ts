@@ -8,7 +8,7 @@ import DealPreparationWorker from './deal-preparation/DealPreparationWorker';
 import axios from 'axios';
 import config from 'config';
 import path from 'path';
-import CidUtil from './cli-util';
+import CliUtil from './cli-util';
 import IndexService from './index/IndexService';
 import HttpHostingService from './hosting/HttpHostingService';
 
@@ -68,41 +68,41 @@ preparation.command('start')
       name: name,
       path: path.resolve(p),
       dealSize: dealSize
-    }).then(CidUtil.renderResponse).catch(CidUtil.renderErrorAndExit);
+    }).then(CliUtil.renderResponse).catch(CliUtil.renderErrorAndExit);
   });
 
 preparation.command('status')
   .argument('<id>', 'A unique id of the dataset')
   .action((id) => {
     const url: string = config.get('connection.deal_preparation_service');
-    axios.get(`${url}/preparation/${id}`).then(CidUtil.renderResponse).catch(CidUtil.renderErrorAndExit);
+    axios.get(`${url}/preparation/${id}`).then(CliUtil.renderResponse).catch(CliUtil.renderErrorAndExit);
   });
 
 preparation.command('list')
   .action(() => {
     const url: string = config.get('connection.deal_preparation_service');
-    axios.get(`${url}/preparations`).then(CidUtil.renderResponse).catch(CidUtil.renderErrorAndExit);
+    axios.get(`${url}/preparations`).then(CliUtil.renderResponse).catch(CliUtil.renderErrorAndExit);
   });
 
 preparation.command('generation-status')
   .argument('<id>', 'A unique id of the generation request')
   .action((id) => {
     const url: string = config.get('connection.deal_preparation_service');
-    axios.get(`${url}/generation/${id}`).then(CidUtil.renderResponse).catch(CidUtil.renderErrorAndExit);
+    axios.get(`${url}/generation/${id}`).then(CliUtil.renderResponse).catch(CliUtil.renderErrorAndExit);
   });
 
 preparation.command('pause')
   .argument('<id>', 'A unique id of the dataset')
   .action((id) => {
     const url: string = config.get('connection.deal_preparation_service');
-    axios.post(`${url}/preparation/${id}`, { status: 'paused' }).then(CidUtil.renderResponse).catch(CidUtil.renderErrorAndExit);
+    axios.post(`${url}/preparation/${id}`, { status: 'paused' }).then(CliUtil.renderResponse).catch(CliUtil.renderErrorAndExit);
   });
 
 preparation.command('resume')
   .argument('<id>', 'A unique id of the dataset')
   .action((id) => {
     const url: string = config.get('connection.deal_preparation_service');
-    axios.post(`${url}/preparation/${id}`, { status: 'active' }).then(CidUtil.renderResponse).catch(CidUtil.renderErrorAndExit);
+    axios.post(`${url}/preparation/${id}`, { status: 'active' }).then(CliUtil.renderResponse).catch(CliUtil.renderErrorAndExit);
   });
 
 program.parse();

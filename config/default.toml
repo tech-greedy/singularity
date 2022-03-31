@@ -27,3 +27,8 @@ enabled = true
 bind = "0.0.0.0"
 port = 8088
 static_path = "./.singularity/cars"
+
+[deal_tracking_service]
+enabled = true
+lotus_api = "https://api.node.glif.io/rpc/v0"
+lotus_token = ""

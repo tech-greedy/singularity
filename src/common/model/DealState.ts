@@ -1,13 +1,9 @@
 export default interface DealState {
-  datasetId: string,
+  id: string,
   client: string,
   provider: string,
-  proposalCid: string,
-  dataCid: string,
+  dataCid?: string,
   dealId: number,
-  sectorId: number,
-  activation: number,
-  expiration: number,
-  state: 'proposed' | 'failed' | 'published' | 'active' | 'slashed',
-  errorMessage: string
+  expiration?: number,
+  state: 'published' | 'active' | 'slashed'
 }

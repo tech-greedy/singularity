@@ -1,6 +1,6 @@
 import { AxiosResponse } from 'axios';
 
-export default class CidUtil {
+export default class CliUtil {
   public static renderErrorAndExit (error: any) {
     if (error instanceof Error) {
       console.error(error.message);
