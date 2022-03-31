@@ -121,7 +121,7 @@ export default class Datastore {
     const dealStateSchema = new Schema<DealState>({
       client: Schema.Types.String,
       provider: Schema.Types.String,
-      dataCid: Schema.Types.String,
+      pieceCid: Schema.Types.String,
       dealId: Schema.Types.Number,
       expiration: Schema.Types.Number,
       state: Schema.Types.String

@@ -106,15 +106,15 @@ export default class DealTrackingService extends BaseService {
       }
       const result = response.data.result;
       const expiration: number = result.Proposal.EndEpoch;
-      const dataCid: string = result.Proposal.Label;
       const slashed = result.State.SlashEpoch > 0;
+      const pieceCid = result.Proposal.PieceCID['/'];
       if (slashed) {
         await Datastore.DealStateModel.findByIdAndUpdate(dealState.id, {
-          dataCid, expiration, state: 'slashed'
+          pieceCid, expiration, state: 'slashed'
         });
       } else if (expiration > 0) {
         await Datastore.DealStateModel.findByIdAndUpdate(dealState.id, {
-          dataCid, expiration, state: 'active'
+          pieceCid, expiration, state: 'active'
         });
       }
     }
