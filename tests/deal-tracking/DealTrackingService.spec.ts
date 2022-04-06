@@ -13,13 +13,6 @@ describe('DealTrackingService', () => {
     await Datastore.DealStateModel.remove();
     await Datastore.DealTrackingStateModel.remove();
   })
-  describe('updateDealFromLotus', () => {
-    fit('should update all deal status - real network call', async () => {
-      Datastore.DealStateModel.create({
-        dealId:
-      });
-    })
-  })
   describe('insertDealFromFilfox', () => {
     xit('should download all deal ids for a client - real network call', async () => {
       await service['insertDealFromFilfox']('f3vfs6f7tagrcpnwv65wq3leznbajqyg77bmijrpvoyjv3zjyi3urq25vigfbs3ob6ug5xdihajumtgsxnz2pa', 0);
