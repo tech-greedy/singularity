@@ -114,6 +114,7 @@ export default class DealTrackingService extends BaseService {
         await Datastore.DealStateModel.findByIdAndUpdate(dealState.id, {
           state: 'slashed'
         });
+        return;
       }
       const result = response.data.result;
       const expiration: number = result.Proposal.EndEpoch;
