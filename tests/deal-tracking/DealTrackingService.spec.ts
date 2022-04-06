@@ -3,7 +3,7 @@ import DealTrackingService from '../../src/deal-tracking/DealTrackingService';
 import Datastore from '../../src/common/Datastore';
 import axios from 'axios';
 
-fdescribe('DealTrackingService', () => {
+describe('DealTrackingService', () => {
   let service: DealTrackingService;
   beforeAll(async () => {
     await Utils.initDatabase();
