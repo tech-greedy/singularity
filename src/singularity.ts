@@ -11,6 +11,7 @@ import path from 'path';
 import CliUtil from './cli-util';
 import IndexService from './index/IndexService';
 import HttpHostingService from './hosting/HttpHostingService';
+import DealTrackingService from './deal-tracking/DealTrackingService';
 
 const version = packageJson.version;
 const program = new Command();
@@ -45,6 +46,9 @@ program.command('daemon')
       }
       if (config.get('http_hosting_service.enabled')) {
         new HttpHostingService().start();
+      }
+      if (config.get('deal_tracking_service.enabled')) {
+        new DealTrackingService().start();
       }
     })();
   });

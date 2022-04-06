@@ -72,7 +72,7 @@ export default class Datastore {
     const dealTrackingStateSchema = new Schema<DealTrackingState>({
       stateType: Schema.Types.String,
       stateKey: Schema.Types.String,
-      stateValue: Schema.Types.Number
+      stateValue: Schema.Types.Mixed
     });
     Datastore.DealTrackingStateModel = mongoose.model<DealTrackingState>('DealTrackingState', dealTrackingStateSchema);
   }

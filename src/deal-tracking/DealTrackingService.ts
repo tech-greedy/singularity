@@ -8,6 +8,7 @@ import retry from 'async-retry';
 export default class DealTrackingService extends BaseService {
   public constructor () {
     super(Category.DealTrackingService);
+    this.startDealTracking = this.startDealTracking.bind(this);
   }
 
   public start (): void {
@@ -24,12 +25,12 @@ export default class DealTrackingService extends BaseService {
   }
 
   private async dealTracking (): Promise<void> {
-    const clientStates = await Datastore.DealTrackingStateModel.find({ stateType: 'client' });
+    const clientStates = await Datastore.DealTrackingStateModel.find({ stateType: 'client', stateValue: 'track' });
     for (const clientState of clientStates) {
       const client = clientState.stateKey;
-      const lastDeal = Number(clientState.stateValue);
+      const lastDeal = await Datastore.DealStateModel.find({ client }).sort({ dealId: -1 }).limit(1);
       try {
-        await this.insertDealFromFilfox(client, lastDeal);
+        await this.insertDealFromFilfox(client, lastDeal.length > 0 ? lastDeal[0].dealId : 0);
       } catch (error) {
         this.logger.error('Encountered an error when importing deals from filfox');
         this.logger.error(error);
@@ -50,13 +51,23 @@ export default class DealTrackingService extends BaseService {
       let breakOuter = false;
       // Exponential retry as filfox can throttle us
       response = await retry(
-        async (_bail) => {
-          return await axios.get(`https://filfox.info/api/v1/deal/list?address=${client}&pagesize=100&page=${page}`);
+        async () => {
+          const url = `https://filfox.info/api/v1/deal/list?address=${client}&pageSize=100&page=${page}`;
+          this.logger.info(`Fetching from ${url}`);
+          let r;
+          try {
+            r = await axios.get(url);
+          } catch (e) {
+            this.logger.warn(e);
+            throw e;
+          }
+          return r;
         }, {
           retries: 3,
           minTimeout: 60_000
         }
       );
+      this.logger.info(`Received ${response.data['deals'].length} deal entries.`);
       for (const deal of response.data['deals']) {
         if (deal['id'] <= lastDeal) {
           breakOuter = true;
