@@ -5,7 +5,7 @@ import mongoose, { Schema } from 'mongoose';
 import Logger, { Category } from './Logger';
 import DatasetFileMapping from './model/DatasetFileMapping';
 import DealState from './model/DealState';
-import DealTrackingLastState from './model/DealTrackingLastState';
+import DealTrackingState from './model/DealTrackingState';
 import GenerationRequest, { FileInfo } from './model/GenerationRequest';
 import HealthCheck from './model/HealthCheck';
 import ProviderMetric from './model/ProviderMetric';
@@ -31,7 +31,7 @@ export default class Datastore {
   // eslint-disable-next-line @typescript-eslint/ban-types
   public static DatasetFileMappingModel: mongoose.Model<DatasetFileMapping, {}, {}, {}>;
   // eslint-disable-next-line @typescript-eslint/ban-types
-  public static DealTrackingLastStateModel: mongoose.Model<DealTrackingLastState, {}, {}, {}>;
+  public static DealTrackingStateModel: mongoose.Model<DealTrackingState, {}, {}, {}>;
 
   private static DB_NAME = 'singularity';
 
@@ -65,14 +65,16 @@ export default class Datastore {
     this.setupReplicationRequestSchema();
     this.setupProviderMetricSchema();
     this.setupDatasetFileMappingSchema();
-    this.setupDealTrackingLastState();
+    this.setupDealTrackingState();
   }
 
-  private static setupDealTrackingLastState () {
-    const dealTrackingLastStateSchema = new Schema<DealTrackingLastState>({
-      lastProcessed: Schema.Types.Number
+  private static setupDealTrackingState () {
+    const dealTrackingStateSchema = new Schema<DealTrackingState>({
+      stateType: Schema.Types.String,
+      stateKey: Schema.Types.String,
+      stateValue: Schema.Types.Mixed
     });
-    Datastore.DealTrackingLastStateModel = mongoose.model<DealTrackingLastState>('DealTrackingLastState', dealTrackingLastStateSchema);
+    Datastore.DealTrackingStateModel = mongoose.model<DealTrackingState>('DealTrackingState', dealTrackingStateSchema);
   }
 
   private static setupDatasetFileMappingSchema () {
@@ -117,17 +119,14 @@ export default class Datastore {
 
   private static setupDealStateSchema () {
     const dealStateSchema = new Schema<DealState>({
-      datasetId: Schema.Types.String,
       client: Schema.Types.String,
       provider: Schema.Types.String,
-      proposalCid: Schema.Types.String,
-      dataCid: Schema.Types.String,
+      pieceCid: Schema.Types.String,
       dealId: Schema.Types.Number,
-      sectorId: Schema.Types.Number,
-      activation: Schema.Types.Number,
-      state: Schema.Types.String,
-      errorMessage: Schema.Types.String
+      expiration: Schema.Types.Number,
+      state: Schema.Types.String
     });
+    // TODO create index if needed
     Datastore.DealStateModel = mongoose.model<DealState>('DealState', dealStateSchema);
   }
 
