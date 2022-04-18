@@ -31,19 +31,97 @@ export default class DealTrackingService extends BaseService {
       const client = clientState.stateKey;
       const lastDeal = await Datastore.DealStateModel.find({ client }).sort({ dealId: -1 }).limit(1);
       try {
-        await this.insertDealFromFilfox(client, lastDeal.length > 0 ? lastDeal[0].dealId : 0);
+        await this.updateDealFromFilscan(client, lastDeal.length > 0 ? lastDeal[0].dealId : 0);
       } catch (error) {
-        this.logger.error('Encountered an error when importing deals from filfox', { error });
+        this.logger.error('Encountered an error when importing deals from filescan', error);
       }
       try {
         await this.updateDealFromLotus(client);
       } catch (error) {
-        this.logger.error('Encountered an error when updating deals from lotus', { error });
+        this.logger.error('Encountered an error when updating deals from lotus', error);
       }
     }
   }
 
-  private async insertDealFromFilfox (client: string, lastDeal: number): Promise<void> {
+  /**
+   * Read from filscan api for PublishStorageDeal status
+   *
+   * @param client
+   * @param lastDeal
+   */
+  private async updateDealFromFilscan (client: string, lastDeal: number): Promise<void> {
+    this.logger.debug('updating deals from filscan', { client, lastDeal });
+    let page = 0;
+    let response;
+    do {
+      let breakOuter = false;
+      // Exponential retry as filscan can throttle us
+      response = await retry(
+        async () => {
+          let url = 'https://api.filscan.io:8700/rpc/v1';
+          if (client.startsWith('t')) {
+            url = 'https://calibration.filscan.io:8700/rpc/v1';
+          }
+          this.logger.debug(`Fetching from ${url}`);
+          let r;
+          try {
+            r = axios.post(url, {
+              id: 1,
+              jsonrpc: '2.0',
+              params: [client, page, 25],
+              method: 'filscan.GetMarketDeal'
+            }, {
+              headers: {
+                'content-type': 'application/json'
+              }
+            });
+          } catch (e) {
+            this.logger.warn(e);
+            throw e;
+          }
+          return r;
+        }, {
+          retries: 3,
+          minTimeout: 60_000
+        }
+      );
+      if (Array.isArray(response.data['result']['deals'])) {
+        const jsonResult = response.data['result'];
+        this.logger.debug(`Received ${jsonResult['deals'].length} out of ${jsonResult['total']} deal entries.`);
+        for (const deal of jsonResult['deals']) {
+          if (deal['dealid'] <= lastDeal || jsonResult['deals'].length < 25) {
+            breakOuter = true;
+            break;
+          }
+          await Datastore.DealStateModel.updateOne({
+            pieceCid: deal['piece_cid'],
+            provider: deal['provider'],
+            client: deal['client'],
+            state: 'proposed'
+          }, {
+            $set: {
+              dealId: deal['dealid'],
+              state: 'published'
+            }
+          });
+        }
+        if (breakOuter) {
+          break;
+        }
+      } else {
+        this.logger.debug('No result from filscan');
+        break;
+      }
+      page += 1;
+    } while (response.data['result']['deals'].length > 0);
+  }
+
+  /**
+   * @param client
+   * @param lastDeal
+   */
+  /* Temporarily disabled in favor of filscan for more information
+  private async insertDealFromFilfox(client: string, lastDeal: number): Promise<void> {
     this.logger.debug('Inserting new deals from filfox', { client, lastDeal });
     let page = 0;
     let response;
@@ -63,9 +141,9 @@ export default class DealTrackingService extends BaseService {
           }
           return r;
         }, {
-          retries: 3,
-          minTimeout: 60_000
-        }
+        retries: 3,
+        minTimeout: 60_000
+      }
       );
       this.logger.debug(`Received ${response.data['deals'].length} deal entries.`);
       for (const deal of response.data['deals']) {
@@ -92,6 +170,7 @@ export default class DealTrackingService extends BaseService {
       page += 1;
     } while (response.data['deals'].length > 0);
   }
+  */
 
   private async updateDealFromLotus (client: string): Promise<void> {
     this.logger.debug('Start update deal state from lotus.', { client });
@@ -101,7 +180,7 @@ export default class DealTrackingService extends BaseService {
       client,
       state: 'published'
     })) {
-      const headers :AxiosRequestHeaders = {};
+      const headers: AxiosRequestHeaders = {};
       if (token !== '') {
         headers['Authorization'] = `Bearer ${token}`;
       }

@@ -10,6 +10,7 @@ import Scanner from './Scanner';
 import config from 'config';
 import fs from 'fs-extra';
 import path from 'path';
+import { performance } from 'perf_hooks';
 
 interface IpldNode {
   Name: string,
@@ -136,7 +137,9 @@ export default class DealPreparationWorker extends BaseService {
     if (newGenerationWork) {
       this.logger.info(`${this.workerId} - Polled a new generation request.`,
         { id: newGenerationWork.id, datasetName: newGenerationWork.datasetName, index: newGenerationWork.index });
+      let timeSpentInMs = performance.now();
       const result = await this.generate(newGenerationWork);
+      timeSpentInMs = performance.now() - timeSpentInMs;
 
       // Parse the output and update the database
       const [stdout, stderr, statusCode] = result!;
@@ -157,7 +160,7 @@ export default class DealPreparationWorker extends BaseService {
         carSize: carFileStat.size
       });
       this.logger.info(`${this.workerId} - Finished Generation of dataset.`,
-        { id: newGenerationWork.id, datasetName: newGenerationWork.datasetName, index: newGenerationWork.index });
+        { id: newGenerationWork.id, datasetName: newGenerationWork.datasetName, index: newGenerationWork.index, timeSpentInMs: timeSpentInMs });
     }
 
     return newGenerationWork != null;
@@ -172,7 +175,7 @@ export default class DealPreparationWorker extends BaseService {
     try {
       hasDoneWork = await this.pollWork();
     } catch (error) {
-      this.logger.crit(this.workerId, { error });
+      this.logger.error(this.workerId, { error });
     }
     if (hasDoneWork) {
       setTimeout(this.startPollWork, this.ImmediatePollInterval);

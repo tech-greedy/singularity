@@ -1,3 +1,6 @@
+/**
+ * Each record represents one dataset (usually within one folder, can have subfolders.)
+ */
 export default interface ScanningRequest {
   id: string,
   name: string,

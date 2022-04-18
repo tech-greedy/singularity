@@ -38,11 +38,11 @@ describe('DealTrackingService', () => {
         dealId: 1000000,
         state: 'published'
       });
-      const insertSpy = spyOn<any>(service, 'insertDealFromFilfox').and.stub();
+      // const insertSpy = spyOn<any>(service, 'insertDealFromFilfox').and.stub();
       const updateSpy = spyOn<any>(service, 'updateDealFromLotus').and.stub();
       await service['dealTracking']();
-      expect(insertSpy).toHaveBeenCalledWith('client1', 1000000);
-      expect(insertSpy).toHaveBeenCalledWith('client2', 0);
+      // expect(insertSpy).toHaveBeenCalledWith('client1', 1000000);
+      // expect(insertSpy).toHaveBeenCalledWith('client2', 0);
       expect(updateSpy).toHaveBeenCalledWith('client1');
       expect(updateSpy).toHaveBeenCalledWith('client2');
     })
@@ -170,6 +170,7 @@ describe('DealTrackingService', () => {
       }))
     })
   })
+  /* Temporarily disabled in favor of filscan for more information
   describe('insertDealFromFilfox', () => {
     xit('should download all deal ids for a client - real network call', async () => {
       await service['insertDealFromFilfox']('f3vfs6f7tagrcpnwv65wq3leznbajqyg77bmijrpvoyjv3zjyi3urq25vigfbs3ob6ug5xdihajumtgsxnz2pa', 0);
@@ -275,4 +276,5 @@ describe('DealTrackingService', () => {
       expect(stored.length).toEqual(2);
     })
   })
+  */
 })

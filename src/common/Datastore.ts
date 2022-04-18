@@ -87,9 +87,16 @@ export default class Datastore {
     const replicationRequestSchema = new Schema<ReplicationRequest>({
       datasetId: Schema.Types.String,
       minReplicas: Schema.Types.Number,
-      client: Schema.Types.String,
       criteria: Schema.Types.String,
-      status: Schema.Types.String
+      client: Schema.Types.String,
+      urlPrefix: Schema.Types.String,
+      maxPrice: Schema.Types.Number,
+      maxNumberOfDeals: Schema.Types.Number,
+      isVerfied: Schema.Types.Boolean,
+      duration: Schema.Types.Number,
+      isOffline: Schema.Types.Boolean,
+      status: Schema.Types.String,
+      errorMessage: Schema.Types.String
     });
     Datastore.ReplicationRequestModel = mongoose.model<ReplicationRequest>('ReplicationRequest', replicationRequestSchema);
   }
@@ -98,10 +105,18 @@ export default class Datastore {
     const dealStateSchema = new Schema<DealState>({
       client: Schema.Types.String,
       provider: Schema.Types.String,
+      dealCid: Schema.Types.String,
+      dataCid: Schema.Types.String,
       pieceCid: Schema.Types.String,
-      dealId: Schema.Types.Number,
       expiration: Schema.Types.Number,
-      state: Schema.Types.String
+      duration: Schema.Types.Number,
+      price: Schema.Types.Number,
+      verified: Schema.Types.Boolean,
+      state: Schema.Types.String,
+      replicationRequestId: Schema.Types.String,
+      datasetId: Schema.Types.String,
+      dealId: Schema.Types.Number,
+      errorMessage: Schema.Types.String
     });
     // TODO create index if needed
     Datastore.DealStateModel = mongoose.model<DealState>('DealState', dealStateSchema);

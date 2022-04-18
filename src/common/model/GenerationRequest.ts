@@ -8,6 +8,9 @@ export interface FileInfo {
 
 export type FileList = FileInfo[];
 
+/**
+ * Each record represents one CAR file
+ */
 export default interface GenerationRequest {
   id: string,
   datasetId: string
