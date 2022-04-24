@@ -128,19 +128,6 @@ export default class DealPreparationService extends BaseService {
   private async handleListPreparationRequests (_request: Request, response: Response) {
     this.logger.info('Received request to list all preparation requests.');
     const scanningRequests = await Datastore.ScanningRequestModel.find();
-    const aggregate = async (match: { status?: string }) => Datastore.GenerationRequestModel.aggregate([{
-      $match: match
-    }, {
-      $group: {
-        _id: '$datasetId',
-        count: { $count: {} }
-      }
-    }]);
-    const total = await aggregate({});
-    const active = await aggregate({ status: 'active' });
-    const paused = await aggregate({ status: 'paused' });
-    const completed = await aggregate({ status: 'completed' });
-    const error = await aggregate({ status: 'error' });
     const result: GetPreparationsResponse = [];
     for (const r of scanningRequests) {
       result.push({
@@ -151,11 +138,11 @@ export default class DealPreparationService extends BaseService {
         maxSize: r.maxSize,
         scanningStatus: r.status,
         errorMessage: r.errorMessage,
-        generationTotal: <number> total[0].count,
-        generationActive: <number> active[0].count,
-        generationPaused: <number> paused[0].count,
-        generationCompleted: <number> completed[0].count,
-        generationError: <number> error[0].count
+        generationTotal: await Datastore.GenerationRequestModel.count({ datasetId: r.id }),
+        generationActive: await Datastore.GenerationRequestModel.count({ datasetId: r.id, status: 'active' }),
+        generationPaused: await Datastore.GenerationRequestModel.count({ datasetId: r.id, status: 'paused' }),
+        generationCompleted: await Datastore.GenerationRequestModel.count({ datasetId: r.id, status: 'completed' }),
+        generationError: await Datastore.GenerationRequestModel.count({ datasetId: r.id, status: 'error' })
       });
     }
     response.end(JSON.stringify(result));
