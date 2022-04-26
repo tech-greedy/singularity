@@ -1,6 +1,7 @@
 [connection]
 database = "mongodb://127.0.0.1:37000"
 deal_preparation_service = 'http://127.0.0.1:7001'
+index_service = 'http://127.0.0.1:7003'
 
 [deal_preparation_service]
 enabled = true
@@ -21,6 +22,8 @@ out_dir = "./.singularity/cars"
 enabled = true
 bind = "0.0.0.0"
 port = 7003
+ipfs_http = "http://localhost:5001"
+ipfs_grpc = "wss://localhost:4001"
 
 [http_hosting_service]
 enabled = true

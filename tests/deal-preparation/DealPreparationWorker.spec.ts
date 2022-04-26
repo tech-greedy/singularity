@@ -1,6 +1,8 @@
 import Utils from '../Utils';
 import Datastore from '../../src/common/Datastore';
 import DealPreparationWorker from '../../src/deal-preparation/DealPreparationWorker';
+import Scanner from '../../src/deal-preparation/Scanner';
+import { FileList } from '../../src/common/model/GenerationRequest';
 
 describe('DealPreparationWorker', () => {
   let worker: DealPreparationWorker;
@@ -11,7 +13,6 @@ describe('DealPreparationWorker', () => {
   beforeEach(async () => {
     await Datastore.ScanningRequestModel.remove();
     await Datastore.GenerationRequestModel.remove();
-    await Datastore.DatasetFileMappingModel.remove();
   });
   describe('startPollWork', () => {
     it('should immediately start next job if Scan work finishes', async () => {
@@ -76,7 +77,7 @@ describe('DealPreparationWorker', () => {
         errorMessage: jasmine.stringContaining('File does not exist')
       }));
     })
-    it('should generate commp, car files and create the index', async () => {
+    it('should generate commp, car files', async () => {
       const created = await Datastore.GenerationRequestModel.create({
         datasetId: 'id',
         datasetName: 'name',
@@ -107,34 +108,6 @@ describe('DealPreparationWorker', () => {
         pieceCid: 'baga6ea4seaqaxateytw36jy72arp4lrxktajs3y5xs2fd7o2xe4cwbvk36b4mpy',
         pieceSize: 512
       }));
-      const indexes = await Datastore.DatasetFileMappingModel.find({
-        datasetId: 'id'
-      });
-      expect(indexes).toEqual([
-        jasmine.objectContaining({
-          datasetId: 'id',
-          datasetName: 'name',
-          index: 0,
-          filePath: '',
-          selector: []
-        }),
-        jasmine.objectContaining({
-          filePath: 'a',
-          selector: [0]
-        }),
-        jasmine.objectContaining({
-          filePath: 'a/1.txt',
-          selector: [0, 0]
-        }),
-        jasmine.objectContaining({
-          filePath: 'b',
-          selector: [1]
-        }),
-        jasmine.objectContaining({
-          filePath: 'b/2.txt',
-          selector: [1, 0]
-        }),
-      ]);
     })
     it('should insert the database with fileLists', async () => {
       const created = await Datastore.ScanningRequestModel.create({
@@ -162,6 +135,19 @@ describe('DealPreparationWorker', () => {
         status: 'error',
         errorMessage: jasmine.stringContaining('ENOENT')
       }))
+    })
+  })
+  describe('buildSelector', () => {
+    it('should return correct selector', () => {
+      const fileList : FileList = ['base/path/a.txt', 'base/path/b/c/d.txt', 'base/path/c/d.txt', 'base/path/c/d2.txt', 'base/path/e.txt'].map((path) => ({
+        path, selector: [], start: 0, end: 0, size: 0, name: 'dummy'
+      }));
+      Scanner.buildSelector("base/path", fileList);
+      expect(fileList[0].selector).toEqual([0]);
+      expect(fileList[1].selector).toEqual([1,0,0]);
+      expect(fileList[2].selector).toEqual([2,0]);
+      expect(fileList[3].selector).toEqual([2,1]);
+      expect(fileList[4].selector).toEqual([3]);
     })
   })
   describe('scan', () => {
@@ -196,13 +182,15 @@ describe('DealPreparationWorker', () => {
           name: '1.txt',
           size: 3,
           start: 0,
-          end: 0
+          end: 0,
+          selector: [0, 0]
         }), jasmine.objectContaining({
           path: 'tests/test_folder/b/2.txt',
           name: '2.txt',
           size: 27,
           start: 0,
-          end: 9
+          end: 9,
+          selector: [1, 0]
         })],
         status: 'active',
       }));
@@ -216,7 +204,8 @@ describe('DealPreparationWorker', () => {
           name: '2.txt',
           size: 27,
           start: 9,
-          end: 21
+          end: 21,
+          selector: [0, 0]
         })],
         status: 'active',
       }));
@@ -230,13 +219,15 @@ describe('DealPreparationWorker', () => {
           name: '2.txt',
           size: 27,
           start: 21,
-          end: 27
+          end: 27,
+          selector: [0, 0]
         }), jasmine.objectContaining({
           path: 'tests/test_folder/c/3.txt',
           name: '3.txt',
           size: 9,
           start: 0,
-          end: 0
+          end: 0,
+          selector: [1, 0]
         })],
         status: 'active',
       }));
@@ -250,7 +241,8 @@ describe('DealPreparationWorker', () => {
           name: 'd.txt',
           size: 9,
           start: 0,
-          end: 0
+          end: 0,
+          selector: [0]
         })],
         status: 'active',
       }));

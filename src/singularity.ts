@@ -53,6 +53,14 @@ program.command('daemon')
     })();
   });
 
+const index = program.command('index').description('Manage the dataset indexing');
+index.command('create')
+  .argument('<id>', 'A unique id of the dataset')
+  .action((id) => {
+    const url: string = config.get('connection.index_service');
+    axios.get(`${url}/create/${id}`).then(CliUtil.renderResponse).catch(CliUtil.renderErrorAndExit);
+  });
+
 const preparation = program.command('preparation')
   .alias('prep')
   .description('Start preparation for a local dataset');

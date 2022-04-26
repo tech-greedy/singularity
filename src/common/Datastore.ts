@@ -3,7 +3,6 @@ import fs from 'fs';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 import mongoose, { Schema } from 'mongoose';
 import Logger, { Category } from './Logger';
-import DatasetFileMapping from './model/DatasetFileMapping';
 import DealState from './model/DealState';
 import DealTrackingState from './model/DealTrackingState';
 import GenerationRequest, { FileInfo } from './model/GenerationRequest';
@@ -28,8 +27,6 @@ export default class Datastore {
   public static ReplicationRequestModel: mongoose.Model<ReplicationRequest, {}, {}, {}>;
   // eslint-disable-next-line @typescript-eslint/ban-types
   public static ProviderMetricModel: mongoose.Model<ProviderMetric, {}, {}, {}>;
-  // eslint-disable-next-line @typescript-eslint/ban-types
-  public static DatasetFileMappingModel: mongoose.Model<DatasetFileMapping, {}, {}, {}>;
   // eslint-disable-next-line @typescript-eslint/ban-types
   public static DealTrackingStateModel: mongoose.Model<DealTrackingState, {}, {}, {}>;
 
@@ -64,7 +61,6 @@ export default class Datastore {
     this.setupDealStateSchema();
     this.setupReplicationRequestSchema();
     this.setupProviderMetricSchema();
-    this.setupDatasetFileMappingSchema();
     this.setupDealTrackingState();
   }
 
@@ -75,26 +71,6 @@ export default class Datastore {
       stateValue: Schema.Types.Mixed
     });
     Datastore.DealTrackingStateModel = mongoose.model<DealTrackingState>('DealTrackingState', dealTrackingStateSchema);
-  }
-
-  private static setupDatasetFileMappingSchema () {
-    const datasetFileMappingSchema = new Schema<DatasetFileMapping>({
-      datasetId: Schema.Types.String,
-      datasetName: Schema.Types.String,
-      index: Schema.Types.Number,
-      filePath: Schema.Types.String,
-      rootCid: Schema.Types.String,
-      selector: [Schema.Types.Number]
-    });
-    datasetFileMappingSchema.index({
-      datasetId: 1,
-      filePath: 1
-    });
-    datasetFileMappingSchema.index({
-      datasetName: 1,
-      filePath: 1
-    });
-    Datastore.DatasetFileMappingModel = mongoose.model<DatasetFileMapping>('DatasetFileMapping', datasetFileMappingSchema);
   }
 
   private static setupProviderMetricSchema () {
@@ -136,7 +112,8 @@ export default class Datastore {
       name: Schema.Types.String,
       size: Schema.Types.Number,
       start: Schema.Types.Number,
-      end: Schema.Types.Number
+      end: Schema.Types.Number,
+      selector: [Schema.Types.Number]
     });
     const generationRequestSchema = new Schema<GenerationRequest>({
       datasetId: Schema.Types.String,
