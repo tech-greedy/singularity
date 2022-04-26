@@ -226,6 +226,7 @@ export default class DealPreparationService extends BaseService {
         this.sendError(response, ErrorCode.DATASET_NAME_CONFLICT);
         return;
       }
+      throw e;
     }
 
     response.end(JSON.stringify({ id: scanningRequest.id }));

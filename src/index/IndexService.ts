@@ -3,16 +3,21 @@ import config from 'config';
 import express, { Express, Request, Response } from 'express';
 import BaseService from '../common/BaseService';
 import Logger, { Category } from '../common/Logger';
-import LookupRequest from './LookupRequest';
 import ErrorCode from './ErrorCode';
 import Datastore from '../common/Datastore';
+import { ObjectId } from 'mongodb';
+import { create } from 'ipfs-client';
+import { IPFS } from 'ipfs-core';
+import { DirNode, FileNode } from './FsDag';
+import path from 'path';
 
 export default class IndexService extends BaseService {
   private app: Express = express();
+  private ipfsClient! : IPFS;
 
   public constructor () {
     super(Category.IndexService);
-    this.handleLookupRequest = this.handleLookupRequest.bind(this);
+    this.createIndexRequest = this.createIndexRequest.bind(this);
     if (!this.enabled) {
       this.logger.warn('Index Service is not enabled. Exit now...');
       return;
@@ -20,45 +25,90 @@ export default class IndexService extends BaseService {
     this.app.use(Logger.getExpressLogger(Category.IndexService));
     this.app.use(bodyParser.urlencoded({ extended: false }));
     this.app.use(bodyParser.json());
-    this.app.post('/lookup', this.handleLookupRequest);
+    this.app.use(function (_req, res, next) {
+      res.setHeader('Content-Type', 'application/json');
+      next();
+    });
+    this.app.post('/create/:id', this.createIndexRequest);
+    this.ipfsClient = create({
+      grpc: config.get('index_service.ipfs_grpc'),
+      http: config.get('index_service.ipfs_http')
+    });
   }
 
-  private async handleLookupRequest (request: Request, response: Response): Promise<void> {
-    console.log(request.body);
-    const {
-      datasetName,
-      datasetId,
-      path
-    } = <LookupRequest>request.body;
-    this.logger.info(`Looking up files with datasetName: "${datasetName}", datasetId: "${datasetId}", path: "${path}"`);
-    if (datasetName === undefined && datasetId === undefined) {
-      response.setHeader('Content-Type', 'application/json');
-      this.sendError(response, ErrorCode.DATASET_EMPTY);
+  private async createIndexRequest (request: Request, response: Response): Promise<void> {
+    const id = request.params['id'];
+    if (!ObjectId.isValid(id)) {
+      this.sendError(response, ErrorCode.INVALID_OBJECT_ID);
       return;
     }
+    this.logger.info(`Creating index for dataset ${id}`);
+    const found = await Datastore.ScanningRequestModel.findById(id);
+    if (!found) {
+      this.sendError(response, ErrorCode.DATASET_NOT_FOUND);
+      return;
+    }
+    if (found.status !== 'completed') {
+      this.sendError(response, ErrorCode.SCANNING_INCOMPLETE);
+      return;
+    }
+    const unfinishedGenerations = await Datastore.GenerationRequestModel.count({ datasetId: id, status: { $ne: 'completed' } });
+    const root : DirNode = {
+      entries: new Map(),
+      name: '',
+      sources: new Map(),
+      type: 'dir'
+    };
+    for await (const generation of Datastore.GenerationRequestModel.find({ datasetId: id, status: 'completed' }).sort({ index: 1 })) {
+      const dataCid = generation.dataCid!;
+      const pieceCid = generation.pieceCid!;
+      for (const file of generation.fileList) {
+        let node = root;
+        const segments = path.relative(found.path, file.path).split(path.sep);
+        // Enter directories
+        for (let i = 0; i < segments.length - 1; ++i) {
+          node.sources.set(dataCid, {
+            dataCid, pieceCid, selector: file.selector.slice(0, i)
+          });
+          if (!node.entries.has(segments[i])) {
+            node.entries.set(segments[i], {
+              entries: new Map(),
+              name: segments[i],
+              sources: new Map(),
+              type: 'dir'
+            });
+          }
+          node = <DirNode>node.entries.get(segments[i]);
+        }
+        // Handle file node
+        const segment = segments[segments.length - 1];
+        node.sources.set(dataCid, {
+          dataCid, pieceCid, selector: file.selector.slice(0, file.selector.length - 1)
+        });
+        if (!node.entries.has(segment)) {
+          node.entries.set(segment, {
+            name: segment,
+            size: file.size,
+            sources: new Map(),
+            type: 'file'
+          });
+        }
+        (<FileNode>node.entries.get(segment)).sources.set(dataCid, {
+          dataCid, pieceCid, selector: file.selector, from: file.start, to: file.end
+        });
+      }
+    }
 
-    response.setHeader('Content-Type', 'application/x-ndjson');
-    const query: any = {};
-    if (datasetId) {
-      query.datasetId = datasetId;
+    const rootCid = await this.ipfsClient.dag.put(root, {
+      pin: true
+    });
+    const result: any = {
+      rootCid: rootCid.toString()
+    };
+    if (unfinishedGenerations > 0) {
+      result.warning = `There are still ${unfinishedGenerations} incomplete generation requests`;
     }
-    if (datasetName) {
-      query.datasetName = datasetName;
-    }
-    if (path) {
-      query.filePath = path;
-    }
-    const resultStream = Datastore.DatasetFileMappingModel.find(query);
-    for await (const entry of resultStream) {
-      response.write(JSON.stringify({
-        datasetId: entry.datasetId,
-        datasetName: entry.datasetName,
-        path: entry.filePath,
-        selector: entry.selector
-      }));
-      response.write('\n');
-    }
-    response.end();
+    response.end(JSON.stringify(result));
   }
 
   public start (): void {

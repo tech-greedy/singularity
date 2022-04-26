@@ -2,6 +2,7 @@ export interface FileInfo {
   path: string,
   name: string,
   size: number,
+  selector: number[],
   start: number,
   end: number,
 }

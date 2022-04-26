@@ -50,6 +50,7 @@ export default class DealPreparationWorker extends BaseService {
   private async scan (request: ScanningRequest): Promise<void> {
     let index = 0;
     for await (const fileList of Scanner.scan(request.path, request.minSize, request.maxSize)) {
+      Scanner.buildSelector(request.path, fileList);
       await Datastore.GenerationRequestModel.create({
         datasetId: request.id,
         datasetName: request.name,
@@ -116,28 +117,6 @@ export default class DealPreparationWorker extends BaseService {
     return newScanningWork != null;
   }
 
-  private async createIndex (generationRequest: GenerationRequest, dataCid: string, ipldNode: IpldNode,
-    nameStack: string[], selectorStack: number[]) : Promise<void> {
-    await Datastore.DatasetFileMappingModel.create({
-      datasetId: generationRequest.datasetId,
-      datasetName: generationRequest.datasetName,
-      index: generationRequest.index,
-      filePath: nameStack.join('/'),
-      rootCid: dataCid,
-      selector: selectorStack
-    });
-    if (ipldNode.Link == null) {
-      return;
-    }
-    for (const [index, node] of ipldNode.Link.entries()) {
-      selectorStack.push(index);
-      nameStack.push(node.Name);
-      await this.createIndex(generationRequest, dataCid, node, nameStack, selectorStack);
-      selectorStack.pop();
-      nameStack.pop();
-    }
-  }
-
   private async pollGenerationWork (): Promise<boolean> {
     const newGenerationWork = await Datastore.GenerationRequestModel.findOneAndUpdate({
       workerId: null,
@@ -165,9 +144,6 @@ export default class DealPreparationWorker extends BaseService {
         pieceCid: output.PieceCid
       });
       this.logger.info(`${this.workerId} - Finished Generation of dataset: ${newGenerationWork.datasetName} [${newGenerationWork.index}]`);
-
-      this.logger.info(`${this.workerId} - Creating index for: ${newGenerationWork.datasetName} [${newGenerationWork.index}]`);
-      await this.createIndex(newGenerationWork, output.DataCid, output.Ipld, [], []);
     }
 
     return newGenerationWork != null;
