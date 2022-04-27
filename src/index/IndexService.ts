@@ -7,7 +7,7 @@ import ErrorCode from './ErrorCode';
 import Datastore from '../common/Datastore';
 import { ObjectId } from 'mongodb';
 import { create } from 'ipfs-client';
-import { IPFS } from 'ipfs-core';
+import { CID, IPFS } from 'ipfs-core';
 import { DirNode, FileNode } from './FsDag';
 import path from 'path';
 
@@ -33,6 +33,17 @@ export default class IndexService extends BaseService {
     this.ipfsClient = create({
       grpc: config.get('index_service.ipfs_grpc'),
       http: config.get('index_service.ipfs_http')
+    });
+  }
+
+  private async pinIndex (dir: DirNode): Promise<CID> {
+    for (const [name, entry] of dir.entries.entries()) {
+      if ((<DirNode | FileNode>entry).type === 'dir') {
+        dir.entries.set(name, await this.pinIndex(<DirNode>entry));
+      }
+    }
+    return this.ipfsClient.dag.put(dir, {
+      pin: true
     });
   }
 
@@ -99,9 +110,8 @@ export default class IndexService extends BaseService {
       }
     }
 
-    const rootCid = await this.ipfsClient.dag.put(root, {
-      pin: true
-    });
+    // PIN to IPFS
+    const rootCid = await this.pinIndex(root);
     const result: any = {
       rootCid: rootCid.toString()
     };

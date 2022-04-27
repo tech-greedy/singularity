@@ -84,7 +84,8 @@
     "dist"
   ],
   "bin": {
-    "singularity": "dist/src/singularity.js"
+    "singularity": "dist/src/singularity.js",
+    "singularity-retrieve": "dist/src/singularity-retrieve.js"
   },
   "nyc": {
     "extends": "@istanbuljs/nyc-config-typescript",

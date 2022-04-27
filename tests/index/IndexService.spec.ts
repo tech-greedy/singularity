@@ -4,7 +4,7 @@ import Datastore from '../../src/common/Datastore';
 import supertest from 'supertest';
 import ErrorCode from '../../src/index/ErrorCode';
 import { CID } from 'ipfs-core';
-import * as IPFS from 'ipfs-core'
+import * as IPFS from 'ipfs-core';
 
 describe('IndexService', () => {
   let service: IndexService;
@@ -102,12 +102,118 @@ describe('IndexService', () => {
         .post(`/create/${scanningRequest.id}`)
         .set('Accept', 'application/json');
       expect(response.status).toEqual(200);
-      const expectCid = 'bafyreihjxxy4ujk7xqa5ict5abni2djdxt4mfmfnzs63dizzcydzwfokvu';
+      const expectCid = 'bafyreihah4flyu6ex4tsdkg3ngnz6dvnfjv6tzgex6nsxrme6uulbubwtm';
       expect(response.body).toEqual({
         rootCid: expectCid
       });
       const result = await service['ipfsClient'].dag.get(CID.parse(expectCid));
-      expect(result.value).toEqual({"entries":{"a":{"entries":{"b.mp4":{"name":"b.mp4","size":100,"sources":{"data1":{"dataCid":"data1","from":0,"pieceCid":"piece1","selector":[0,0],"to":100}},"type":"file"},"c.mp4":{"name":"c.mp4","size":100,"sources":{"data1":{"dataCid":"data1","from":0,"pieceCid":"piece1","selector":[0,1],"to":50},"data2":{"dataCid":"data2","from":50,"pieceCid":"piece2","selector":[0,0],"to":100}},"type":"file"}},"name":"a","sources":{"data1":{"dataCid":"data1","pieceCid":"piece1","selector":[0]},"data2":{"dataCid":"data2","pieceCid":"piece2","selector":[0]}},"type":"dir"},"d":{"entries":{"e.mp4":{"name":"e.mp4","size":100,"sources":{"data2":{"dataCid":"data2","from":0,"pieceCid":"piece2","selector":[1,0],"to":100}},"type":"file"}},"name":"d","sources":{"data2":{"dataCid":"data2","pieceCid":"piece2","selector":[1]}},"type":"dir"}},"name":"","sources":{"data1":{"dataCid":"data1","pieceCid":"piece1","selector":[]},"data2":{"dataCid":"data2","pieceCid":"piece2","selector":[]}},"type":"dir"});
+      const expectedCidA = CID.parse('bafyreigf573nwgfleglbyb3e43agibk3hxddnzhq4l3q2jsjbn2i6drkn4');
+      const expectedCidD = CID.parse('bafyreibbnaqs6y63rkmpwikrziqn5wldcxe2jx3s7u5bzg4mnjkvvymucm');
+      const expectedResult = {
+        name: '',
+        type: 'dir',
+        entries: {
+          a: expectedCidA,
+          d: expectedCidD
+        },
+        sources: {
+          data1: {
+            dataCid: 'data1',
+            pieceCid: 'piece1',
+            selector: []
+          },
+          data2: {
+            dataCid: 'data2',
+            pieceCid: 'piece2',
+            selector: []
+          }
+        }
+      };
+      expect(result.value).toEqual(expectedResult);
+      const resultA = await service['ipfsClient'].dag.get(expectedCidA);
+      const resultD = await service['ipfsClient'].dag.get(expectedCidD);
+      const expectedResultA = {
+        name: 'a',
+        type: 'dir',
+        entries: {
+          'b.mp4': {
+            name: 'b.mp4',
+            size: 100,
+            type: 'file',
+            sources: {
+              data1: {
+                to: 100,
+                from: 0,
+                dataCid: 'data1',
+                pieceCid: 'piece1',
+                selector: [0, 0]
+              }
+            }
+          },
+          'c.mp4': {
+            name: 'c.mp4',
+            size: 100,
+            type: 'file',
+            sources: {
+              data1: {
+                to: 50,
+                from: 0,
+                dataCid: 'data1',
+                pieceCid: 'piece1',
+                selector: [0, 1]
+              },
+              data2: {
+                to: 100,
+                from: 50,
+                dataCid: 'data2',
+                pieceCid: 'piece2',
+                selector: [0, 0]
+              }
+            }
+          }
+        },
+        sources: {
+          data1: {
+            dataCid: 'data1',
+            pieceCid: 'piece1',
+            selector: [0]
+          },
+          data2: {
+            dataCid: 'data2',
+            pieceCid: 'piece2',
+            selector: [0]
+          }
+        }
+      };
+      const expectedResultD = {
+        name: 'd',
+        type: 'dir',
+        entries: {
+          'e.mp4': {
+            name: 'e.mp4',
+            size: 100,
+            type: 'file',
+            sources: {
+              data2: {
+                to: 100,
+                from: 0,
+                dataCid: 'data2',
+                pieceCid: 'piece2',
+                selector: [1, 0]
+              }
+            }
+          }
+        },
+        sources: {
+          data2: {
+            dataCid: 'data2',
+            pieceCid: 'piece2',
+            selector: [1]
+          }
+        }
+      }
+      expect(resultA.value).toEqual(expectedResultA);
+      expect(resultD.value).toEqual(expectedResultD);
     })
   })
 })
