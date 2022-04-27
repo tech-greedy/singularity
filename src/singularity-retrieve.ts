@@ -8,7 +8,7 @@ const version = packageJson.version;
 const program = new Command();
 program.name('singularity-retrieve')
   .version(version)
-  .description('A tool for large-scale clients with PB-scale data onboarding to Filecoin network')
+  .description('A tool for large-scale clients with PB-scale data onboarding to Filecoin network');
 
 program.command('ls').description('List the files under a path')
   .argument('<path>', 'The path inside a dataset, i.e. singularity://ipns/dataset.io/path/to/folder')
