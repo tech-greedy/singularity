@@ -4,6 +4,7 @@ import { CID, IPFS } from 'ipfs-core';
 import * as pth from 'path';
 import { spawnSync } from 'child_process';
 import fs from 'fs';
+import rrdir from 'rrdir';
 
 export interface FileStat {
   type: 'file' | 'dir',
@@ -112,6 +113,7 @@ export default class Retrieval {
           console.error(retrieveResult.stderr);
           continue;
         }
+        console.log(`${provider} has the file ${source.dataCid}. Retrieval completed.`);
         success = true;
         break;
       }
@@ -121,7 +123,26 @@ export default class Retrieval {
         process.exit(1);
       }
 
-
+      for (const entry of rrdir.sync(tempDir, { stats: true })) {
+        const relative = pth.relative(tempDir, entry.path);
+        const target = pth.join(dest, relative);
+        if (entry.directory) {
+          console.log(`mkdir ${target}`);
+          fs.mkdirSync(target, { recursive: true });
+        } else {
+          if (!fs.existsSync(target)) {
+            console.log(`mv ${entry.path} to ${target}`);
+            fs.renameSync(entry.path, target);
+          } else {
+            console.log(`append ${entry.path} to ${target}`);
+            const r = fs.createReadStream(entry.path);
+            const w = fs.createWriteStream(target);
+            r.pipe(w);
+          }
+        }
+      }
+      fs.rmSync(tempDir, { recursive: true, force: true });
     }
+    console.log('Succeeded');
   }
 }
