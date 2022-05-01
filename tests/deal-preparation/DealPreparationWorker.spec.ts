@@ -3,8 +3,6 @@ import Datastore from '../../src/common/Datastore';
 import DealPreparationWorker from '../../src/deal-preparation/DealPreparationWorker';
 import Scanner from '../../src/deal-preparation/Scanner';
 import { FileList } from '../../src/common/model/GenerationRequest';
-import { spawn } from 'child_process';
-import { onExit, readableToString, streamEnd, streamWrite } from '@rauschma/stringio';
 
 describe('DealPreparationWorker', () => {
   let worker: DealPreparationWorker;
