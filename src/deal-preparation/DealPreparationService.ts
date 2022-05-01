@@ -54,7 +54,7 @@ export default class DealPreparationService extends BaseService {
   }
 
   private async cleanupHealthCheck (): Promise<void> {
-    this.logger.info(`Cleaning up health check table`);
+    this.logger.debug(`Cleaning up health check table`);
     // Find all active workerId
     const workerIds = (await Datastore.HealthCheckModel.find()).map(worker => worker.workerId);
     let modified = (await Datastore.ScanningRequestModel.updateMany({ workerId: { $nin: workerIds } }, { workerId: null })).modifiedCount;
