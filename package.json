@@ -6,7 +6,7 @@
   "types": "dist/source/start.d.ts",
   "scripts": {
     "build": "tsc && copyfiles \"config/**/*\" dist",
-    "start": "node dist/src/singularity.js",
+    "start": "node dist/src/singularity.js daemon",
     "test": "jasmine-ts --config=./tests/jasmine.json",
     "coverage": "nyc jasmine-ts --config=./tests/jasmine.json",
     "lint": "eslint --ext ts --fix src/",
@@ -57,7 +57,7 @@
   },
   "dependencies": {
     "@rauschma/stringio": "^1.4.0",
-    "@techgreedy/generate-car": "^0.1.6",
+    "@techgreedy/generate-car": "^1.0.0",
     "async-retry": "^1.3.3",
     "axios": "^0.26.1",
     "body-parser": "^1.19.2",

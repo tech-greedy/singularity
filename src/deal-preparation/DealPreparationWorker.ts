@@ -65,27 +65,24 @@ export default class DealPreparationWorker extends BaseService {
   }
 
   private async generate (request: GenerationRequest): Promise<[stdout: string, stderr: string, statusCode: number | null]> {
-    const input = JSON.stringify({
-      ParentPath: request.path,
-      OutPath: this.outPath,
-      Parallelism: 2,
-      FileList: request.fileList.map(file => ({
-        Path: file.path,
-        Name: file.name,
-        Size: file.size,
-        Start: file.start,
-        End: file.end
-      }))
-    });
-    const child = spawn('generate-car', {
+    const input = JSON.stringify(request.fileList.map(file => ({
+      Path: file.path,
+      Size: file.size,
+      Start: file.start,
+      End: file.end
+    })));
+    const child = spawn('generate-car', ['-o', this.outPath, '-p', request.path], {
       stdio: ['pipe', 'pipe', 'pipe']
     });
     (async () => {
       await streamWrite(child.stdin, input);
       await streamEnd(child.stdin);
     })();
-    const stderr = await readableToString(child.stderr);
     const stdout = await readableToString(child.stdout);
+    let stderr = '';
+    child.stderr.on('data', function (chunk) {
+      stderr += chunk;
+    });
     try {
       await onExit(child);
     } catch (_) {}
@@ -183,7 +180,7 @@ export default class DealPreparationWorker extends BaseService {
   }
 
   private async healthCheck (): Promise<void> {
-    this.logger.info(`${this.workerId} - Sending HealthCheck`);
+    this.logger.debug(`${this.workerId} - Sending HealthCheck`);
     await Datastore.HealthCheckModel.findOneAndUpdate(
       {
         workerId: this.workerId

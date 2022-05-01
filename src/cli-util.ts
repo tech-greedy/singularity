@@ -11,6 +11,6 @@ export default class CliUtil {
   }
 
   public static renderResponse (response: AxiosResponse) {
-    console.log(response.data);
+    console.table(response.data);
   }
 }

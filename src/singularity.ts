@@ -27,6 +27,8 @@ program.command('init')
     if (!fs.existsSync(path.join(configDir, 'default.toml'))) {
       console.info(`Initializing at ${configDir} ...`);
       fs.copyFileSync(path.join(__dirname, '../config/default.toml'), path.join(configDir, 'default.toml'));
+    } else {
+      console.warn(`${configDir} already has the repo.`);
     }
   });
 

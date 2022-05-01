@@ -74,7 +74,7 @@ describe('DealPreparationWorker', () => {
       const found = await Datastore.GenerationRequestModel.findById(created.id);
       expect<any>(found).toEqual(jasmine.objectContaining({
         status: 'error',
-        errorMessage: jasmine.stringContaining('File does not exist')
+        errorMessage: jasmine.stringContaining('no such file or directory')
       }));
     })
     it('should generate commp, car files', async () => {
@@ -104,8 +104,8 @@ describe('DealPreparationWorker', () => {
       const found = await Datastore.GenerationRequestModel.findById(created.id);
       expect(found).toEqual(jasmine.objectContaining({
         status: 'completed',
-        dataCid: 'bafybeia6uolpacfmy6tcf4oux7ewqyrqo5iwrxyvsaszgfoetmijn62eeu',
-        pieceCid: 'baga6ea4seaqaxateytw36jy72arp4lrxktajs3y5xs2fd7o2xe4cwbvk36b4mpy',
+        dataCid: 'bafybeih2nwd66s7rstnbj4grzjw7re4lyhmx3auvphibbz7nalo4ygfypq',
+        pieceCid: 'baga6ea4seaqoqixvkneyg6tzwfoqsmw33xdva3aywkawp6n5jd5tffjdmqrn6gy',
         pieceSize: 512
       }));
     })
