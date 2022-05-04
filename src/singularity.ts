@@ -45,7 +45,10 @@ program.command('daemon')
         new DealPreparationService().start();
       }
       if (config.get('deal_preparation_worker.enabled')) {
-        new DealPreparationWorker().start();
+        const numWorkers = config.has('deal_preparation_worker.num_workers') ? config.get<number>('deal_preparation_worker.num_workers') : 1;
+        for (let i = 0; i < numWorkers; ++i) {
+          new DealPreparationWorker().start();
+        }
       }
       if (config.get('index_service.enabled')) {
         new IndexService().start();
