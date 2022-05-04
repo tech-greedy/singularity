@@ -174,7 +174,7 @@ export default class Datastore {
 
   public static async init (): Promise<void> {
     if (config.has('database.start_local') && config.get('database.start_local')) {
-      await Datastore.setupLocalMongoDb(config.get('database.local_bind'), config.get('database.local_port'), path.resolve(config.get<string>('database.local_path')));
+      await Datastore.setupLocalMongoDb(config.get('database.local_bind'), config.get('database.local_port'), path.resolve(process.env.NODE_CONFIG_DIR!, config.get<string>('database.local_path')));
     }
 
     if (config.has('connection.database')) {

@@ -14,7 +14,7 @@ export default class HttpHostingService extends BaseService {
       return;
     }
     this.app.use(Logger.getExpressLogger(Category.HttpHostingService));
-    const staticPath = path.resolve(config.get<string>('http_hosting_service.static_path'));
+    const staticPath = path.resolve(process.env.NODE_CONFIG_DIR!, config.get<string>('http_hosting_service.static_path'));
     this.app.use(express.static(staticPath));
   }
 
