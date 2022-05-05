@@ -14,7 +14,7 @@ import path from 'path';
 
 export default class Datastore {
   private static logger = Logger.getLogger(Category.Database);
-  private static mongoMemoryServer : MongoMemoryServer;
+  protected static mongoMemoryServer : MongoMemoryServer;
 
   // eslint-disable-next-line @typescript-eslint/ban-types
   public static HealthCheckModel: mongoose.Model<HealthCheck, {}, {}, {}>;
@@ -47,10 +47,6 @@ export default class Datastore {
         storageEngine: path ? 'wiredTiger' : 'ephemeralForTest',
         auth: false
       }
-    });
-    process.on('SIGUSR2', async () => {
-      await Datastore.mongoMemoryServer.stop();
-      process.kill(process.pid, 'SIGKILL');
     });
   }
 

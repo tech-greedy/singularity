@@ -44,6 +44,17 @@ program.command('daemon')
   .description('Start a daemon process for deal preparation and deal making')
   .action((_options) => {
     (async function () {
+      let indexService: IndexService;
+      process.on('SIGUSR2', async () => {
+        if (Datastore['mongoMemoryServer']) {
+          await Datastore['mongoMemoryServer'].stop();
+        }
+        if (config.get('index_service.enabled') && config.get('index_service.start_ipfs') && indexService && indexService['ipfsClient']) {
+          await indexService['ipfsClient'].stop();
+        }
+
+        process.kill(process.pid, 'SIGKILL');
+      });
       await Datastore.init();
       if (config.get('deal_preparation_service.enabled')) {
         new DealPreparationService().start();
@@ -68,7 +79,9 @@ program.command('daemon')
         }
       }
       if (config.get('index_service.enabled')) {
-        new IndexService().start();
+        indexService = new IndexService();
+        await indexService.init();
+        indexService.start();
       }
       if (config.get('http_hosting_service.enabled')) {
         new HttpHostingService().start();
@@ -82,9 +95,21 @@ program.command('daemon')
 const index = program.command('index').description('Manage the dataset indexing');
 index.command('create')
   .argument('<id>', 'A unique id of the dataset')
-  .action((id) => {
+  .action(async (id) => {
     const url: string = config.get('connection.index_service');
-    axios.get(`${url}/create/${id}`).then(CliUtil.renderResponseOld).catch(CliUtil.renderErrorAndExit);
+    let response! : AxiosResponse;
+    try {
+      response = await axios.get(`${url}/create/${id}`);
+    } catch (error) {
+      CliUtil.renderErrorAndExit(error);
+    }
+
+    const cid: string = response.data.rootCid;
+    console.log('To publish the index to IPNS:');
+    console.log(`  ipfs name publish /ipfs/${cid}`);
+    console.log('To publish the index to DNSLink:');
+    console.log('  Add or update the TXT record for _dnslink.your_domain.net');
+    console.log(`  _dnslink.your_domain.net.  34  IN  TXT "dnslink=/ipfs/${cid}"`);
   });
 
 const preparation = program.command('preparation')

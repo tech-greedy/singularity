@@ -24,8 +24,9 @@ out_dir = "./cars"
 enabled = true
 bind = "0.0.0.0"
 port = 7003
-ipfs_http = "http://localhost:5001"
-ipfs_grpc = "wss://localhost:4001"
+start_ipfs = true
+ipfs_http = "http://localhost:5002"
+ipfs_grpc = "wss://localhost:5003"
 
 [http_hosting_service]
 enabled = true
