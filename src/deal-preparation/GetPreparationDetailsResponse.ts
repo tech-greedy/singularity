@@ -5,7 +5,8 @@ export interface GenerationRequestSummary {
   errorMessage?: string,
   dataCid?: string,
   pieceCid?: string,
-  pieceSize?: number
+  pieceSize?: number,
+  carSize?: number
 }
 
 export default interface GetPreparationDetailsResponse {

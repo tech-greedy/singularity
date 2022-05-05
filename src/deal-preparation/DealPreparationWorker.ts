@@ -8,7 +8,7 @@ import GenerationRequest from '../common/model/GenerationRequest';
 import ScanningRequest from '../common/model/ScanningRequest';
 import Scanner from './Scanner';
 import config from 'config';
-import fs from 'fs';
+import fs from 'fs-extra';
 import path from 'path';
 
 interface IpldNode {
@@ -134,11 +134,14 @@ export default class DealPreparationWorker extends BaseService {
       }
 
       const output :GenerateCarOutput = JSON.parse(stdout);
+      const carFile = path.join(this.outPath, output.DataCid + '.car');
+      const carFileStat = await fs.stat(carFile);
       await Datastore.GenerationRequestModel.findByIdAndUpdate(newGenerationWork.id, {
         status: 'completed',
         dataCid: output.DataCid,
         pieceSize: output.PieceSize,
-        pieceCid: output.PieceCid
+        pieceCid: output.PieceCid,
+        carSize: carFileStat.size
       });
       this.logger.info(`${this.workerId} - Finished Generation of dataset: ${newGenerationWork.datasetName} [${newGenerationWork.index}]`);
     }

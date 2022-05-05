@@ -14,7 +14,7 @@ import path from 'path';
 
 export default class Datastore {
   private static logger = Logger.getLogger(Category.Database);
-  private static mongoMemoryServer : MongoMemoryServer;
+  protected static mongoMemoryServer : MongoMemoryServer;
 
   // eslint-disable-next-line @typescript-eslint/ban-types
   public static HealthCheckModel: mongoose.Model<HealthCheck, {}, {}, {}>;
@@ -47,10 +47,6 @@ export default class Datastore {
         storageEngine: path ? 'wiredTiger' : 'ephemeralForTest',
         auth: false
       }
-    });
-    process.on('SIGUSR2', async () => {
-      await Datastore.mongoMemoryServer.stop();
-      process.kill(process.pid, 'SIGKILL');
     });
   }
 
@@ -114,7 +110,6 @@ export default class Datastore {
   private static setupGenerationRequestSchema () {
     const fileInfoSchema = new Schema<FileInfo>({
       path: Schema.Types.String,
-      name: Schema.Types.String,
       size: Schema.Types.Number,
       start: Schema.Types.Number,
       end: Schema.Types.Number,
@@ -133,6 +128,7 @@ export default class Datastore {
       status: Schema.Types.String,
       errorMessage: Schema.Types.String,
       dataCid: Schema.Types.String,
+      carSize: Schema.Types.Number,
       pieceCid: Schema.Types.String,
       pieceSize: Schema.Types.Number
     });
@@ -177,9 +173,10 @@ export default class Datastore {
     Datastore.HealthCheckModel = mongoose.model<HealthCheck>('HealthCheck', healthCheckSchema);
   }
 
-  public static async init (): Promise<void> {
+  public static async init (inMemory: boolean): Promise<void> {
     if (config.has('database.start_local') && config.get('database.start_local')) {
-      await Datastore.setupLocalMongoDb(config.get('database.local_bind'), config.get('database.local_port'), path.resolve(process.env.NODE_CONFIG_DIR!, config.get<string>('database.local_path')));
+      const localPath = config.has('database.local_path') ? path.resolve(process.env.NODE_CONFIG_DIR!, config.get<string>('database.local_path')) : undefined;
+      await Datastore.setupLocalMongoDb(config.get('database.local_bind'), config.get('database.local_port'), inMemory ? undefined : localPath);
     }
 
     if (config.has('connection.database')) {

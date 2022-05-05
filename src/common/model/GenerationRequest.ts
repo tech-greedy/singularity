@@ -1,6 +1,5 @@
 export interface FileInfo {
   path: string,
-  name: string,
   size: number,
   selector: number[],
   start: number,
@@ -20,6 +19,7 @@ export default interface GenerationRequest {
   status: 'active' | 'paused' | 'completed' | 'error',
   errorMessage?: string,
   dataCid?: string,
+  carSize?: number,
   pieceCid?: string,
   pieceSize?: number
 }

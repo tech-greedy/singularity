@@ -44,6 +44,65 @@ describe('DealPreparationService', () => {
       expect(await Datastore.GenerationRequestModel.findOne({ workerId: 'd' })).toBeNull();
     })
   })
+  describe('GET /generation/:dataset/:id', () => {
+    it('should return error if the id is not integer', async () => {
+      const response = await (supertest(service['app']))
+        .get(`/generation/name/not_number`);
+      expect(response.status).toEqual(400);
+      expect(response.body).toEqual({
+        error: ErrorCode.INVALID_OBJECT_ID
+      });
+    })
+    it('should return error if the id is not found', async () => {
+      const response = await (supertest(service['app']))
+        .get(`/generation/name/10`);
+      expect(response.status).toEqual(400);
+      expect(response.body).toEqual({
+        error: ErrorCode.DATASET_GENERATION_REQUEST_NOT_FOUND
+      });
+    })
+    it('should return found generation request by dataset name and index', async () => {
+      await Datastore.GenerationRequestModel.create({
+        datasetId: fakeId,
+        datasetName: 'datasetName',
+        status: 'active',
+        index: 10,
+        dataCid: 'dataCid',
+        pieceCid: 'pieceCid',
+        pieceSize: 10,
+        fileList: [{
+          path: '/data/file1.mp4',
+          start: 0,
+          end: 0,
+          size: 100
+        }]
+      });
+      let response = await (supertest(service['app']))
+        .get(`/generation/datasetName/10`);
+      expect(response.status).toEqual(200);
+      expect(response.body).toEqual(jasmine.objectContaining({
+        datasetId: fakeId,
+        datasetName: 'datasetName',
+        status: 'active',
+        index: 10,
+        dataCid: 'dataCid',
+        pieceCid: 'pieceCid',
+        pieceSize: 10
+      }));
+      response = await (supertest(service['app']))
+        .get(`/generation/${fakeId}/10`);
+      expect(response.status).toEqual(200);
+      expect(response.body).toEqual(jasmine.objectContaining({
+        datasetId: fakeId,
+        datasetName: 'datasetName',
+        status: 'active',
+        index: 10,
+        dataCid: 'dataCid',
+        pieceCid: 'pieceCid',
+        pieceSize: 10
+      }));
+    })
+  })
   describe('GET /generation/:id', () => {
     it('should return error if the id cannot be found', async () => {
       const response = await (supertest(service['app']))
@@ -70,7 +129,6 @@ describe('DealPreparationService', () => {
         pieceCid: 'pieceCid',
         pieceSize: 10,
         fileList: [{
-          name: 'file1.mp4',
           path: '/data/file1.mp4',
           start: 0,
           end: 0,
@@ -90,7 +148,6 @@ describe('DealPreparationService', () => {
       }));
       expect(response.body.fileList.length).toEqual(1);
       expect(response.body.fileList[0]).toEqual(jasmine.objectContaining({
-        name: 'file1.mp4',
         path: '/data/file1.mp4',
         start: 0,
         end: 0,
@@ -112,7 +169,7 @@ describe('DealPreparationService', () => {
         .get('/preparation/fakeid');
       expect(response.status).toEqual(400);
       expect(response.body).toEqual({
-        error: ErrorCode.INVALID_OBJECT_ID
+        error: ErrorCode.DATASET_NOT_FOUND
       });
     })
     it('should return all generation requests', async () => {
@@ -131,7 +188,6 @@ describe('DealPreparationService', () => {
         pieceCid: 'pieceCid',
         pieceSize: 10,
         fileList: [{
-          name: 'file1.mp4',
           path: '/data/file1.mp4',
           start: 0,
           end: 0,

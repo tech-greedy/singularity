@@ -3,8 +3,12 @@ import { AxiosResponse } from 'axios';
 export default class CliUtil {
   public static renderErrorAndExit (error: any) {
     if (error.response) {
-      console.log(`Response: ${error.response.status}`);
-      console.log(error.response.data);
+      console.error(`Response: ${error.response.status}`);
+      if (error.response.data?.error) {
+        console.error(error.response.data.error);
+      } else {
+        console.error(error.response.data);
+      }
     } else {
       console.error(error);
     }

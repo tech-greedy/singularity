@@ -8,12 +8,13 @@ import Datastore from '../common/Datastore';
 import { ObjectId } from 'mongodb';
 import { create } from 'ipfs-client';
 import { CID, IPFS } from 'ipfs-core';
+import * as IpfsCore from 'ipfs-core';
 import { DirNode, FileNode } from './FsDag';
 import path from 'path';
 
 export default class IndexService extends BaseService {
   private app: Express = express();
-  private ipfsClient! : IPFS;
+  public ipfsClient! : IPFS;
 
   public constructor () {
     super(Category.IndexService);
@@ -29,7 +30,7 @@ export default class IndexService extends BaseService {
       res.setHeader('Content-Type', 'application/json');
       next();
     });
-    this.app.post('/create/:id', this.createIndexRequest);
+    this.app.get('/create/:id', this.createIndexRequest);
     this.ipfsClient = create({
       grpc: config.get('index_service.ipfs_grpc'),
       http: config.get('index_service.ipfs_http')
@@ -49,12 +50,8 @@ export default class IndexService extends BaseService {
 
   private async createIndexRequest (request: Request, response: Response): Promise<void> {
     const id = request.params['id'];
-    if (!ObjectId.isValid(id)) {
-      this.sendError(response, ErrorCode.INVALID_OBJECT_ID);
-      return;
-    }
     this.logger.info(`Creating index for dataset ${id}`);
-    const found = await Datastore.ScanningRequestModel.findById(id);
+    const found = ObjectId.isValid(id) ? await Datastore.ScanningRequestModel.findById(id) : await Datastore.ScanningRequestModel.findOne({ name: id });
     if (!found) {
       this.sendError(response, ErrorCode.DATASET_NOT_FOUND);
       return;
@@ -127,6 +124,13 @@ export default class IndexService extends BaseService {
     this.app!.listen(port, bind, () => {
       this.logger.info(`Index Service started listening at http://${bind}:${port}`);
     });
+  }
+
+  public async init (): Promise<void> {
+    if (config.get('index_service.start_ipfs')) {
+      const ipfs = await IpfsCore.create();
+      this.ipfsClient = ipfs;
+    }
   }
 
   private sendError (response: Response, error: ErrorCode) {

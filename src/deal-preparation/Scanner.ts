@@ -50,7 +50,6 @@ export default class Scanner {
           start: 0,
           end: 0,
           path: entry.path,
-          name: path.basename(entry.path),
           selector: []
         });
         currentSize = newSize;
@@ -71,7 +70,6 @@ export default class Scanner {
             start: entry.stats!.size - remaining,
             end: entry.stats!.size - remaining + splitSize,
             path: entry.path,
-            name: path.basename(entry.path),
             selector: []
           });
           currentSize += splitSize;

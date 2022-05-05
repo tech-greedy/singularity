@@ -2,6 +2,7 @@
 /* eslint-disable import/first */
 import { homedir } from 'os';
 import path from 'path';
+process.env.NODE_CONFIG_DIR = process.env.SINGULARITY_PATH || path.join(homedir(), '.singularity');
 import { Command } from 'commander';
 import packageJson from '../package.json';
 import Datastore from './common/Datastore';
@@ -17,8 +18,6 @@ import GetPreparationDetailsResponse from './deal-preparation/GetPreparationDeta
 import fs from 'fs-extra';
 import Logger, { Category } from './common/Logger';
 import GenerationRequest from './common/model/GenerationRequest';
-
-process.env.NODE_CONFIG_DIR = process.env.SINGULARITY_PATH || path.join(homedir(), '.singularity');
 
 const logger = Logger.getLogger(Category.Cli);
 const version = packageJson.version;
@@ -44,7 +43,20 @@ program.command('daemon')
   .description('Start a daemon process for deal preparation and deal making')
   .action((_options) => {
     (async function () {
-      await Datastore.init();
+      let indexService: IndexService;
+      process.on('SIGUSR2', async () => {
+        // Gracefully turn off mongodb memory server
+        if (Datastore['mongoMemoryServer']) {
+          await Datastore['mongoMemoryServer'].stop();
+        }
+        // unlock ipfs repo
+        if (config.get('index_service.enabled') && config.get('index_service.start_ipfs') && indexService && indexService['ipfsClient']) {
+          await indexService['ipfsClient'].stop();
+        }
+
+        process.kill(process.pid, 'SIGKILL');
+      });
+      await Datastore.init(false);
       if (config.get('deal_preparation_service.enabled')) {
         new DealPreparationService().start();
       }
@@ -68,7 +80,9 @@ program.command('daemon')
         }
       }
       if (config.get('index_service.enabled')) {
-        new IndexService().start();
+        indexService = new IndexService();
+        await indexService.init();
+        indexService.start();
       }
       if (config.get('http_hosting_service.enabled')) {
         new HttpHostingService().start();
@@ -81,10 +95,22 @@ program.command('daemon')
 
 const index = program.command('index').description('Manage the dataset indexing');
 index.command('create')
-  .argument('<id>', 'A unique id of the dataset')
-  .action((id) => {
+  .argument('<id_or_name>', 'The dataset id or name')
+  .action(async (id) => {
     const url: string = config.get('connection.index_service');
-    axios.get(`${url}/create/${id}`).then(CliUtil.renderResponseOld).catch(CliUtil.renderErrorAndExit);
+    let response! : AxiosResponse;
+    try {
+      response = await axios.get(`${url}/create/${id}`);
+    } catch (error) {
+      CliUtil.renderErrorAndExit(error);
+    }
+
+    const cid: string = response.data.rootCid;
+    console.log('To publish the index to IPNS:');
+    console.log(`  ipfs name publish /ipfs/${cid}`);
+    console.log('To publish the index to DNSLink:');
+    console.log('  Add or update the TXT record for _dnslink.your_domain.net');
+    console.log(`  _dnslink.your_domain.net.  34  IN  TXT "dnslink=/ipfs/${cid}"`);
   });
 
 const preparation = program.command('preparation')
@@ -118,7 +144,7 @@ preparation.command('start')
 
 preparation.command('status')
   .option('--json', 'Output with JSON format')
-  .argument('<id>', 'A unique id of the dataset')
+  .argument('<id_or_name>', 'The dataset id or name')
   .action(async (id, options) => {
     const url: string = config.get('connection.deal_preparation_service');
     let response! : AxiosResponse;
@@ -156,12 +182,13 @@ preparation.command('list')
 
 preparation.command('generation-status')
   .option('--json', 'Output with JSON format')
-  .argument('<id>', 'A unique id of the generation request')
+  .option('--dataset <dataset>', 'The dataset id or name, required if looking for generation request using index')
+  .argument('<id_or_index>', 'A unique id or index of the generation request')
   .action(async (id, options) => {
     const url: string = config.get('connection.deal_preparation_service');
     let response! : AxiosResponse;
     try {
-      response = await axios.get(`${url}/generation/${id}`);
+      response = options.dataset ? await axios.get(`${url}/generation/${options.dataset}/${id}`) : await axios.get(`${url}/generation/${id}`);
     } catch (error) {
       CliUtil.renderErrorAndExit(error);
     }
@@ -178,7 +205,7 @@ preparation.command('generation-status')
   });
 
 preparation.command('pause')
-  .argument('<id>', 'A unique id of the dataset')
+  .argument('<id_or_name>', 'The dataset id or name')
   .action(async (id) => {
     const url: string = config.get('connection.deal_preparation_service');
     try {
@@ -190,7 +217,7 @@ preparation.command('pause')
   });
 
 preparation.command('resume')
-  .argument('<id>', 'A unique id of the dataset')
+  .argument('<id_or_name>', 'The dataset id or name')
   .action(async (id) => {
     const url: string = config.get('connection.deal_preparation_service');
     try {
@@ -201,4 +228,6 @@ preparation.command('resume')
     console.log('Success');
   });
 
+program.showSuggestionAfterError();
+program.showHelpAfterError('(add --help for additional information)');
 program.parse();
