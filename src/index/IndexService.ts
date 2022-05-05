@@ -50,12 +50,8 @@ export default class IndexService extends BaseService {
 
   private async createIndexRequest (request: Request, response: Response): Promise<void> {
     const id = request.params['id'];
-    if (!ObjectId.isValid(id)) {
-      this.sendError(response, ErrorCode.INVALID_OBJECT_ID);
-      return;
-    }
     this.logger.info(`Creating index for dataset ${id}`);
-    const found = await Datastore.ScanningRequestModel.findById(id);
+    const found = ObjectId.isValid(id) ? await Datastore.ScanningRequestModel.findById(id) : await Datastore.ScanningRequestModel.findOne({ name: id });
     if (!found) {
       this.sendError(response, ErrorCode.DATASET_NOT_FOUND);
       return;

@@ -21,9 +21,9 @@ describe('Datastore', () => {
     it('should be able to create and fetch entries', async () => {
       const model = new Datastore.GenerationRequestModel();
       model.datasetName = 'name';
-      const fileInfo1 = {name: 'name2', path: 'path', start: 0, end: 0 , size: 1024, selector: []}
-      const fileInfo2 = {name: 'name1', path: 'path', start: 0, end: 0 , size: 1024, selector: []}
-      const fileInfo3 = {name: 'name3', path: 'path', start: 0, end: 0 , size: 1024, selector: []}
+      const fileInfo1 = {path: 'path1', start: 0, end: 0 , size: 1024, selector: []}
+      const fileInfo2 = {path: 'path2', start: 0, end: 0 , size: 1024, selector: []}
+      const fileInfo3 = {path: 'path3', start: 0, end: 0 , size: 1024, selector: []}
       model.fileList = [fileInfo1, fileInfo2, fileInfo3];
       await model.save();
 

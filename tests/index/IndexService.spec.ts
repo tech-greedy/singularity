@@ -26,23 +26,35 @@ describe('IndexService', () => {
     })
   })
   describe('POST /create/:id', () => {
+    it('should throw error if no dataset has not completed scanning', async () => {
+      const scanningRequest = await Datastore.ScanningRequestModel.create({
+        status: 'active',
+        path: 'base/path'
+      });
+      const response = await (supertest(service['app']))
+        .get(`/create/${scanningRequest.id}`);
+      expect(response.status).toEqual(400);
+      expect(response.body).toEqual({
+        error: ErrorCode.SCANNING_INCOMPLETE
+      });
+    })
     it('should throw error if no dataset is provided', async () => {
       const response = await (supertest(service['app']))
-        .post(`/create`);
+        .get(`/create`);
       expect(response.status).toEqual(404);
     })
     it('should throw error if dataset id is invalid', async () => {
       const response = await (supertest(service['app']))
-        .post(`/create/invalid_id`)
+        .get(`/create/invalid_id`)
         .set('Accept', 'application/json');
       expect(response.status).toEqual(400);
       expect(response.body).toEqual({
-        error: ErrorCode.INVALID_OBJECT_ID
+        error: ErrorCode.DATASET_NOT_FOUND
       });
     })
     it('should throw error if dataset id does not exist', async () => {
       const response = await (supertest(service['app']))
-        .post(`/create/507f1f77bcf86cd799439011`)
+        .get(`/create/507f1f77bcf86cd799439011`)
         .set('Accept', 'application/json');
       expect(response.status).toEqual(400);
       expect(response.body).toEqual({
@@ -99,7 +111,7 @@ describe('IndexService', () => {
         ]
       });
       const response = await (supertest(service['app']))
-        .post(`/create/${scanningRequest.id}`)
+        .get(`/create/${scanningRequest.id}`)
         .set('Accept', 'application/json');
       expect(response.status).toEqual(200);
       const expectCid = 'bafyreihah4flyu6ex4tsdkg3ngnz6dvnfjv6tzgex6nsxrme6uulbubwtm';

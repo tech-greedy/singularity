@@ -42,6 +42,7 @@ export default class DealPreparationService extends BaseService {
     this.app.post('/preparation/:id', this.handleUpdatePreparationRequest);
     this.app.get('/preparations', this.handleListPreparationRequests);
     this.app.get('/preparation/:id', this.handleGetPreparationRequest);
+    this.app.get('/generation/:dataset/:id', this.handleGetGenerationRequest);
     this.app.get('/generation/:id', this.handleGetGenerationRequest);
   }
 
@@ -75,12 +76,20 @@ export default class DealPreparationService extends BaseService {
 
   private async handleGetGenerationRequest (request: Request, response: Response) {
     const id = request.params['id'];
-    if (!ObjectId.isValid(id)) {
+    const dataset = request.params['dataset'];
+    this.logger.info(`Received request to get details of dataset generation request "${id}", dataset: "${dataset}".`);
+    let found;
+    const idIsInt = !isNaN(parseInt(id));
+    if (ObjectId.isValid(id)) {
+      found = await Datastore.GenerationRequestModel.findById(id);
+    } else if (ObjectId.isValid(dataset) && idIsInt) {
+      found = await Datastore.GenerationRequestModel.findOne({ index: id, datasetId: dataset });
+    } else if (dataset !== undefined && idIsInt) {
+      found = await Datastore.GenerationRequestModel.findOne({ index: id, datasetName: dataset });
+    } else {
       this.sendError(response, ErrorCode.INVALID_OBJECT_ID);
       return;
     }
-    this.logger.info(`Received request to get details of dataset generation request "${id}".`);
-    const found = await Datastore.GenerationRequestModel.findById(id);
     if (!found) {
       this.sendError(response, ErrorCode.DATASET_GENERATION_REQUEST_NOT_FOUND);
       return;
@@ -94,7 +103,6 @@ export default class DealPreparationService extends BaseService {
       index: found.index,
       fileList: found.fileList.map((f) => ({
         path: f.path,
-        name: f.name,
         size: f.size,
         selector: f.selector,
         start: f.start,
@@ -105,24 +113,21 @@ export default class DealPreparationService extends BaseService {
       errorMessage: found.errorMessage,
       dataCid: found.dataCid,
       pieceCid: found.pieceCid,
-      pieceSize: found.pieceSize
+      pieceSize: found.pieceSize,
+      carSize: found.carSize
     };
     response.end(JSON.stringify(result));
   }
 
   private async handleGetPreparationRequest (request: Request, response: Response) {
     const id = request.params['id'];
-    if (!ObjectId.isValid(id)) {
-      this.sendError(response, ErrorCode.INVALID_OBJECT_ID);
-      return;
-    }
     this.logger.info(`Received request to get details of dataset preparation request "${id}".`);
-    const found = await Datastore.ScanningRequestModel.findById(id);
+    const found = ObjectId.isValid(id) ? await Datastore.ScanningRequestModel.findById(id) : await Datastore.ScanningRequestModel.findOne({ name: id });
     if (!found) {
       this.sendError(response, ErrorCode.DATASET_NOT_FOUND);
       return;
     }
-    const generations = await Datastore.GenerationRequestModel.find({ datasetId: id });
+    const generations = await Datastore.GenerationRequestModel.find({ datasetId: found.id });
     const result: GetPreparationDetailsResponse = {
       id: found.id,
       name: found.name,
@@ -146,7 +151,8 @@ export default class DealPreparationService extends BaseService {
         errorMessage: generation.errorMessage,
         dataCid: generation.dataCid,
         pieceCid: generation.pieceCid,
-        pieceSize: generation.pieceSize
+        pieceSize: generation.pieceSize,
+        carSize: generation.carSize
       });
     }
     response.end(JSON.stringify(result));
@@ -177,17 +183,13 @@ export default class DealPreparationService extends BaseService {
 
   private async handleUpdatePreparationRequest (request: Request, response: Response) {
     const id = request.params['id'];
-    if (!ObjectId.isValid(id)) {
-      this.sendError(response, ErrorCode.INVALID_OBJECT_ID);
-      return;
-    }
     const { status } = <UpdatePreparationRequest>request.body;
     this.logger.info(`Received request to change status of dataset "${id}" to "${status}".`);
     if (!['active', 'paused'].includes(status)) {
       this.sendError(response, ErrorCode.CHANGE_STATE_INVALID);
       return;
     }
-    const found = await Datastore.ScanningRequestModel.findById(id);
+    const found = ObjectId.isValid(id) ? await Datastore.ScanningRequestModel.findById(id) : await Datastore.ScanningRequestModel.findOne({ name: id });
     if (!found) {
       this.sendError(response, ErrorCode.DATASET_NOT_FOUND);
       return;

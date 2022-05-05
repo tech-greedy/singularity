@@ -63,7 +63,6 @@ describe('DealPreparationWorker', () => {
         fileList: [
           {
             path: 'tests/test_folder/not_exists.txt',
-            name: '1.txt',
             size: 3,
             start: 0,
             end: 0
@@ -87,13 +86,11 @@ describe('DealPreparationWorker', () => {
         fileList: [
           {
             path: 'tests/test_folder/a/1.txt',
-            name: '1.txt',
             size: 3,
             start: 0,
             end: 0
           }, {
             path: 'tests/test_folder/b/2.txt',
-            name: '2.txt',
             size: 27,
             start: 0,
             end: 9
@@ -179,14 +176,12 @@ describe('DealPreparationWorker', () => {
         index: 0,
         fileList: [jasmine.objectContaining({
           path: 'tests/test_folder/a/1.txt',
-          name: '1.txt',
           size: 3,
           start: 0,
           end: 0,
           selector: [0, 0]
         }), jasmine.objectContaining({
           path: 'tests/test_folder/b/2.txt',
-          name: '2.txt',
           size: 27,
           start: 0,
           end: 9,
@@ -201,7 +196,6 @@ describe('DealPreparationWorker', () => {
         index: 1,
         fileList: [jasmine.objectContaining({
           path: 'tests/test_folder/b/2.txt',
-          name: '2.txt',
           size: 27,
           start: 9,
           end: 21,
@@ -216,14 +210,12 @@ describe('DealPreparationWorker', () => {
         index: 2,
         fileList: [jasmine.objectContaining({
           path: 'tests/test_folder/b/2.txt',
-          name: '2.txt',
           size: 27,
           start: 21,
           end: 27,
           selector: [0, 0]
         }), jasmine.objectContaining({
           path: 'tests/test_folder/c/3.txt',
-          name: '3.txt',
           size: 9,
           start: 0,
           end: 0,
@@ -238,7 +230,6 @@ describe('DealPreparationWorker', () => {
         index: 3,
         fileList: [jasmine.objectContaining({
           path: 'tests/test_folder/d.txt',
-          name: 'd.txt',
           size: 9,
           start: 0,
           end: 0,
