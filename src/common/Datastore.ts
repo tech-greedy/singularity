@@ -14,6 +14,7 @@ import path from 'path';
 
 export default class Datastore {
   private static logger = Logger.getLogger(Category.Database);
+  private static mongoMemoryServer : MongoMemoryServer;
 
   // eslint-disable-next-line @typescript-eslint/ban-types
   public static HealthCheckModel: mongoose.Model<HealthCheck, {}, {}, {}>;
@@ -38,7 +39,7 @@ export default class Datastore {
         recursive: true
       });
     }
-    await MongoMemoryServer.create({
+    Datastore.mongoMemoryServer = await MongoMemoryServer.create({
       instance: {
         port,
         ip,
@@ -46,6 +47,10 @@ export default class Datastore {
         storageEngine: path ? 'wiredTiger' : 'ephemeralForTest',
         auth: false
       }
+    });
+    process.on('SIGUSR2', async () => {
+      await Datastore.mongoMemoryServer.stop();
+      process.kill(process.pid, 'SIGKILL');
     });
   }
 
@@ -174,7 +179,7 @@ export default class Datastore {
 
   public static async init (): Promise<void> {
     if (config.has('database.start_local') && config.get('database.start_local')) {
-      await Datastore.setupLocalMongoDb(config.get('database.local_bind'), config.get('database.local_port'), path.resolve(config.get<string>('database.local_path')));
+      await Datastore.setupLocalMongoDb(config.get('database.local_bind'), config.get('database.local_port'), path.resolve(process.env.NODE_CONFIG_DIR!, config.get<string>('database.local_path')));
     }
 
     if (config.has('connection.database')) {

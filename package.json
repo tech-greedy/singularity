@@ -6,7 +6,7 @@
   "types": "dist/source/start.d.ts",
   "scripts": {
     "build": "tsc && copyfiles \"config/**/*\" dist",
-    "start": "node dist/src/singularity.js daemon",
+    "start": "nodemon src/singularity.ts daemon",
     "test": "jasmine-ts --config=./tests/jasmine.json",
     "coverage": "nyc jasmine-ts --config=./tests/jasmine.json",
     "lint": "eslint --ext ts --fix src/",
@@ -50,6 +50,7 @@
     "jasmine-reporters": "^2.5.0",
     "jasmine-spec-reporter": "^7.0.0",
     "jasmine-ts": "^0.4.0",
+    "nodemon": "^2.0.16",
     "nyc": "^15.1.0",
     "supertest": "^6.2.2",
     "ts-node": "^10.7.0",
@@ -105,5 +106,8 @@
     "functions": 75,
     "statements": 75,
     "per-file": true
+  },
+  "nodemonConfig": {
+    "ignore": ["tests/*", "docs/*"]
   }
 }

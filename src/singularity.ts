@@ -1,4 +1,9 @@
 #!/usr/bin/env node
+/* eslint-disable import/first */
+import { homedir } from 'os';
+import path from 'path';
+
+process.env.NODE_CONFIG_DIR = process.env.SINGULARITY_PATH || path.join(homedir(), '.singularity');
 import { Command } from 'commander';
 import packageJson from '../package.json';
 import fs from 'fs';
@@ -7,7 +12,6 @@ import DealPreparationService from './deal-preparation/DealPreparationService';
 import DealPreparationWorker from './deal-preparation/DealPreparationWorker';
 import axios from 'axios';
 import config from 'config';
-import path from 'path';
 import CliUtil from './cli-util';
 import IndexService from './index/IndexService';
 import HttpHostingService from './hosting/HttpHostingService';
@@ -41,7 +45,10 @@ program.command('daemon')
         new DealPreparationService().start();
       }
       if (config.get('deal_preparation_worker.enabled')) {
-        new DealPreparationWorker().start();
+        const numWorkers = config.has('deal_preparation_worker.num_workers') ? config.get<number>('deal_preparation_worker.num_workers') : 1;
+        for (let i = 0; i < numWorkers; ++i) {
+          new DealPreparationWorker().start();
+        }
       }
       if (config.get('index_service.enabled')) {
         new IndexService().start();
