@@ -13,6 +13,7 @@ import GetPreparationDetailsResponse from './GetPreparationDetailsResponse';
 import { GetPreparationsResponse } from './GetPreparationsResponse';
 import UpdatePreparationRequest from './UpdatePreparationRequest';
 import { ObjectId } from 'mongodb';
+import GenerationRequest from '../common/model/GenerationRequest';
 
 export default class DealPreparationService extends BaseService {
   private static AllowedDealSizes: number[] = DealPreparationService.initAllowedDealSizes();
@@ -85,7 +86,28 @@ export default class DealPreparationService extends BaseService {
       return;
     }
 
-    response.end(JSON.stringify(found));
+    const result : GenerationRequest = {
+      id: found.id,
+      datasetId: found.datasetId,
+      datasetName: found.datasetName,
+      path: found.path,
+      index: found.index,
+      fileList: found.fileList.map((f) => ({
+        path: f.path,
+        name: f.name,
+        size: f.size,
+        selector: f.selector,
+        start: f.start,
+        end: f.end
+      })),
+      workerId: found.workerId,
+      status: found.status,
+      errorMessage: found.errorMessage,
+      dataCid: found.dataCid,
+      pieceCid: found.pieceCid,
+      pieceSize: found.pieceSize
+    };
+    response.end(JSON.stringify(result));
   }
 
   private async handleGetPreparationRequest (request: Request, response: Response) {
@@ -109,6 +131,11 @@ export default class DealPreparationService extends BaseService {
       maxSize: found.maxSize,
       scanningStatus: found.status,
       errorMessage: found.errorMessage,
+      generationTotal: await Datastore.GenerationRequestModel.count({ datasetId: found.id }),
+      generationActive: await Datastore.GenerationRequestModel.count({ datasetId: found.id, status: 'active' }),
+      generationPaused: await Datastore.GenerationRequestModel.count({ datasetId: found.id, status: 'paused' }),
+      generationCompleted: await Datastore.GenerationRequestModel.count({ datasetId: found.id, status: 'completed' }),
+      generationError: await Datastore.GenerationRequestModel.count({ datasetId: found.id, status: 'error' }),
       generationRequests: []
     };
     for (const generation of generations) {

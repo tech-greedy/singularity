@@ -5,7 +5,8 @@
   "main": "dist/source/start.js",
   "types": "dist/source/start.d.ts",
   "scripts": {
-    "build": "tsc && copyfiles \"config/**/*\" dist",
+    "build": "tsc && copyfiles \"config/**/*.toml\" dist",
+    "postbuild": "chmod +x dist/src/singularity.js",
     "start": "nodemon src/singularity.ts daemon",
     "test": "jasmine-ts --config=./tests/jasmine.json",
     "coverage": "nyc jasmine-ts --config=./tests/jasmine.json",
@@ -28,9 +29,11 @@
   "devDependencies": {
     "@gzuidhof/go-npm": "^0.1.13",
     "@istanbuljs/nyc-config-typescript": "^1.0.2",
+    "@kei-g/chmod": "^1.0.7",
     "@types/async-retry": "^1.4.3",
     "@types/config": "^0.0.41",
     "@types/express": "^4.17.13",
+    "@types/fs-extra": "^9.0.13",
     "@types/jasmine": "^4.0.0",
     "@types/node": "^14.17.6",
     "@types/rrdir": "^8.2.3",
@@ -66,6 +69,7 @@
     "config": "^3.3.7",
     "express": "^5.0.0-beta.1",
     "express-winston": "^4.2.0",
+    "fs-extra": "^10.1.0",
     "ipfs-client": "^0.7.8",
     "ipfs-core": "^0.14.2",
     "minimist": "^1.2.6",
@@ -108,6 +112,9 @@
     "per-file": true
   },
   "nodemonConfig": {
-    "ignore": ["tests/*", "docs/*"]
+    "ignore": [
+      "tests/*",
+      "docs/*"
+    ]
   }
 }

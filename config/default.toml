@@ -10,14 +10,15 @@ port = 7001
 
 [database]
 start_local = true
-local_path = "./.singularity/database"
+local_path = "./database"
 local_bind = "0.0.0.0"
 local_port = 37000
 
 [deal_preparation_worker]
 num_workers = 2
 enabled = true
-out_dir = "./.singularity/cars"
+enable_cleanup = true
+out_dir = "./cars"
 
 [index_service]
 enabled = true
@@ -30,7 +31,7 @@ ipfs_grpc = "wss://localhost:4001"
 enabled = true
 bind = "0.0.0.0"
 port = 8088
-static_path = "./.singularity/cars"
+static_path = "./cars"
 
 [deal_tracking_service]
 enabled = true
