@@ -8,9 +8,9 @@ describe('DealPreparationWorker', () => {
   let worker: DealPreparationWorker;
   beforeAll(async () => {
     await Utils.initDatabase();
-    worker = new DealPreparationWorker();
   });
   beforeEach(async () => {
+    worker = new DealPreparationWorker();
     await Datastore.ScanningRequestModel.remove();
     await Datastore.GenerationRequestModel.remove();
   });
