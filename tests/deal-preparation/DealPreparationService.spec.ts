@@ -310,8 +310,12 @@ describe('DealPreparationService', () => {
       expect(await Datastore.GenerationRequestModel.findById(r2.id)).toEqual(jasmine.objectContaining({
         status: 'completed'
       }));
+      expect(response.body).toEqual({
+        scanningRequestsChanged: 1,
+        generationRequestsChanged: 1
+      });
     });
-    it('should return error if generation does not exist', async () => {
+    it('should return 0 changed if generation does not exist', async () => {
       const scanning = await Datastore.ScanningRequestModel.create({
         name: 'name',
         status: 'active'
@@ -319,9 +323,10 @@ describe('DealPreparationService', () => {
       const response = await supertest(service['app'])
         .post(`/preparation/${scanning.id}/${fakeId}`)
         .send({ action: 'resume' }).set('Accept', 'application/json');
-      expect(response.status).toEqual(400);
+      expect(response.status).toEqual(200);
       expect(response.body).toEqual({
-        error: ErrorCode.DATASET_GENERATION_REQUEST_NOT_FOUND
+        scanningRequestsChanged: 0,
+        generationRequestsChanged: 0
       });
     });
     it('should return error if generation is malformed', async () => {
@@ -364,6 +369,10 @@ describe('DealPreparationService', () => {
       expect(await Datastore.GenerationRequestModel.findById(r2.id)).toEqual(jasmine.objectContaining({
         status: 'active'
       }));
+      expect(response.body).toEqual({
+        scanningRequestsChanged: 0,
+        generationRequestsChanged: 1
+      });
     });
   });
   it('should change status for specific generation request by index', async () => {
@@ -393,6 +402,10 @@ describe('DealPreparationService', () => {
     expect(await Datastore.GenerationRequestModel.findById(r2.id)).toEqual(jasmine.objectContaining({
       status: 'paused'
     }));
+    expect(response.body).toEqual({
+      scanningRequestsChanged: 0,
+      generationRequestsChanged: 1
+    });
   });
   describe('POST /preparation', () => {
     it('should return error if deal size is not allowed', async () => {
