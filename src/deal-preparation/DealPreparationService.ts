@@ -40,6 +40,7 @@ export default class DealPreparationService extends BaseService {
     });
     this.app.post('/preparation', this.handleCreatePreparationRequest);
     this.app.post('/preparation/:id', this.handleUpdatePreparationRequest);
+    this.app.post('/preparation/:id/:generation', this.handleUpdatePreparationRequest);
     this.app.get('/preparations', this.handleListPreparationRequests);
     this.app.get('/preparation/:id', this.handleGetPreparationRequest);
     this.app.get('/generation/:dataset/:id', this.handleGetGenerationRequest);
@@ -183,10 +184,11 @@ export default class DealPreparationService extends BaseService {
 
   private async handleUpdatePreparationRequest (request: Request, response: Response) {
     const id = request.params['id'];
-    const { status } = <UpdatePreparationRequest>request.body;
-    this.logger.info(`Received request to change status of dataset "${id}" to "${status}".`);
-    if (!['active', 'paused'].includes(status)) {
-      this.sendError(response, ErrorCode.CHANGE_STATE_INVALID);
+    const generation = request.params['generation'];
+    const { action } = <UpdatePreparationRequest>request.body;
+    this.logger.info(`Received request to ${action} dataset "${id}" (generation "${generation}").`);
+    if (!['resume', 'pause', 'retry'].includes(action)) {
+      this.sendError(response, ErrorCode.ACTION_INVALID);
       return;
     }
     const found = ObjectId.isValid(id) ? await Datastore.ScanningRequestModel.findById(id) : await Datastore.ScanningRequestModel.findOne({ name: id });
@@ -194,25 +196,50 @@ export default class DealPreparationService extends BaseService {
       this.sendError(response, ErrorCode.DATASET_NOT_FOUND);
       return;
     }
-    // Only allow making change to the request if the scanning has completed
-    if ((found.status === 'active' && status === 'paused') || (found.status === 'paused' && status === 'active')) {
-      await Datastore.ScanningRequestModel.findOneAndUpdate({
+    const actionMap: {[key: string]: ('active' | 'completed' | 'error' | 'paused')[]} = {
+      resume: ['paused', 'active'],
+      pause: ['active', 'paused'],
+      retry: ['error', 'active']
+    };
+
+    const changed = (await Datastore.ScanningRequestModel.findOneAndUpdate({
+      id: found.id,
+      status: actionMap[action][0]
+    }, { status: actionMap[action][1] })) != null
+      ? 1
+      : 0;
+
+    let changedGenerations;
+    let changedGeneration;
+    if (!generation) {
+      changedGenerations = (await Datastore.GenerationRequestModel.updateMany({
         id: found.id,
-        status: found.status
-      }, { status: status });
-      this.logger.info(`Updated status of scanning request to "${status}".`);
-    }
-    await Datastore.GenerationRequestModel.updateMany({
-      status: {
-        $nin: [
-          'completed', 'error'
-        ]
+        status: actionMap[action][0]
+      }, { status: actionMap[action][1] })).modifiedCount;
+    } else {
+      const generationIsInt = !isNaN(parseInt(generation));
+      if (ObjectId.isValid(generation)) {
+        changedGeneration = (await Datastore.GenerationRequestModel.findOneAndUpdate(
+          { id: generation, status: actionMap[action][0] },
+          { status: actionMap[action][1] }))
+          ? 1
+          : 0;
+      } else if (generationIsInt) {
+        changedGeneration = (await Datastore.GenerationRequestModel.findOneAndUpdate(
+          { index: generation, status: actionMap[action][0] },
+          { status: actionMap[action][1] }))
+          ? 1
+          : 0;
+      } else {
+        this.sendError(response, ErrorCode.INVALID_OBJECT_ID);
+        return;
       }
-    }, {
-      status
-    });
-    this.logger.info(`Updated status of incomplete generation request to "${status}".`);
-    response.end();
+    }
+
+    response.end(JSON.stringify({
+      scanningRequestsChanged: changed,
+      generationRequestsChanged: changedGenerations ?? changedGeneration
+    }));
   }
 
   private sendError (response: Response, error: ErrorCode) {
@@ -259,8 +286,14 @@ export default class DealPreparationService extends BaseService {
       }
       throw e;
     }
-
-    response.end(JSON.stringify({ id: scanningRequest.id }));
+    response.end(JSON.stringify({
+      id: scanningRequest.id,
+      name,
+      minSize,
+      maxSize,
+      path,
+      status: scanningRequest.status
+    }));
   }
 
   private static initAllowedDealSizes (): number[] {

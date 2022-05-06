@@ -1,3 +1,3 @@
 export default interface UpdatePreparationRequest {
-  status: 'active' | 'paused'
+  action: 'resume' | 'pause' | 'retry'
 }

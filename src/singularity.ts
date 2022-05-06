@@ -3,7 +3,7 @@
 import { homedir } from 'os';
 import path from 'path';
 process.env.NODE_CONFIG_DIR = process.env.SINGULARITY_PATH || path.join(homedir(), '.singularity');
-import { Command } from 'commander';
+import { Argument, Command } from 'commander';
 import packageJson from '../package.json';
 import Datastore from './common/Datastore';
 import DealPreparationService from './deal-preparation/DealPreparationService';
@@ -24,16 +24,17 @@ const version = packageJson.version;
 const program = new Command();
 program.name('singularity')
   .version(version)
-  .description('A tool for large-scale clients with PB-scale data onboarding to Filecoin network');
+  .description('A tool for large-scale clients with PB-scale data onboarding to Filecoin network\nVisit https://github.com/tech-greedy/singularity for more details');
 
 program.command('init')
-  .description('Initialize the configuration directory')
+  .description('Initialize the configuration directory in SINGULARITY_PATH\nIf unset, it will be initialized at HOME_DIR/.singularity')
   .action(async () => {
     const configDir = config.util.getEnv('NODE_CONFIG_DIR');
     await fs.mkdirp(configDir);
     if (!await fs.pathExists(path.join(configDir, 'default.toml'))) {
       logger.info(`Initializing at ${configDir} ...`);
       await fs.copyFile(path.join(__dirname, '../config/default.toml'), path.join(configDir, 'default.toml'));
+      logger.info(`Please check ${path.join(configDir, 'default.toml')}`);
     } else {
       logger.warn(`${configDir} already has the repo.`);
     }
@@ -93,7 +94,7 @@ program.command('daemon')
     })();
   });
 
-const index = program.command('index').description('Manage the dataset indexing');
+const index = program.command('index').description('Manage the dataset index which will help map the dataset path to actual piece');
 index.command('create')
   .argument('<id_or_name>', 'The dataset id or name')
   .action(async (id) => {
@@ -115,12 +116,12 @@ index.command('create')
 
 const preparation = program.command('preparation')
   .alias('prep')
-  .description('Start preparation for a local dataset');
+  .description('Manage deal preparation');
 
-preparation.command('start')
-  .argument('<name>', 'A unique name of the dataset')
-  .argument('<path>', 'Directory path to the dataset')
-  .option('-s, --deal-size <deal_size>', 'Target deal size, i.e. 16GiB', '32 GiB')
+preparation.command('create').description('Start deal preparation for a local dataset')
+  .argument('<datasetName>', 'A unique name of the dataset')
+  .argument('<datasetPath>', 'Directory path to the dataset')
+  .option('-s, --deal-size <deal_size>', 'Target deal size, i.e. 32GiB', '32 GiB')
   .action(async (name, p, options) => {
     if (!await fs.pathExists(p)) {
       logger.error(`Dataset path "${p}" does not exist.`);
@@ -142,9 +143,9 @@ preparation.command('start')
     CliUtil.renderResponse(response.data, options.json);
   });
 
-preparation.command('status')
+preparation.command('status').description('Check the status of a deal preparation request')
   .option('--json', 'Output with JSON format')
-  .argument('<id_or_name>', 'The dataset id or name')
+  .argument('<dataset>', 'The dataset id or name')
   .action(async (id, options) => {
     const url: string = config.get('connection.deal_preparation_service');
     let response! : AxiosResponse;
@@ -166,7 +167,7 @@ preparation.command('status')
     }
   });
 
-preparation.command('list')
+preparation.command('list').description('List all deal preparation requests')
   .option('--json', 'Output with JSON format')
   .action(async (options) => {
     const url: string = config.get('connection.deal_preparation_service');
@@ -180,10 +181,10 @@ preparation.command('list')
     CliUtil.renderResponse(response.data, options.json);
   });
 
-preparation.command('generation-status')
+preparation.command('generation-status').description('Check the status of a single deal generation request')
   .option('--json', 'Output with JSON format')
   .option('--dataset <dataset>', 'The dataset id or name, required if looking for generation request using index')
-  .argument('<id_or_index>', 'A unique id or index of the generation request')
+  .argument('<generationId>', 'A unique id or index of the generation request')
   .action(async (id, options) => {
     const url: string = config.get('connection.deal_preparation_service');
     let response! : AxiosResponse;
@@ -204,28 +205,46 @@ preparation.command('generation-status')
     }
   });
 
-preparation.command('pause')
-  .argument('<id_or_name>', 'The dataset id or name')
-  .action(async (id) => {
-    const url: string = config.get('connection.deal_preparation_service');
-    try {
-      await axios.post(`${url}/preparation/${id}`, { status: 'paused' });
-    } catch (error) {
-      CliUtil.renderErrorAndExit(error);
+async function UpdateState (id : string, generation: string, action: string) : Promise<AxiosResponse> {
+  const url: string = config.get('connection.deal_preparation_service');
+  let response! : AxiosResponse;
+  try {
+    if (generation) {
+      response = await axios.post(`${url}/preparation/${id}/${generation}`, { action });
+    } else {
+      response = await axios.post(`${url}/preparation/${id}`, { action });
     }
-    console.log('Success');
+  } catch (error) {
+    CliUtil.renderErrorAndExit(error);
+  }
+  return response;
+}
+
+preparation.command('pause').description('Pause an active deal preparation request and its active deal generation requests')
+  .option('--json', 'Output with JSON format')
+  .argument('<dataset>', 'The dataset id or name')
+  .addArgument(new Argument('<generationId>', 'Optionally specify a generation request').argOptional())
+  .action(async (id, generation, options) => {
+    const response = await UpdateState(id, generation, 'pause');
+    CliUtil.renderResponse(response.data, options.json);
   });
 
-preparation.command('resume')
-  .argument('<id_or_name>', 'The dataset id or name')
-  .action(async (id) => {
-    const url: string = config.get('connection.deal_preparation_service');
-    try {
-      await axios.post(`${url}/preparation/${id}`, { status: 'active' });
-    } catch (error) {
-      CliUtil.renderErrorAndExit(error);
-    }
-    console.log('Success');
+preparation.command('resume').description('Resume a paused deal preparation request and its paused deal generation requests')
+  .option('--json', 'Output with JSON format')
+  .argument('<dataset>', 'The dataset id or name')
+  .addArgument(new Argument('<generationId>', 'Optionally specify a generation request').argOptional())
+  .action(async (id, generation, options) => {
+    const response = await UpdateState(id, generation, 'resume');
+    CliUtil.renderResponse(response.data, options.json);
+  });
+
+preparation.command('retry').description('Retry an errored preparation request and its errored deal generation requests')
+  .option('--json', 'Output with JSON format')
+  .argument('<dataset>', 'The dataset id or name')
+  .addArgument(new Argument('<generationId>', 'Optionally specify a generation request').argOptional())
+  .action(async (id, generation, options) => {
+    const response = await UpdateState(id, generation, 'retry');
+    CliUtil.renderResponse(response.data, options.json);
   });
 
 program.showSuggestionAfterError();

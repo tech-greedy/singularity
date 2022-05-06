@@ -266,25 +266,25 @@ describe('DealPreparationService', () => {
     });
   });
   describe('POST /preparation/:id', () => {
-    it('should return error if status is not valid', async () => {
+    it('should return error if action is not valid', async () => {
       const response = await supertest(service['app'])
         .post(`/preparation/${fakeId}`)
-        .send({ status: 'wrong_state' }).set('Accept', 'application/json');
+        .send({ action: 'invalid' }).set('Accept', 'application/json');
       expect(response.status).toEqual(400);
       expect(response.body).toEqual({
-        error: ErrorCode.CHANGE_STATE_INVALID
+        error: ErrorCode.ACTION_INVALID
       });
     });
     it('should return error if database does not exist', async () => {
       const response = await supertest(service['app'])
         .post(`/preparation/${fakeId}`)
-        .send({ status: 'active' }).set('Accept', 'application/json');
+        .send({ action: 'resume' }).set('Accept', 'application/json');
       expect(response.status).toEqual(400);
       expect(response.body).toEqual({
         error: ErrorCode.DATASET_NOT_FOUND
       });
     });
-    it('should change status for all generation requests', async () => {
+    it('should change status for all generation requests if generation is not given', async () => {
       const scanning = await Datastore.ScanningRequestModel.create({
         name: 'name',
         status: 'active'
@@ -299,7 +299,7 @@ describe('DealPreparationService', () => {
       });
       const response = await supertest(service['app'])
         .post('/preparation/' + scanning.id)
-        .send({ status: 'paused' }).set('Accept', 'application/json');
+        .send({ action: 'pause' }).set('Accept', 'application/json');
       expect(response.status).toEqual(200);
       expect(await Datastore.ScanningRequestModel.findById(scanning.id)).toEqual(jasmine.objectContaining({
         status: 'paused'
@@ -310,6 +310,101 @@ describe('DealPreparationService', () => {
       expect(await Datastore.GenerationRequestModel.findById(r2.id)).toEqual(jasmine.objectContaining({
         status: 'completed'
       }));
+      expect(response.body).toEqual({
+        scanningRequestsChanged: 1,
+        generationRequestsChanged: 1
+      });
+    });
+    it('should return 0 changed if generation does not exist', async () => {
+      const scanning = await Datastore.ScanningRequestModel.create({
+        name: 'name',
+        status: 'active'
+      });
+      const response = await supertest(service['app'])
+        .post(`/preparation/${scanning.id}/${fakeId}`)
+        .send({ action: 'resume' }).set('Accept', 'application/json');
+      expect(response.status).toEqual(200);
+      expect(response.body).toEqual({
+        scanningRequestsChanged: 0,
+        generationRequestsChanged: 0
+      });
+    });
+    it('should return error if generation is malformed', async () => {
+      const scanning = await Datastore.ScanningRequestModel.create({
+        name: 'name',
+        status: 'active'
+      });
+      const response = await supertest(service['app'])
+        .post(`/preparation/${scanning.id}/fffff`)
+        .send({ action: 'resume' }).set('Accept', 'application/json');
+      expect(response.status).toEqual(400);
+      expect(response.body).toEqual({
+        error: ErrorCode.INVALID_OBJECT_ID
+      });
+    });
+    it('should change status for specific generation request', async () => {
+      const scanning = await Datastore.ScanningRequestModel.create({
+        name: 'name',
+        status: 'completed'
+      });
+      const r1 = await Datastore.GenerationRequestModel.create({
+        datasetId: scanning.id,
+        status: 'active'
+      });
+      const r2 = await Datastore.GenerationRequestModel.create({
+        datasetId: scanning.id,
+        index: 5,
+        status: 'active'
+      });
+      const response = await supertest(service['app'])
+        .post(`/preparation/${scanning.id}/${r1.id}`)
+        .send({ action: 'pause' }).set('Accept', 'application/json');
+      expect(response.status).toEqual(200);
+      expect(await Datastore.ScanningRequestModel.findById(scanning.id)).toEqual(jasmine.objectContaining({
+        status: 'completed'
+      }));
+      expect(await Datastore.GenerationRequestModel.findById(r1.id)).toEqual(jasmine.objectContaining({
+        status: 'paused'
+      }));
+      expect(await Datastore.GenerationRequestModel.findById(r2.id)).toEqual(jasmine.objectContaining({
+        status: 'active'
+      }));
+      expect(response.body).toEqual({
+        scanningRequestsChanged: 0,
+        generationRequestsChanged: 1
+      });
+    });
+  });
+  it('should change status for specific generation request by index', async () => {
+    const scanning = await Datastore.ScanningRequestModel.create({
+      name: 'name',
+      status: 'completed'
+    });
+    const r1 = await Datastore.GenerationRequestModel.create({
+      datasetId: scanning.id,
+      status: 'active'
+    });
+    const r2 = await Datastore.GenerationRequestModel.create({
+      datasetId: scanning.id,
+      index: 5,
+      status: 'active'
+    });
+    const response = await supertest(service['app'])
+      .post(`/preparation/${scanning.id}/${r2.index}`)
+      .send({ action: 'pause' }).set('Accept', 'application/json');
+    expect(response.status).toEqual(200);
+    expect(await Datastore.ScanningRequestModel.findById(scanning.id)).toEqual(jasmine.objectContaining({
+      status: 'completed'
+    }));
+    expect(await Datastore.GenerationRequestModel.findById(r1.id)).toEqual(jasmine.objectContaining({
+      status: 'active'
+    }));
+    expect(await Datastore.GenerationRequestModel.findById(r2.id)).toEqual(jasmine.objectContaining({
+      status: 'paused'
+    }));
+    expect(response.body).toEqual({
+      scanningRequestsChanged: 0,
+      generationRequestsChanged: 1
     });
   });
   describe('POST /preparation', () => {
