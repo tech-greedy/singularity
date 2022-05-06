@@ -15,7 +15,7 @@ export default interface GetPreparationDetailsResponse {
   path: string,
   minSize: number,
   maxSize: number,
-  scanningStatus: 'active' | 'error' | 'completed',
+  scanningStatus: 'active' | 'error' | 'completed' | 'paused',
   errorMessage?: string,
   generationTotal: number,
   generationActive: number,
