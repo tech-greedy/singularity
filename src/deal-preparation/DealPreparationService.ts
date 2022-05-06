@@ -28,7 +28,7 @@ export default class DealPreparationService extends BaseService {
     this.handleGetGenerationRequest = this.handleGetGenerationRequest.bind(this);
     this.startCleanupHealthCheck = this.startCleanupHealthCheck.bind(this);
     if (!this.enabled) {
-      this.logger.warn('Deal Preparation Service is not enabled. Exit now...');
+      this.logger.warn('Service is not enabled. Exit now...');
       return;
     }
     this.app.use(Logger.getExpressLogger(Category.DealPreparationService));
@@ -52,7 +52,7 @@ export default class DealPreparationService extends BaseService {
     const port = config.get<number>('deal_preparation_service.port');
     this.startCleanupHealthCheck();
     this.app!.listen(port, bind, () => {
-      this.logger.info(`Deal Preparation Service started listening at http://${bind}:${port}`);
+      this.logger.info(`Service started listening at http://${bind}:${port}`);
     });
   }
 
@@ -62,11 +62,11 @@ export default class DealPreparationService extends BaseService {
     const workerIds = (await Datastore.HealthCheckModel.find()).map(worker => worker.workerId);
     let modified = (await Datastore.ScanningRequestModel.updateMany({ workerId: { $nin: workerIds } }, { workerId: null })).modifiedCount;
     if (modified > 0) {
-      this.logger.info(`Reset ${modified} tasks from Scanning Request table`);
+      this.logger.debug(`Reset ${modified} tasks from Scanning Request table`);
     }
     modified = (await Datastore.GenerationRequestModel.updateMany({ workerId: { $nin: workerIds } }, { workerId: null })).modifiedCount;
     if (modified > 0) {
-      this.logger.info(`Reset ${modified} tasks from Generation Request table`);
+      this.logger.debug(`Reset ${modified} tasks from Generation Request table`);
     }
   }
 
@@ -78,14 +78,17 @@ export default class DealPreparationService extends BaseService {
   private async handleGetGenerationRequest (request: Request, response: Response) {
     const id = request.params['id'];
     const dataset = request.params['dataset'];
-    this.logger.info(`Received request to get details of dataset generation request "${id}", dataset: "${dataset}".`);
+    this.logger.info('Received request to get details of dataset generation.', { id, dataset });
     let found;
     const idIsInt = !isNaN(parseInt(id));
     if (ObjectId.isValid(id)) {
+      this.logger.debug('id is valid ObjectId');
       found = await Datastore.GenerationRequestModel.findById(id);
     } else if (ObjectId.isValid(dataset) && idIsInt) {
+      this.logger.debug('id is valid integer and dataset is valid ObjectId');
       found = await Datastore.GenerationRequestModel.findOne({ index: id, datasetId: dataset });
     } else if (dataset !== undefined && idIsInt) {
+      this.logger.debug('id is valid integer and dataset is undefined');
       found = await Datastore.GenerationRequestModel.findOne({ index: id, datasetName: dataset });
     } else {
       this.sendError(response, ErrorCode.INVALID_OBJECT_ID);
@@ -122,7 +125,7 @@ export default class DealPreparationService extends BaseService {
 
   private async handleGetPreparationRequest (request: Request, response: Response) {
     const id = request.params['id'];
-    this.logger.info(`Received request to get details of dataset preparation request "${id}".`);
+    this.logger.info(`Received request to get details of dataset preparation request.`, { id });
     const found = ObjectId.isValid(id) ? await Datastore.ScanningRequestModel.findById(id) : await Datastore.ScanningRequestModel.findOne({ name: id });
     if (!found) {
       this.sendError(response, ErrorCode.DATASET_NOT_FOUND);
@@ -186,7 +189,7 @@ export default class DealPreparationService extends BaseService {
     const id = request.params['id'];
     const generation = request.params['generation'];
     const { action } = <UpdatePreparationRequest>request.body;
-    this.logger.info(`Received request to ${action} dataset "${id}" (generation "${generation}").`);
+    this.logger.info(`Received request to update dataset preparation request.`, { id, generation, action });
     if (!['resume', 'pause', 'retry'].includes(action)) {
       this.sendError(response, ErrorCode.ACTION_INVALID);
       return;
@@ -243,7 +246,7 @@ export default class DealPreparationService extends BaseService {
   }
 
   private sendError (response: Response, error: ErrorCode) {
-    this.logger.warn(`Error code - ${error}`);
+    this.logger.warn(`Error code`, { error });
     response.status(400);
     response.end(JSON.stringify({ error }));
   }
@@ -254,7 +257,7 @@ export default class DealPreparationService extends BaseService {
       path,
       dealSize
     } = <CreatePreparationRequest>request.body;
-    this.logger.info(`Received request to prepare dataset "${name}" from "${path}". Target Deal Size - ${dealSize}.`);
+    this.logger.info(`Received request to start preparing dataset.`, { name, path, dealSize });
     const dealSizeNumber = xbytes.parseSize(dealSize);
     // Validate dealSize
     if (!DealPreparationService.AllowedDealSizes.includes(dealSizeNumber)) {

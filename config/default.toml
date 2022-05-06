@@ -1,3 +1,8 @@
+[logging]
+console_level = 'info'
+file_level = 'debug'
+file_path = './logs'
+
 [connection]
 # Connection string to MongoDB, it can be either a built-in mongodb
 # shipped with this software or a standalone mongodb server

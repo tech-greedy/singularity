@@ -10,7 +10,7 @@ export default class HttpHostingService extends BaseService {
   public constructor () {
     super(Category.HttpHostingService);
     if (!this.enabled) {
-      this.logger.warn('HTTP Hosting Service is not enabled. Exit now...');
+      this.logger.warn('Service is not enabled. Exit now...');
       return;
     }
     this.app.use(Logger.getExpressLogger(Category.HttpHostingService));
@@ -22,7 +22,7 @@ export default class HttpHostingService extends BaseService {
     const bind = config.get<string>('http_hosting_service.bind');
     const port = config.get<number>('http_hosting_service.port');
     this.app!.listen(port, bind, () => {
-      this.logger.info(`HTTP Hosting Service started listening at http://${bind}:${port}`);
+      this.logger.info(`Started listening at http://${bind}:${port}`);
     });
   }
 }

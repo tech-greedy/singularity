@@ -40,7 +40,7 @@ export default class DealPreparationWorker extends BaseService {
 
   public start (): void {
     if (!this.enabled) {
-      this.logger.warn('Deal Preparation Worker is not enabled. Exit now...');
+      this.logger.warn('Worker is not enabled. Exit now...');
     }
 
     this.startHealthCheck();
@@ -48,6 +48,7 @@ export default class DealPreparationWorker extends BaseService {
   }
 
   private async scan (request: ScanningRequest): Promise<void> {
+    this.logger.debug(`Started scanning.`, { id: request.id, name: request.name, path: request.path, minSize: request.minSize, maxSize: request.maxSize });
     let index = 0;
     for await (const fileList of Scanner.scan(request.path, request.minSize, request.maxSize)) {
       Scanner.buildSelector(request.path, fileList);
@@ -61,7 +62,7 @@ export default class DealPreparationWorker extends BaseService {
       });
       index++;
     }
-    this.logger.info(`Finished scanning. Inserted ${index} tasks.`);
+    this.logger.debug(`Finished scanning. Inserted ${index} tasks.`);
   }
 
   private async generate (request: GenerationRequest): Promise<[stdout: string, stderr: string, statusCode: number | null]> {
@@ -71,6 +72,7 @@ export default class DealPreparationWorker extends BaseService {
       Start: file.start,
       End: file.end
     })));
+    this.logger.debug(`Spawning generate-car.`, { outPath: this.outPath, parentPath: request.path });
     const child = spawn('generate-car', ['-o', this.outPath, '-p', request.path], {
       stdio: ['pipe', 'pipe', 'pipe']
     });
@@ -86,6 +88,7 @@ export default class DealPreparationWorker extends BaseService {
     try {
       await onExit(child);
     } catch (_) {}
+    this.logger.debug(`Child process finished.`, { stdout, stderr, exitCode: child.exitCode });
     return [stdout, stderr, child.exitCode];
   }
 
@@ -97,12 +100,12 @@ export default class DealPreparationWorker extends BaseService {
       workerId: this.workerId
     });
     if (newScanningWork) {
-      this.logger.info(`${this.workerId} - Received a new request - dataset: ${newScanningWork.name}`);
+      this.logger.info(`${this.workerId} - Polled a new scanning request.`, { name: newScanningWork.name, id: newScanningWork.id });
       try {
         await this.scan(newScanningWork);
       } catch (err) {
         if (err instanceof Error) {
-          this.logger.error(`${this.workerId} - Encountered an error - ${err.message}`);
+          this.logger.error(`${this.workerId} - Encountered an error.`, err.message);
           await Datastore.ScanningRequestModel.findByIdAndUpdate(newScanningWork.id, { status: 'error', errorMessage: err.message });
           return true;
         }
@@ -122,13 +125,14 @@ export default class DealPreparationWorker extends BaseService {
       workerId: this.workerId
     });
     if (newGenerationWork) {
-      this.logger.info(`${this.workerId} - Received a new request - dataset: ${newGenerationWork.datasetName} [${newGenerationWork.index}]`);
+      this.logger.info(`${this.workerId} - Polled a new generation request.`,
+        { id: newGenerationWork.id, datasetName: newGenerationWork.datasetName, index: newGenerationWork.index });
       const result = await this.generate(newGenerationWork);
 
       // Parse the output and update the database
       const [stdout, stderr, statusCode] = result!;
       if (statusCode !== 0) {
-        this.logger.error(`${this.workerId} - Encountered an error - ${stderr}`);
+        this.logger.error(`${this.workerId} - Encountered an error.`, stderr);
         await Datastore.GenerationRequestModel.findByIdAndUpdate(newGenerationWork.id, { status: 'error', errorMessage: stderr });
         return true;
       }
@@ -143,7 +147,8 @@ export default class DealPreparationWorker extends BaseService {
         pieceCid: output.PieceCid,
         carSize: carFileStat.size
       });
-      this.logger.info(`${this.workerId} - Finished Generation of dataset: ${newGenerationWork.datasetName} [${newGenerationWork.index}]`);
+      this.logger.info(`${this.workerId} - Finished Generation of dataset.`,
+        { id: newGenerationWork.id, datasetName: newGenerationWork.datasetName, index: newGenerationWork.index });
     }
 
     return newGenerationWork != null;
@@ -157,8 +162,8 @@ export default class DealPreparationWorker extends BaseService {
     let hasDoneWork = false;
     try {
       hasDoneWork = await this.pollWork();
-    } catch (err) {
-      this.logger.crit(err);
+    } catch (error) {
+      this.logger.crit(this.workerId, { error });
     }
     if (hasDoneWork) {
       setTimeout(this.startPollWork, this.ImmediatePollInterval);
