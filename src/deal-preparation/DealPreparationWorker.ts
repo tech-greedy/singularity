@@ -105,7 +105,7 @@ export default class DealPreparationWorker extends BaseService {
         await this.scan(newScanningWork);
       } catch (err) {
         if (err instanceof Error) {
-          this.logger.error(`${this.workerId} - Encountered an error.`, err.message);
+          this.logger.error(`${this.workerId} - Encountered an error.`, { error: err.message });
           await Datastore.ScanningRequestModel.findByIdAndUpdate(newScanningWork.id, { status: 'error', errorMessage: err.message });
           return true;
         }
@@ -132,7 +132,7 @@ export default class DealPreparationWorker extends BaseService {
       // Parse the output and update the database
       const [stdout, stderr, statusCode] = result!;
       if (statusCode !== 0) {
-        this.logger.error(`${this.workerId} - Encountered an error.`, stderr);
+        this.logger.error(`${this.workerId} - Encountered an error.`, { stderr });
         await Datastore.GenerationRequestModel.findByIdAndUpdate(newGenerationWork.id, { status: 'error', errorMessage: stderr });
         return true;
       }
