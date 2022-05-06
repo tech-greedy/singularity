@@ -195,11 +195,13 @@ export default class DealPreparationService extends BaseService {
       return;
     }
     // Only allow making change to the request if the scanning has completed
-    if (found.status !== 'completed') {
-      this.sendError(response, ErrorCode.CANNOT_CHANGE_STATE_IF_SCANNING_NOT_COMPLETE);
-      return;
+    if ((found.status === 'active' && status === 'paused') || (found.status === 'paused' && status === 'active')) {
+      await Datastore.ScanningRequestModel.findOneAndUpdate({
+        id: found.id,
+        status: found.status
+      }, { status: status });
+      this.logger.info(`Updated status of scanning request to "${status}".`);
     }
-
     await Datastore.GenerationRequestModel.updateMany({
       status: {
         $nin: [

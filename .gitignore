@@ -115,3 +115,4 @@ go-bodyshop/bodyshop.exe
 
 # Unit test results
 nunitresults.xml
+config/cars/

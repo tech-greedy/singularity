@@ -5,6 +5,6 @@ export default interface ScanningRequest {
   minSize: number,
   maxSize: number,
   workerId?: string,
-  status: 'active' | 'completed' | 'error',
+  status: 'active' | 'completed' | 'error' | 'paused',
   errorMessage?: string
 }

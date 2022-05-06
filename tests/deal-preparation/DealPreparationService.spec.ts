@@ -284,23 +284,10 @@ describe('DealPreparationService', () => {
         error: ErrorCode.DATASET_NOT_FOUND
       });
     });
-    it('should return error if database state is not complete', async () => {
-      const doc = await Datastore.ScanningRequestModel.create({
-        name: 'name',
-        status: 'active'
-      });
-      const response = await supertest(service['app'])
-        .post('/preparation/' + doc.id)
-        .send({ status: 'active' }).set('Accept', 'application/json');
-      expect(response.status).toEqual(400);
-      expect(response.body).toEqual({
-        error: ErrorCode.CANNOT_CHANGE_STATE_IF_SCANNING_NOT_COMPLETE
-      });
-    });
     it('should change status for all generation requests', async () => {
       const scanning = await Datastore.ScanningRequestModel.create({
         name: 'name',
-        status: 'completed'
+        status: 'active'
       });
       const r1 = await Datastore.GenerationRequestModel.create({
         datasetId: scanning.id,
@@ -314,6 +301,9 @@ describe('DealPreparationService', () => {
         .post('/preparation/' + scanning.id)
         .send({ status: 'paused' }).set('Accept', 'application/json');
       expect(response.status).toEqual(200);
+      expect(await Datastore.ScanningRequestModel.findById(scanning.id)).toEqual(jasmine.objectContaining({
+        status: 'paused'
+      }));
       expect(await Datastore.GenerationRequestModel.findById(r1.id)).toEqual(jasmine.objectContaining({
         status: 'paused'
       }));
