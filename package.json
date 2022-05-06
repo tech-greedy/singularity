@@ -7,6 +7,7 @@
   "scripts": {
     "build": "tsc && copyfiles \"config/**/*.toml\" dist",
     "postbuild": "chmod +x dist/src/singularity.js",
+    "init": "ts-node src/singularity.ts init",
     "start": "nodemon src/singularity.ts daemon",
     "test": "jasmine-ts --config=./tests/jasmine.json",
     "coverage": "nyc jasmine-ts --config=./tests/jasmine.json",

@@ -20,7 +20,7 @@ export default class IndexService extends BaseService {
     super(Category.IndexService);
     this.createIndexRequest = this.createIndexRequest.bind(this);
     if (!this.enabled) {
-      this.logger.warn('Index Service is not enabled. Exit now...');
+      this.logger.warn('Service is not enabled. Exit now...');
       return;
     }
     this.app.use(Logger.getExpressLogger(Category.IndexService));
@@ -50,7 +50,7 @@ export default class IndexService extends BaseService {
 
   private async createIndexRequest (request: Request, response: Response): Promise<void> {
     const id = request.params['id'];
-    this.logger.info(`Creating index for dataset ${id}`);
+    this.logger.info(`Creating index for dataset`, { id });
     const found = ObjectId.isValid(id) ? await Datastore.ScanningRequestModel.findById(id) : await Datastore.ScanningRequestModel.findOne({ name: id });
     if (!found) {
       this.sendError(response, ErrorCode.DATASET_NOT_FOUND);
@@ -134,7 +134,7 @@ export default class IndexService extends BaseService {
   }
 
   private sendError (response: Response, error: ErrorCode) {
-    this.logger.warn(`Error code - ${error}`);
+    this.logger.warn(`Error code`, { error });
     response.status(400);
     response.end(JSON.stringify({ error }));
   }

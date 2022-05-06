@@ -13,7 +13,7 @@ export default class DealTrackingService extends BaseService {
 
   public start (): void {
     if (!this.enabled) {
-      this.logger.warn('Deal Tracking Service is not enabled. Exit now...');
+      this.logger.warn('Service is not enabled. Exit now...');
     }
 
     this.startDealTracking();
@@ -25,6 +25,7 @@ export default class DealTrackingService extends BaseService {
   }
 
   private async dealTracking (): Promise<void> {
+    this.logger.info('Start update deal tracking');
     const clientStates = await Datastore.DealTrackingStateModel.find({ stateType: 'client', stateValue: 'track' });
     for (const clientState of clientStates) {
       const client = clientState.stateKey;
@@ -32,19 +33,18 @@ export default class DealTrackingService extends BaseService {
       try {
         await this.insertDealFromFilfox(client, lastDeal.length > 0 ? lastDeal[0].dealId : 0);
       } catch (error) {
-        this.logger.error('Encountered an error when importing deals from filfox');
-        this.logger.error(error);
+        this.logger.error('Encountered an error when importing deals from filfox', { error });
       }
       try {
         await this.updateDealFromLotus(client);
       } catch (error) {
-        this.logger.error('Encountered an error when updating deals from lotus');
-        this.logger.error(error);
+        this.logger.error('Encountered an error when updating deals from lotus', { error });
       }
     }
   }
 
   private async insertDealFromFilfox (client: string, lastDeal: number): Promise<void> {
+    this.logger.debug('Inserting new deals from filfox', { client, lastDeal });
     let page = 0;
     let response;
     do {
@@ -53,7 +53,7 @@ export default class DealTrackingService extends BaseService {
       response = await retry(
         async () => {
           const url = `https://filfox.info/api/v1/deal/list?address=${client}&pageSize=100&page=${page}`;
-          this.logger.info(`Fetching from ${url}`);
+          this.logger.debug(`Fetching from ${url}`);
           let r;
           try {
             r = await axios.get(url);
@@ -67,7 +67,7 @@ export default class DealTrackingService extends BaseService {
           minTimeout: 60_000
         }
       );
-      this.logger.info(`Received ${response.data['deals'].length} deal entries.`);
+      this.logger.debug(`Received ${response.data['deals'].length} deal entries.`);
       for (const deal of response.data['deals']) {
         if (deal['id'] <= lastDeal) {
           breakOuter = true;
@@ -94,6 +94,7 @@ export default class DealTrackingService extends BaseService {
   }
 
   private async updateDealFromLotus (client: string): Promise<void> {
+    this.logger.debug('Start update deal state from lotus.', { client });
     const api = config.get<string>('deal_tracking_service.lotus_api');
     const token = config.get<string>('deal_tracking_service.lotus_token');
     for await (const dealState of Datastore.DealStateModel.find({
@@ -104,6 +105,7 @@ export default class DealTrackingService extends BaseService {
       if (token !== '') {
         headers['Authorization'] = `Bearer ${token}`;
       }
+      this.logger.debug(`Fetching from ${api}`, { dealId: dealState.dealId });
       const response = await axios.post(api, {
         id: 1,
         jsonrpc: '2.0',
