@@ -1,30 +1,46 @@
 [connection]
+# Connection string to MongoDB, it can be either a built-in mongodb
+# shipped with this software or a standalone mongodb server
 database = "mongodb://127.0.0.1:37000"
+
+# Connection string to deal preparation service, used by Singularity CLI
 deal_preparation_service = 'http://127.0.0.1:7001'
+
+# Connection string to index service, used by Singularity CLI
 index_service = 'http://127.0.0.1:7003'
 
 [deal_preparation_service]
 enabled = true
+# API to serve singularity prep commands
 bind = "0.0.0.0"
 port = 7001
 
 [database]
+# Start a built-in MongoDB server shipped with this software
 start_local = true
+# The path to store the MongoDB database
 local_path = "./database"
+# MongoDB API
 local_bind = "0.0.0.0"
 local_port = 37000
 
 [deal_preparation_worker]
-num_workers = 2
 enabled = true
+# Number of workers to start, one worker consumes 2 - 2.5 CPUs
+num_workers = 2
+# Whether to cleanup temporary CAR files
 enable_cleanup = true
+# Path to store generated CAR files
 out_dir = "./cars"
 
 [index_service]
 enabled = true
+# API to serve singularity index commands
 bind = "0.0.0.0"
 port = 7003
+# Whether to start a built-in IPFS daemon
 start_ipfs = true
+# If not using the built-in IPFS daemon, use below URI to connect to IPFS API
 ipfs_http = "http://localhost:5002"
 ipfs_grpc = "wss://localhost:5003"
 
