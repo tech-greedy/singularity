@@ -107,6 +107,9 @@ index.command('create')
     }
 
     const cid: string = response.data.rootCid;
+    if (response.data.warning) {
+      console.warn(response.data.warning);
+    }
     console.log('To publish the index to IPNS:');
     console.log(`  ipfs name publish /ipfs/${cid}`);
     console.log('To publish the index to DNSLink:');

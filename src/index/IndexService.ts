@@ -32,17 +32,20 @@ export default class IndexService extends BaseService {
     });
     this.app.get('/create/:id', this.createIndexRequest);
     this.ipfsClient = create({
-      grpc: config.get('index_service.ipfs_grpc'),
       http: config.get('index_service.ipfs_http')
     });
   }
 
   private async pinIndex (dir: DirNode): Promise<CID> {
     for (const [name, entry] of dir.entries.entries()) {
-      if ((<DirNode | FileNode>entry).type === 'dir') {
+      const type = (<DirNode | FileNode>entry).type;
+      if (type === 'dir') {
         dir.entries.set(name, await this.pinIndex(<DirNode>entry));
+      } else if (type === 'file') {
+        (<FileNode>entry).sourcesMap = null;
       }
     }
+    dir.sourcesMap = null;
     return this.ipfsClient.dag.put(dir, {
       pin: true
     });
@@ -60,14 +63,15 @@ export default class IndexService extends BaseService {
       this.sendError(response, ErrorCode.SCANNING_INCOMPLETE);
       return;
     }
-    const unfinishedGenerations = await Datastore.GenerationRequestModel.count({ datasetId: id, status: { $ne: 'completed' } });
+    const unfinishedGenerations = await Datastore.GenerationRequestModel.count({ datasetId: found.id, status: { $ne: 'completed' } });
     const root : DirNode = {
       entries: new Map(),
       name: '',
-      sources: new Map(),
+      sourcesMap: new Map(),
+      sources: [],
       type: 'dir'
     };
-    for await (const generation of Datastore.GenerationRequestModel.find({ datasetId: id, status: 'completed' }).sort({ index: 1 })) {
+    for await (const generation of Datastore.GenerationRequestModel.find({ datasetId: found.id, status: 'completed' }).sort({ index: 1 })) {
       const dataCid = generation.dataCid!;
       const pieceCid = generation.pieceCid!;
       for (const file of generation.fileList) {
@@ -75,35 +79,51 @@ export default class IndexService extends BaseService {
         const segments = path.relative(found.path, file.path).split(path.sep);
         // Enter directories
         for (let i = 0; i < segments.length - 1; ++i) {
-          node.sources.set(dataCid, {
+          const source = {
             dataCid, pieceCid, selector: file.selector.slice(0, i)
-          });
+          };
+          if (!node.sourcesMap!.has(dataCid)) {
+            node.sourcesMap!.set(dataCid, source);
+            node.sources.push(source);
+          }
           if (!node.entries.has(segments[i])) {
-            node.entries.set(segments[i], {
+            const entry : DirNode = {
               entries: new Map(),
-              name: segments[i],
-              sources: new Map(),
-              type: 'dir'
-            });
+              sourcesMap: new Map(),
+              sources: [],
+              type: 'dir',
+              name: segments[i]
+            };
+            node.entries.set(segments[i], entry);
           }
           node = <DirNode>node.entries.get(segments[i]);
         }
         // Handle file node
         const segment = segments[segments.length - 1];
-        node.sources.set(dataCid, {
+        const source = {
           dataCid, pieceCid, selector: file.selector.slice(0, file.selector.length - 1)
-        });
+        };
+        if (!node.sourcesMap!.has(dataCid)) {
+          node.sourcesMap!.set(dataCid, source);
+          node.sources.push(source);
+        }
         if (!node.entries.has(segment)) {
           node.entries.set(segment, {
             name: segment,
             size: file.size,
-            sources: new Map(),
+            sourcesMap: new Map(),
+            sources: [],
             type: 'file'
           });
         }
-        (<FileNode>node.entries.get(segment)).sources.set(dataCid, {
+        const fileSource = {
           dataCid, pieceCid, selector: file.selector, from: file.start, to: file.end
-        });
+        };
+        const sourceMap = (<FileNode>node.entries.get(segment)).sourcesMap!;
+        if (!sourceMap.has(dataCid)) {
+          sourceMap.set(dataCid, fileSource);
+          (<FileNode>node.entries.get(segment)).sources.push(fileSource);
+        }
       }
     }
 

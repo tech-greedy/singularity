@@ -8,13 +8,14 @@ const version = packageJson.version;
 const program = new Command();
 program.name('singularity-retrieve')
   .version(version)
-  .description('A tool for large-scale clients with PB-scale data onboarding to Filecoin network');
+  .description('A tool for large-scale clients with PB-scale data onboarding to Filecoin network')
 
 program.command('ls').description('List the files under a path')
   .argument('<path>', 'The path inside a dataset, i.e. singularity://ipns/dataset.io/path/to/folder')
+  .requiredOption('--ipfs-api <ipfs_api>', 'The IPFS API to look for dataset index')
   .option('-v, --verbose', 'Use a more verbose output')
   .action(async (path, options) => {
-    const files = await Retrieval.list(path);
+    const files = await Retrieval.list(options.ipfsApi, path);
     if (options.verbose) {
       console.table(files);
     } else {
@@ -26,8 +27,9 @@ program.command('ls').description('List the files under a path')
   });
 program.command('show').description('Show the detailed sources for the corresponding CID and how files are splitted')
   .argument('<path>', 'The path inside a dataset, i.e. singularity://ipns/dataset.io/path/to/folder')
-  .action(async (path) => {
-    const sources = await Retrieval.show(path);
+  .requiredOption('--ipfs-api <ipfs_api>', 'The IPFS API to look for dataset index')
+  .action(async (path, options) => {
+    const sources = await Retrieval.show(options.ipfsApi, path);
     console.table(sources);
     process.exit(0);
   });
@@ -35,8 +37,9 @@ program.command('cp').description('Copy the file from storage provider to local 
   .argument('<path>', 'The path inside a dataset, i.e. singularity://ipns/dataset.io/path/to/folder')
   .argument('<dest>', 'The destination to save the downloaded file or directory')
   .requiredOption('-p, --provider [providers...]', 'The storage providers to retrieve the data from')
+  .requiredOption('--ipfs-api <ipfs_api>', 'The IPFS API to look for dataset index')
   .action(async (path, dest, options) => {
-    await Retrieval.cp(path, dest, options.provider);
+    await Retrieval.cp(options.ipfsApi, path, dest, options.provider);
   });
 
 program.parse();
