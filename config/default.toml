@@ -47,7 +47,6 @@ port = 7003
 start_ipfs = true
 # If not using the built-in IPFS daemon, use below URI to connect to IPFS API
 ipfs_http = "http://localhost:5002"
-ipfs_grpc = "wss://localhost:5003"
 
 [http_hosting_service]
 enabled = true

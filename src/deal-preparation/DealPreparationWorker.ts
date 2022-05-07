@@ -173,7 +173,7 @@ export default class DealPreparationWorker extends BaseService {
   }
 
   private async pollWork (): Promise<boolean> {
-    this.logger.info(`${this.workerId} - Polling for work`);
+    this.logger.debug(`${this.workerId} - Polling for work`);
     let hasDoneWork = await this.pollScanningWork();
     if (!hasDoneWork) {
       hasDoneWork = await this.pollGenerationWork();
