@@ -178,7 +178,9 @@ export default class Datastore {
       const localPath = config.has('database.local_path') ? path.resolve(process.env.NODE_CONFIG_DIR!, config.get<string>('database.local_path')) : undefined;
       await Datastore.setupLocalMongoDb(config.get('database.local_bind'), config.get('database.local_port'), inMemory ? undefined : localPath);
     }
+  }
 
+  public static async connect (): Promise<void> {
     if (config.has('connection.database')) {
       await Datastore.connectMongoDb(config.get('connection.database'));
       Datastore.setupDataModels();

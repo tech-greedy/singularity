@@ -6,6 +6,7 @@ export default class Utils {
     if (!Utils.initialized) {
       Utils.initialized = true;
       await Datastore.init(true);
+      await Datastore.connect();
     }
   }
 }

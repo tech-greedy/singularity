@@ -2,6 +2,7 @@
 /* eslint-disable import/first */
 import { homedir } from 'os';
 import path from 'path';
+import cluster from 'node:cluster';
 process.env.NODE_CONFIG_DIR = process.env.SINGULARITY_PATH || path.join(homedir(), '.singularity');
 import { Argument, Command } from 'commander';
 import packageJson from '../package.json';
@@ -18,6 +19,8 @@ import GetPreparationDetailsResponse from './deal-preparation/GetPreparationDeta
 import fs from 'fs-extra';
 import Logger, { Category } from './common/Logger';
 import GenerationRequest from './common/model/GenerationRequest';
+import { Worker } from 'cluster';
+import * as IpfsCore from 'ipfs-core';
 
 const logger = Logger.getLogger(Category.Cli);
 const version = packageJson.version;
@@ -44,52 +47,88 @@ program.command('daemon')
   .description('Start a daemon process for deal preparation and deal making')
   .action((_options) => {
     (async function () {
-      let indexService: IndexService;
-      process.on('SIGUSR2', async () => {
-        // Gracefully turn off mongodb memory server
-        if (Datastore['mongoMemoryServer']) {
-          await Datastore['mongoMemoryServer'].stop();
-        }
-        // unlock ipfs repo
-        if (config.get('index_service.enabled') && config.get('index_service.start_ipfs') && indexService && indexService['ipfsClient']) {
-          await indexService['ipfsClient'].stop();
-        }
+      if (cluster.isMaster) {
+        let indexService: IndexService;
+        process.on('SIGUSR2', async () => {
+          // Gracefully turn off mongodb memory server
+          if (Datastore['mongoMemoryServer']) {
+            await Datastore['mongoMemoryServer'].stop();
+          }
+          // unlock ipfs repo
+          if (config.get('index_service.enabled') && config.get('index_service.start_ipfs') && indexService && indexService['ipfsClient']) {
+            await indexService['ipfsClient'].stop();
+          }
 
-        process.kill(process.pid, 'SIGKILL');
-      });
-      await Datastore.init(false);
-      if (config.get('deal_preparation_service.enabled')) {
-        new DealPreparationService().start();
-      }
-      if (config.get('deal_preparation_worker.enable_cleanup')) {
-        const outDir = path.resolve(process.env.NODE_CONFIG_DIR!, config.get('deal_preparation_worker.out_dir'));
-        if (await fs.pathExists(outDir)) {
-          for (const file of await fs.readdir(outDir)) {
-            const regex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.car$/;
-            if (regex.test(file)) {
-              const fullPath = path.join(outDir, file);
-              logger.info(`Removing temporary file ${fullPath}`);
-              await fs.remove(fullPath);
+          process.kill(process.pid, 'SIGKILL');
+        });
+        await Datastore.init(false);
+        await Datastore.connect();
+        if (config.get('ipfs.enabled')) {
+          await IpfsCore.create();
+        }
+        if (config.get('deal_preparation_worker.enable_cleanup')) {
+          const outDir = path.resolve(process.env.NODE_CONFIG_DIR!, config.get('deal_preparation_worker.out_dir'));
+          if (await fs.pathExists(outDir)) {
+            for (const file of await fs.readdir(outDir)) {
+              const regex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.car$/;
+              if (regex.test(file)) {
+                const fullPath = path.join(outDir, file);
+                logger.info(`Removing temporary file ${fullPath}`);
+                await fs.remove(fullPath);
+              }
             }
           }
         }
-      }
-      if (config.get('deal_preparation_worker.enabled')) {
-        const numWorkers = config.has('deal_preparation_worker.num_workers') ? config.get<number>('deal_preparation_worker.num_workers') : 1;
-        for (let i = 0; i < numWorkers; ++i) {
-          new DealPreparationWorker().start();
+        const workers: [Worker, string][] = [];
+        let readied = 0;
+        cluster.on('message', _ => {
+          readied += 1;
+          if (readied === workers.length) {
+            for (const w of workers) {
+              w[0].send(w[1]);
+            }
+          }
+        });
+        if (config.get('deal_preparation_service.enabled')) {
+          workers.push([cluster.fork(), 'deal_preparation_service']);
         }
-      }
-      if (config.get('index_service.enabled')) {
-        indexService = new IndexService();
-        await indexService.init();
-        indexService.start();
-      }
-      if (config.get('http_hosting_service.enabled')) {
-        new HttpHostingService().start();
-      }
-      if (config.get('deal_tracking_service.enabled')) {
-        new DealTrackingService().start();
+        if (config.get('deal_preparation_worker.enabled')) {
+          const numWorkers = config.has('deal_preparation_worker.num_workers') ? config.get<number>('deal_preparation_worker.num_workers') : 1;
+          for (let i = 0; i < numWorkers; ++i) {
+            workers.push([cluster.fork(), 'deal_preparation_worker']);
+          }
+        }
+        if (config.get('index_service.enabled')) {
+          workers.push([cluster.fork(), 'index_service']);
+        }
+        if (config.get('http_hosting_service.enabled')) {
+          workers.push([cluster.fork(), 'http_hosting_service']);
+        }
+        if (config.get('deal_tracking_service.enabled')) {
+          workers.push([cluster.fork(), 'deal_tracking_service']);
+        }
+      } else if (cluster.isWorker) {
+        await Datastore.connect();
+        process.on('message', async (msg) => {
+          switch (msg) {
+            case 'deal_preparation_service':
+              new DealPreparationService().start();
+              break;
+            case 'deal_preparation_worker':
+              new DealPreparationWorker().start();
+              break;
+            case 'index_service':
+              new IndexService().start();
+              break;
+            case 'http_hosting_service':
+              new HttpHostingService().start();
+              break;
+            case 'deal_tracking_service':
+              new DealTrackingService().start();
+              break;
+          }
+        });
+        process.send!('ready');
       }
     })();
   });
