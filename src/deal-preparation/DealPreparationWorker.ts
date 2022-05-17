@@ -52,14 +52,23 @@ export default class DealPreparationWorker extends BaseService {
     let index = 0;
     for await (const fileList of Scanner.scan(request.path, request.minSize, request.maxSize)) {
       Scanner.buildSelector(request.path, fileList);
-      await Datastore.GenerationRequestModel.create({
+      const generationRequest = await Datastore.GenerationRequestModel.create({
         datasetId: request.id,
         datasetName: request.name,
         path: request.path,
         index,
-        fileList,
+        fileList: fileList.slice(0, 1000),
         status: 'active'
       });
+      for (let i = 1000; i < fileList.length; i += 1000) {
+        await Datastore.GenerationRequestModel.findByIdAndUpdate(generationRequest.id, {
+          $push: {
+            fileList: {
+              $each: fileList.slice(i, i + 1000)
+            }
+          }
+        });
+      }
       index++;
     }
     this.logger.debug(`Finished scanning. Inserted ${index} tasks.`);

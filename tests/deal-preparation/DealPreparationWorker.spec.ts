@@ -148,6 +148,32 @@ describe('DealPreparationWorker', () => {
     })
   })
   describe('scan', () => {
+    it('should work with >1000 fileList', async () => {
+      let fileList: FileList = Array(5000).fill(null).map((_, i) => ({
+        path: `folder/${i}.txt`,
+        size: 100,
+        selector: [],
+        start: 0,
+        end: 0
+      }));
+      const f = async function * () : AsyncGenerator<FileList> {
+        yield fileList;
+      };
+      spyOn(Scanner, 'scan').and.returnValue(f());
+      await worker['scan']({
+        id: 'id',
+        name: 'name',
+        path: 'tests/test_folder',
+        minSize: 12,
+        maxSize: 16,
+        status: 'active'
+      });
+      const requests = await Datastore.GenerationRequestModel.find({}, null, { sort: { index: 1 } });
+      expect(requests.length).toEqual(1);
+      expect(requests[0].fileList.length).toEqual(5000);
+      expect(requests[0].fileList[0].path).toEqual('folder/0.txt');
+      expect(requests[0].fileList[4999].path).toEqual('folder/4999.txt');
+    })
     it('should get the correct fileList', async () => {
       await worker['scan']({
         id: 'id',
