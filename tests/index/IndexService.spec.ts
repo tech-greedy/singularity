@@ -71,16 +71,16 @@ describe('IndexService', () => {
         status: 'completed',
         pieceCid: 'piece1',
         dataCid: 'data1',
-        fileList: [
+        generatedFileList: [
           {
-            path: 'base/path/a/b.mp4',
+            path: 'a/b.mp4',
             selector: [0, 0],
             size: 100,
             start: 0,
             end: 100
           },
           {
-            path: 'base/path/a/c.mp4',
+            path: 'a/c.mp4',
             selector: [0, 1],
             size: 100,
             start: 0,
@@ -93,16 +93,16 @@ describe('IndexService', () => {
         status: 'completed',
         pieceCid: 'piece2',
         dataCid: 'data2',
-        fileList: [
+        generatedFileList: [
           {
-            path: 'base/path/a/c.mp4',
+            path: 'a/c.mp4',
             selector: [0, 0],
             size: 100,
             start: 50,
             end: 100
           },
           {
-            path: 'base/path/d/e.mp4',
+            path: 'd/e.mp4',
             selector: [1, 0],
             size: 100,
             start: 0,
