@@ -79,7 +79,7 @@ export default class IndexService extends BaseService {
         // Enter directories
         for (let i = 0; i < segments.length - 1; ++i) {
           const source = {
-            dataCid, pieceCid, selector: file.selector.slice(0, i)
+            dataCid, pieceCid, selector: file.selector!.slice(0, i)
           };
           if (!node.sourcesMap!.has(dataCid)) {
             node.sourcesMap!.set(dataCid, source);

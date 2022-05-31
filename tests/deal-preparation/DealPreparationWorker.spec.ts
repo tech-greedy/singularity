@@ -134,27 +134,15 @@ describe('DealPreparationWorker', () => {
       }))
     })
   })
-  describe('buildSelector', () => {
-    it('should return correct selector', () => {
-      const fileList : FileList = ['base/path/a.txt', 'base/path/b/c/d.txt', 'base/path/c/d.txt', 'base/path/c/d2.txt', 'base/path/e.txt'].map((path) => ({
-        path, selector: [], start: 0, end: 0, size: 0, name: 'dummy'
-      }));
-      Scanner.buildSelector("base/path", fileList);
-      expect(fileList[0].selector).toEqual([0]);
-      expect(fileList[1].selector).toEqual([1,0,0]);
-      expect(fileList[2].selector).toEqual([2,0]);
-      expect(fileList[3].selector).toEqual([2,1]);
-      expect(fileList[4].selector).toEqual([3]);
-    })
-  })
   describe('scan', () => {
     it('should work with >1000 fileList', async () => {
       let fileList: FileList = Array(5000).fill(null).map((_, i) => ({
-        path: `folder/${i}.txt`,
+        path: `tests/test_folder/folder/${i}.txt`,
         size: 100,
         selector: [],
         start: 0,
-        end: 0
+        end: 0,
+        dir: false
       }));
       const f = async function * () : AsyncGenerator<FileList> {
         yield fileList;
@@ -170,9 +158,9 @@ describe('DealPreparationWorker', () => {
       });
       const requests = await Datastore.GenerationRequestModel.find({}, null, { sort: { index: 1 } });
       expect(requests.length).toEqual(1);
-      expect(requests[0].fileList.length).toEqual(5000);
-      expect(requests[0].fileList[0].path).toEqual('folder/0.txt');
-      expect(requests[0].fileList[4999].path).toEqual('folder/4999.txt');
+      expect(requests[0].fileList.length).toEqual(5001);
+      expect(requests[0].fileList[0].path).toEqual('tests/test_folder/folder');
+      expect(requests[0].fileList[5000].path).toEqual('tests/test_folder/folder/4999.txt');
     })
     it('should get the correct fileList', async () => {
       await worker['scan']({
@@ -201,17 +189,33 @@ describe('DealPreparationWorker', () => {
         path: 'tests/test_folder',
         index: 0,
         fileList: [jasmine.objectContaining({
+          path: 'tests/test_folder/a',
+          size: 0,
+          start: 0,
+          end: 0,
+          selector: [],
+          dir: true
+        }), jasmine.objectContaining({
           path: 'tests/test_folder/a/1.txt',
           size: 3,
           start: 0,
           end: 0,
-          selector: [0, 0]
+          selector: [],
+          dir: false
+        }), jasmine.objectContaining({
+          path: 'tests/test_folder/b',
+          size: 0,
+          start: 0,
+          end: 0,
+          selector: [],
+          dir: true
         }), jasmine.objectContaining({
           path: 'tests/test_folder/b/2.txt',
           size: 27,
           start: 0,
           end: 9,
-          selector: [1, 0]
+          selector: [],
+          dir: false
         })],
         status: 'active',
       }));
@@ -221,11 +225,19 @@ describe('DealPreparationWorker', () => {
         path: 'tests/test_folder',
         index: 1,
         fileList: [jasmine.objectContaining({
+          path: 'tests/test_folder/b',
+          size: 0,
+          start: 0,
+          end: 0,
+          selector: [],
+          dir: true
+        }), jasmine.objectContaining({
           path: 'tests/test_folder/b/2.txt',
           size: 27,
           start: 9,
           end: 21,
-          selector: [0, 0]
+          selector: [],
+          dir: false
         })],
         status: 'active',
       }));
@@ -235,17 +247,33 @@ describe('DealPreparationWorker', () => {
         path: 'tests/test_folder',
         index: 2,
         fileList: [jasmine.objectContaining({
+          path: 'tests/test_folder/b',
+          size: 0,
+          start: 0,
+          end: 0,
+          selector: [],
+          dir: true
+        }), jasmine.objectContaining({
           path: 'tests/test_folder/b/2.txt',
           size: 27,
           start: 21,
           end: 27,
-          selector: [0, 0]
+          selector: [],
+          dir: false
+        }), jasmine.objectContaining({
+          path: 'tests/test_folder/c',
+          size: 0,
+          start: 0,
+          end: 0,
+          selector: [],
+          dir: true
         }), jasmine.objectContaining({
           path: 'tests/test_folder/c/3.txt',
           size: 9,
           start: 0,
           end: 0,
-          selector: [1, 0]
+          selector: [],
+          dir: false
         })],
         status: 'active',
       }));
@@ -259,7 +287,8 @@ describe('DealPreparationWorker', () => {
           size: 9,
           start: 0,
           end: 0,
-          selector: [0]
+          selector: [],
+          dir: false
         })],
         status: 'active',
       }));

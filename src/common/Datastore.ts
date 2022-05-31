@@ -113,7 +113,9 @@ export default class Datastore {
       size: Schema.Types.Number,
       start: Schema.Types.Number,
       end: Schema.Types.Number,
-      selector: [Schema.Types.Number]
+      selector: [Schema.Types.Number],
+      cid: Schema.Types.String,
+      dir: Schema.Types.Boolean
     });
     const generationRequestSchema = new Schema<GenerationRequest>({
       datasetId: Schema.Types.String,

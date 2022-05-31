@@ -1,36 +1,7 @@
 import rrdir from 'rrdir';
-import path from 'path';
 import { FileList } from '../common/model/GenerationRequest';
 
 export default class Scanner {
-  public static buildSelector (basePath: string, fileList: FileList) {
-    let previousSegments: string[] = [];
-    let previousSelector: number[] = [];
-    for (const fileInfo of fileList) {
-      const segments = path.relative(basePath, fileInfo.path).split(path.sep);
-      const newSelector: number[] = [];
-      let i = 0;
-      while (i < previousSegments.length) {
-        if (previousSegments[i] !== segments[i]) {
-          break;
-        }
-        newSelector.push(previousSelector[i]);
-        ++i;
-      }
-      if (previousSelector.length !== 0) {
-        newSelector.push(previousSelector[i] + 1);
-        ++i;
-      }
-      while (i < segments.length) {
-        newSelector.push(0);
-        ++i;
-      }
-      fileInfo.selector = newSelector;
-      previousSegments = segments;
-      previousSelector = newSelector;
-    }
-  }
-
   public static async * scan (root: string, minSize: number, maxSize: number): AsyncGenerator<FileList> {
     let currentList: FileList = [];
     let currentSize = 0;
@@ -38,6 +9,14 @@ export default class Scanner {
       stats: true, followSymlinks: true
     })) {
       if (entry.directory) {
+        currentList.push({
+          size: 0,
+          start: 0,
+          end: 0,
+          path: entry.path,
+          selector: [],
+          dir: true
+        });
         continue;
       }
       if (entry.err) {
@@ -50,7 +29,8 @@ export default class Scanner {
           start: 0,
           end: 0,
           path: entry.path,
-          selector: []
+          selector: [],
+          dir: false
         });
         currentSize = newSize;
         if (newSize >= minSize) {
@@ -70,7 +50,8 @@ export default class Scanner {
             start: entry.stats!.size - remaining,
             end: entry.stats!.size - remaining + splitSize,
             path: entry.path,
-            selector: []
+            selector: [],
+            dir: false
           });
           currentSize += splitSize;
           remaining -= splitSize;

@@ -19,6 +19,8 @@ enabled = true
 # API to serve singularity prep commands
 bind = "0.0.0.0"
 port = 7001
+minDealSizeRatio = 0.55
+maxDealSizeRatio = 0.95
 
 [database]
 # Start a built-in MongoDB server shipped with this software

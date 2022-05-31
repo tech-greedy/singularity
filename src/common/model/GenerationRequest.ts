@@ -1,6 +1,8 @@
 export interface FileInfo {
   path: string,
+  dir: boolean,
   size: number,
+  cid?: string,
   selector: number[],
   start: number,
   end: number,
@@ -14,7 +16,7 @@ export default interface GenerationRequest {
   datasetName: string,
   path: string,
   index: number,
-  fileList: FileList
+  fileList: FileList,
   workerId?: string,
   status: 'active' | 'paused' | 'completed' | 'error',
   errorMessage?: string,

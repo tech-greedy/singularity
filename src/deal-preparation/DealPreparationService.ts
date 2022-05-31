@@ -110,7 +110,8 @@ export default class DealPreparationService extends BaseService {
         size: f.size,
         selector: f.selector,
         start: f.start,
-        end: f.end
+        end: f.end,
+        dir: f.dir
       })),
       workerId: found.workerId,
       status: found.status,
@@ -131,7 +132,7 @@ export default class DealPreparationService extends BaseService {
       this.sendError(response, ErrorCode.DATASET_NOT_FOUND);
       return;
     }
-    const generations = await Datastore.GenerationRequestModel.find({ datasetId: found.id });
+    const generations = await Datastore.GenerationRequestModel.find({ datasetId: found.id }, { fileList: 0 });
     const result: GetPreparationDetailsResponse = {
       id: found.id,
       name: found.name,
@@ -224,13 +225,15 @@ export default class DealPreparationService extends BaseService {
       if (ObjectId.isValid(generation)) {
         changedGeneration = (await Datastore.GenerationRequestModel.findOneAndUpdate(
           { id: generation, status: actionMap[action][0] },
-          { status: actionMap[action][1] }))
+          { status: actionMap[action][1] },
+          { projection: { fileList: 0 } }))
           ? 1
           : 0;
       } else if (generationIsInt) {
         changedGeneration = (await Datastore.GenerationRequestModel.findOneAndUpdate(
           { index: generation, status: actionMap[action][0] },
-          { status: actionMap[action][1] }))
+          { status: actionMap[action][1] },
+          { projection: { fileList: 0 } }))
           ? 1
           : 0;
       } else {
@@ -265,8 +268,8 @@ export default class DealPreparationService extends BaseService {
       return;
     }
 
-    const minSize = Math.floor(dealSizeNumber * 0.55);
-    const maxSize = Math.floor(dealSizeNumber * 0.95);
+    const minSize = Math.floor(dealSizeNumber * config.get<number>('deal_preparation_service.minDealSizeRatio'));
+    const maxSize = Math.floor(dealSizeNumber * config.get<number>('deal_preparation_service.maxDealSizeRatio'));
     try {
       await fs.access(path, constants.F_OK);
     } catch (_) {
