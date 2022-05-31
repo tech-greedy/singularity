@@ -73,9 +73,9 @@ export default class IndexService extends BaseService {
     for await (const generation of Datastore.GenerationRequestModel.find({ datasetId: found.id, status: 'completed' }).sort({ index: 1 })) {
       const dataCid = generation.dataCid!;
       const pieceCid = generation.pieceCid!;
-      for (const file of generation.fileList) {
+      for (const file of generation.generatedFileList) {
         let node = root;
-        const segments = path.relative(found.path, file.path).split(path.sep);
+        const segments = file.path.split(path.sep);
         // Enter directories
         for (let i = 0; i < segments.length - 1; ++i) {
           const source = {

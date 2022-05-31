@@ -9,14 +9,6 @@ export default class Scanner {
       stats: true, followSymlinks: true
     })) {
       if (entry.directory) {
-        currentList.push({
-          size: 0,
-          start: 0,
-          end: 0,
-          path: entry.path,
-          selector: [],
-          dir: true
-        });
         continue;
       }
       if (entry.err) {
@@ -28,9 +20,7 @@ export default class Scanner {
           size: entry.stats!.size,
           start: 0,
           end: 0,
-          path: entry.path,
-          selector: [],
-          dir: false
+          path: entry.path
         });
         currentSize = newSize;
         if (newSize >= minSize) {
@@ -49,9 +39,7 @@ export default class Scanner {
             size: entry.stats!.size,
             start: entry.stats!.size - remaining,
             end: entry.stats!.size - remaining + splitSize,
-            path: entry.path,
-            selector: [],
-            dir: false
+            path: entry.path
           });
           currentSize += splitSize;
           remaining -= splitSize;

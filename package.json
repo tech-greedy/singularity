@@ -6,6 +6,8 @@
   "types": "dist/source/start.d.ts",
   "scripts": {
     "build": "tsc && copyfiles \"config/**/*.toml\" dist",
+    "build-singularity": "ncc build src/singularity.ts -m -o dist/ncc/singularity --target es2020",
+    "build-singularity-retrieve": "ncc build src/singularity-retrieve.ts -m -o dist/ncc/singularity-retrieve --target es2020",
     "postbuild": "chmod +x dist/src/singularity.js",
     "init": "ts-node src/singularity.ts init",
     "start": "nodemon src/singularity.ts daemon",
@@ -41,13 +43,14 @@
     "@types/typescript": "^2.0.0",
     "@typescript-eslint/eslint-plugin": "^5.15.0",
     "@typescript-eslint/parser": "^5.15.0",
+    "@vercel/ncc": "^0.34.0",
     "copyfiles": "^2.4.1",
     "eslint": "^7.32.0",
     "eslint-config-standard": "^16.0.3",
     "eslint-plugin-import": "^2.25.4",
     "eslint-plugin-node": "^11.1.0",
     "eslint-plugin-prefer-arrow": "^1.2.3",
-    "eslint-plugin-promise": "^6.0.0",
+    "eslint-plugin-promise": "^5.0.0",
     "eslint-plugin-standard": "^5.0.0",
     "jasmine": "^3.99.0",
     "jasmine-reporters": "^2.5.0",
@@ -90,8 +93,8 @@
     "dist"
   ],
   "bin": {
-    "singularity": "dist/src/singularity.js",
-    "singularity-retrieve": "dist/src/singularity-retrieve.js"
+    "singularity": "dist/ncc/singularity/index.js",
+    "singularity-retrieve": "dist/ncc/singularity-retrieve/index.js"
   },
   "nyc": {
     "extends": "@istanbuljs/nyc-config-typescript",

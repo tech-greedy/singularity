@@ -21,10 +21,14 @@ describe('Datastore', () => {
     it('should be able to create and fetch entries', async () => {
       const model = new Datastore.GenerationRequestModel();
       model.datasetName = 'name';
-      const fileInfo1 = {path: 'path1', start: 0, end: 0 , size: 1024, selector: [], dir: false}
-      const fileInfo2 = {path: 'path2', start: 0, end: 0 , size: 1024, selector: [], dir: false}
-      const fileInfo3 = {path: 'path3', start: 0, end: 0 , size: 1024, selector: [], dir: false}
+      const fileInfo1 = {path: 'path1', start: 0, end: 0 , size: 1024}
+      const fileInfo2 = {path: 'path2', start: 0, end: 0 , size: 1024}
+      const fileInfo3 = {path: 'path3', start: 0, end: 0 , size: 1024}
       model.fileList = [fileInfo1, fileInfo2, fileInfo3];
+      const generatedFile = {
+        path: 'path1', start: 0, end: 0 , size: 1024, dir: true, selector: [], cid: 'cid'
+      }
+      model.generatedFileList = [generatedFile]
       await model.save();
 
       const found = await Datastore.GenerationRequestModel.findOne({ name: model.datasetName });
@@ -35,6 +39,8 @@ describe('Datastore', () => {
       expect(found!.fileList[0]).toEqual(jasmine.objectContaining(fileInfo1));
       expect(found!.fileList[1]).toEqual(jasmine.objectContaining(fileInfo2));
       expect(found!.fileList[2]).toEqual(jasmine.objectContaining(fileInfo3));
+      console.log(found!.generatedFileList[0]);
+      expect(found!.generatedFileList[0]).toEqual(jasmine.objectContaining(generatedFile));
     })
   })
 

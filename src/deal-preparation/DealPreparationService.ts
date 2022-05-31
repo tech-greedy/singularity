@@ -108,10 +108,17 @@ export default class DealPreparationService extends BaseService {
       fileList: found.fileList.map((f) => ({
         path: f.path,
         size: f.size,
-        selector: f.selector,
+        start: f.start,
+        end: f.end
+      })),
+      generatedFileList: found.generatedFileList.map((f) => ({
+        path: f.path,
+        size: f.size,
         start: f.start,
         end: f.end,
-        dir: f.dir
+        dir: f.dir,
+        selector: f.selector,
+        cid: f.cid
       })),
       workerId: found.workerId,
       status: found.status,
@@ -132,7 +139,7 @@ export default class DealPreparationService extends BaseService {
       this.sendError(response, ErrorCode.DATASET_NOT_FOUND);
       return;
     }
-    const generations = await Datastore.GenerationRequestModel.find({ datasetId: found.id }, { fileList: 0 });
+    const generations = await Datastore.GenerationRequestModel.find({ datasetId: found.id }, { fileList: 0, generatedFileList: 0 });
     const result: GetPreparationDetailsResponse = {
       id: found.id,
       name: found.name,
@@ -226,14 +233,14 @@ export default class DealPreparationService extends BaseService {
         changedGeneration = (await Datastore.GenerationRequestModel.findOneAndUpdate(
           { id: generation, status: actionMap[action][0] },
           { status: actionMap[action][1] },
-          { projection: { fileList: 0 } }))
+          { projection: { _id: 1 } }))
           ? 1
           : 0;
       } else if (generationIsInt) {
         changedGeneration = (await Datastore.GenerationRequestModel.findOneAndUpdate(
           { index: generation, status: actionMap[action][0] },
           { status: actionMap[action][1] },
-          { projection: { fileList: 0 } }))
+          { projection: { _id: 1 } }))
           ? 1
           : 0;
       } else {

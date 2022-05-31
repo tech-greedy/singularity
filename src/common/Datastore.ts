@@ -5,7 +5,7 @@ import mongoose, { Schema } from 'mongoose';
 import Logger, { Category } from './Logger';
 import DealState from './model/DealState';
 import DealTrackingState from './model/DealTrackingState';
-import GenerationRequest, { FileInfo } from './model/GenerationRequest';
+import GenerationRequest, { FileInfo, GeneratedFileInfo } from './model/GenerationRequest';
 import HealthCheck from './model/HealthCheck';
 import ProviderMetric from './model/ProviderMetric';
 import ReplicationRequest from './model/ReplicationRequest';
@@ -112,10 +112,16 @@ export default class Datastore {
       path: Schema.Types.String,
       size: Schema.Types.Number,
       start: Schema.Types.Number,
+      end: Schema.Types.Number
+    });
+    const generatedFileInfoSchema = new Schema<GeneratedFileInfo>({
+      path: Schema.Types.String,
+      size: Schema.Types.Number,
+      start: Schema.Types.Number,
       end: Schema.Types.Number,
-      selector: [Schema.Types.Number],
+      dir: Schema.Types.Boolean,
       cid: Schema.Types.String,
-      dir: Schema.Types.Boolean
+      selector: [Schema.Types.Number]
     });
     const generationRequestSchema = new Schema<GenerationRequest>({
       datasetId: Schema.Types.String,
@@ -123,6 +129,7 @@ export default class Datastore {
       path: Schema.Types.String,
       index: Schema.Types.Number,
       fileList: [fileInfoSchema],
+      generatedFileList: [generatedFileInfoSchema],
       workerId: {
         type: Schema.Types.String,
         index: 1
