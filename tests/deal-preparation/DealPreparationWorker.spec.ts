@@ -85,15 +85,38 @@ describe('DealPreparationWorker', () => {
         status: 'active',
         fileList: [
           {
+            path: 'tests/test_folder',
+            size: 0,
+            start: 0,
+            end: 0,
+            dir: true
+          },
+          {
+            path: 'tests/test_folder/a',
+            size: 0,
+            start: 0,
+            end: 0,
+            dir: true
+          },
+          {
             path: 'tests/test_folder/a/1.txt',
             size: 3,
             start: 0,
-            end: 0
-          }, {
+            end: 0,
+            dir: false
+          },
+          {
+            path: 'tests/test_folder/b',
+            size: 0,
+            start: 0,
+            end: 0,
+            dir: true
+          },{
             path: 'tests/test_folder/b/2.txt',
             size: 27,
             start: 0,
-            end: 9
+            end: 9,
+            dir: false
           }
         ]
       });
@@ -103,7 +126,34 @@ describe('DealPreparationWorker', () => {
         status: 'completed',
         dataCid: 'bafybeih2nwd66s7rstnbj4grzjw7re4lyhmx3auvphibbz7nalo4ygfypq',
         pieceCid: 'baga6ea4seaqoqixvkneyg6tzwfoqsmw33xdva3aywkawp6n5jd5tffjdmqrn6gy',
-        pieceSize: 512
+        pieceSize: 512,
+        fileList: [
+          jasmine.objectContaining({
+            path: 'tests/test_folder',
+            selector: [],
+            cid: 'bafybeih2nwd66s7rstnbj4grzjw7re4lyhmx3auvphibbz7nalo4ygfypq'
+          }),
+          jasmine.objectContaining({
+            path: 'tests/test_folder/a',
+            selector: [0],
+            cid: 'bafybeifd34zco7545dzqflv7djpi3q2l2egi4l4coohgftgjssn4zoeu2y'
+          }),
+          jasmine.objectContaining({
+            path: 'tests/test_folder/a/1.txt',
+            selector: [0, 0],
+            cid: 'bafkreiey5jxe6ilpf62lnh77tm5ejbbmhbugzjuf6p2v3remlu73ced34q'
+          }),
+          jasmine.objectContaining({
+            path: 'tests/test_folder/b',
+            selector: [1],
+            cid: 'bafybeif7zaqg45xk5zvwybbfgeiotkzvjmd4bpjasb4aevne57dpt67com'
+          }),
+          jasmine.objectContaining({
+            path: 'tests/test_folder/b/2.txt',
+            selector: [1, 0],
+            cid: 'bafkreiblmv6wzk3grdk7u5a7u5zqh5vez3zatwuk3ptparw45unujqxysi'
+          }),
+        ]
       }));
     })
     it('should insert the database with fileLists', async () => {
@@ -158,9 +208,10 @@ describe('DealPreparationWorker', () => {
       });
       const requests = await Datastore.GenerationRequestModel.find({}, null, { sort: { index: 1 } });
       expect(requests.length).toEqual(1);
-      expect(requests[0].fileList.length).toEqual(5001);
-      expect(requests[0].fileList[0].path).toEqual('tests/test_folder/folder');
-      expect(requests[0].fileList[5000].path).toEqual('tests/test_folder/folder/4999.txt');
+      expect(requests[0].fileList.length).toEqual(5002);
+      expect(requests[0].fileList[0].path).toEqual('tests/test_folder');
+      expect(requests[0].fileList[2].path).toEqual('tests/test_folder/folder/0.txt');
+      expect(requests[0].fileList[5001].path).toEqual('tests/test_folder/folder/4999.txt');
     })
     it('should get the correct fileList', async () => {
       await worker['scan']({
@@ -189,6 +240,13 @@ describe('DealPreparationWorker', () => {
         path: 'tests/test_folder',
         index: 0,
         fileList: [jasmine.objectContaining({
+          path: 'tests/test_folder',
+          size: 0,
+          start: 0,
+          end: 0,
+          selector: [],
+          dir: true
+        }), jasmine.objectContaining({
           path: 'tests/test_folder/a',
           size: 0,
           start: 0,
@@ -225,6 +283,13 @@ describe('DealPreparationWorker', () => {
         path: 'tests/test_folder',
         index: 1,
         fileList: [jasmine.objectContaining({
+          path: 'tests/test_folder',
+          size: 0,
+          start: 0,
+          end: 0,
+          selector: [],
+          dir: true
+        }), jasmine.objectContaining({
           path: 'tests/test_folder/b',
           size: 0,
           start: 0,
@@ -247,6 +312,13 @@ describe('DealPreparationWorker', () => {
         path: 'tests/test_folder',
         index: 2,
         fileList: [jasmine.objectContaining({
+          path: 'tests/test_folder',
+          size: 0,
+          start: 0,
+          end: 0,
+          selector: [],
+          dir: true
+        }), jasmine.objectContaining({
           path: 'tests/test_folder/b',
           size: 0,
           start: 0,
@@ -283,6 +355,13 @@ describe('DealPreparationWorker', () => {
         path: 'tests/test_folder',
         index: 3,
         fileList: [jasmine.objectContaining({
+          path: 'tests/test_folder',
+          size: 0,
+          start: 0,
+          end: 0,
+          selector: [],
+          dir: true
+        }), jasmine.objectContaining({
           path: 'tests/test_folder/d.txt',
           size: 9,
           start: 0,

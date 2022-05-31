@@ -54,8 +54,7 @@ export default class DealPreparationWorker extends BaseService {
       const segments = path.relative(request.path, fileList[0].path).split(path.sep);
       let newPath = request.path;
       const newList: FileList = [];
-      for (let i = 0; i < segments.length - 1; ++i) {
-        newPath = path.join(newPath, segments[i]);
+      for (let i = 0; i < segments.length; ++i) {
         newList.push({
           path: newPath,
           selector: [],
@@ -64,6 +63,7 @@ export default class DealPreparationWorker extends BaseService {
           size: 0,
           start: 0
         });
+        newPath = path.join(newPath, segments[i]);
       }
       fileList.unshift(...newList);
       const generationRequest = await Datastore.GenerationRequestModel.create({
