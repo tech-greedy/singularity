@@ -289,6 +289,18 @@ preparation.command('retry').description('Retry an errored preparation request a
     CliUtil.renderResponse(response.data, options.json);
   });
 
+preparation.command('remove').description('Remove all records from database for a dataset')
+  .option('--purge', 'Whether to also purge the car files')
+  .argument('<dataset>', 'The dataset id or name')
+  .action(async (id, options) => {
+    const url: string = config.get('connection.deal_preparation_service');
+    try {
+      await axios.delete(`${url}/preparation/${id}`, { data: { purge: options.purge } });
+    } catch (error) {
+      CliUtil.renderErrorAndExit(error);
+    }
+  });
+
 program.showSuggestionAfterError();
 program.showHelpAfterError('(add --help for additional information)');
 program.parse();

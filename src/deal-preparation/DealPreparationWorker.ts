@@ -51,6 +51,10 @@ export default class DealPreparationWorker extends BaseService {
     this.logger.debug(`Started scanning.`, { id: request.id, name: request.name, path: request.path, minSize: request.minSize, maxSize: request.maxSize });
     let index = 0;
     for await (const fileList of Scanner.scan(request.path, request.minSize, request.maxSize)) {
+      const existing = await Datastore.GenerationRequestModel.findOne({ datasetId: request.id, index }, { _id: 1 });
+      if (existing) {
+        continue;
+      }
       const generationRequest = await Datastore.GenerationRequestModel.create({
         datasetId: request.id,
         datasetName: request.name,
@@ -69,6 +73,10 @@ export default class DealPreparationWorker extends BaseService {
         }, { projection: { _id: 1 } });
       }
       index++;
+      if ((await Datastore.ScanningRequestModel.findById(request.id))?.status === 'paused') {
+        this.logger.info(`Scanning request has been paused.`);
+        return;
+      }
     }
     this.logger.debug(`Finished scanning. Inserted ${index} tasks.`);
   }
