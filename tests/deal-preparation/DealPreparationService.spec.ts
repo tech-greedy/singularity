@@ -420,6 +420,7 @@ describe('DealPreparationService', () => {
         dataCid: 'bafy',
       });
       const filePath = path.resolve(process.env.NODE_CONFIG_DIR!, config.get('deal_preparation_worker.out_dir'), 'bafy.car');
+      await fs.mkdir(path.dirname(filePath), {recursive: true});
       await fs.writeFile(filePath, 'some data');
       const response = await supertest(service['app'])
         .delete('/preparation/test-deletion').send({ purge: true }).set('Accept', 'application/json');
