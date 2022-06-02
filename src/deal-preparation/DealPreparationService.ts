@@ -3,11 +3,13 @@ import config from 'config';
 import express, { Express, Request, Response } from 'express';
 import { constants } from 'fs';
 import fs from 'fs/promises';
+import path from 'path';
 import xbytes from 'xbytes';
 import BaseService from '../common/BaseService';
 import Datastore from '../common/Datastore';
 import Logger, { Category } from '../common/Logger';
 import CreatePreparationRequest from './CreatePreparationRequest';
+import DeletePreparationRequest from './DeletePreparationRequest';
 import ErrorCode from './ErrorCode';
 import GetPreparationDetailsResponse from './GetPreparationDetailsResponse';
 import { GetPreparationsResponse } from './GetPreparationsResponse';
@@ -23,6 +25,7 @@ export default class DealPreparationService extends BaseService {
     super(Category.DealPreparationService);
     this.handleCreatePreparationRequest = this.handleCreatePreparationRequest.bind(this);
     this.handleUpdatePreparationRequest = this.handleUpdatePreparationRequest.bind(this);
+    this.handleRemovePreparationRequest = this.handleRemovePreparationRequest.bind(this);
     this.handleListPreparationRequests = this.handleListPreparationRequests.bind(this);
     this.handleGetPreparationRequest = this.handleGetPreparationRequest.bind(this);
     this.handleGetGenerationRequest = this.handleGetGenerationRequest.bind(this);
@@ -40,6 +43,7 @@ export default class DealPreparationService extends BaseService {
     });
     this.app.post('/preparation', this.handleCreatePreparationRequest);
     this.app.post('/preparation/:id', this.handleUpdatePreparationRequest);
+    this.app.delete('/preparation/:id', this.handleRemovePreparationRequest);
     this.app.post('/preparation/:id/:generation', this.handleUpdatePreparationRequest);
     this.app.get('/preparations', this.handleListPreparationRequests);
     this.app.get('/preparation/:id', this.handleGetPreparationRequest);
@@ -193,6 +197,32 @@ export default class DealPreparationService extends BaseService {
     response.end(JSON.stringify(result));
   }
 
+  private async handleRemovePreparationRequest (request: Request, response: Response) {
+    const id = request.params['id'];
+    const generation = request.params['generation'];
+    const { purge } = <DeletePreparationRequest>request.body;
+    this.logger.info(`Received request to delete dataset preparation request.`, { id, generation, purge });
+    const found = ObjectId.isValid(id) ? await Datastore.ScanningRequestModel.findById(id) : await Datastore.ScanningRequestModel.findOne({ name: id });
+    if (!found) {
+      this.sendError(response, ErrorCode.DATASET_NOT_FOUND);
+      return;
+    }
+
+    await found.remove();
+
+    const outPath = path.resolve(process.env.NODE_CONFIG_DIR!, config.get('deal_preparation_worker.out_dir'));
+    if (purge) {
+      for await (const { dataCid } of Datastore.GenerationRequestModel.find({ databaseId: found.id }, { dataCid: 1 })) {
+        const filename = path.join(outPath, dataCid + '.car');
+        this.logger.info(`Removing file.`, { filename });
+        await fs.rm(filename, { force: true });
+      }
+    }
+    await Datastore.GenerationRequestModel.remove({ databaseId: found.id });
+
+    response.end();
+  }
+
   private async handleUpdatePreparationRequest (request: Request, response: Response) {
     const id = request.params['id'];
     const generation = request.params['generation'];
@@ -207,16 +237,16 @@ export default class DealPreparationService extends BaseService {
       this.sendError(response, ErrorCode.DATASET_NOT_FOUND);
       return;
     }
-    const actionMap: {[key: string]: ('active' | 'completed' | 'error' | 'paused')[]} = {
-      resume: ['paused', 'active'],
-      pause: ['active', 'paused'],
-      retry: ['error', 'active']
+    const actionMap = {
+      resume: [{ status: 'paused' }, { status: 'active' }],
+      pause: [{ status: 'active' }, { status: 'paused' }],
+      retry: [{ status: 'error' }, { status: 'active', errorMessage: undefined }]
     };
 
     const changed = (await Datastore.ScanningRequestModel.findOneAndUpdate({
       id: found.id,
-      status: actionMap[action][0]
-    }, { status: actionMap[action][1] })) != null
+      ...actionMap[action][0]
+    }, actionMap[action][1])) != null
       ? 1
       : 0;
 
@@ -225,21 +255,21 @@ export default class DealPreparationService extends BaseService {
     if (!generation) {
       changedGenerations = (await Datastore.GenerationRequestModel.updateMany({
         id: found.id,
-        status: actionMap[action][0]
-      }, { status: actionMap[action][1] })).modifiedCount;
+        ...actionMap[action][0]
+      }, actionMap[action][1])).modifiedCount;
     } else {
       const generationIsInt = !isNaN(parseInt(generation));
       if (ObjectId.isValid(generation)) {
         changedGeneration = (await Datastore.GenerationRequestModel.findOneAndUpdate(
-          { id: generation, status: actionMap[action][0] },
-          { status: actionMap[action][1] },
+          { id: generation, ...actionMap[action][0] },
+          actionMap[action][1],
           { projection: { _id: 1 } }))
           ? 1
           : 0;
       } else if (generationIsInt) {
         changedGeneration = (await Datastore.GenerationRequestModel.findOneAndUpdate(
-          { index: generation, status: actionMap[action][0] },
-          { status: actionMap[action][1] },
+          { index: generation, ...actionMap[action][0] },
+          actionMap[action][1],
           { projection: { _id: 1 } }))
           ? 1
           : 0;

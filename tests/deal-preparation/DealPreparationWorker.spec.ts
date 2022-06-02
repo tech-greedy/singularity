@@ -127,7 +127,7 @@ describe('DealPreparationWorker', () => {
             selector: [0]
           }),
           jasmine.objectContaining({
-            path: 'a/1.txt',
+            path: path.join('a', '1.txt'),
             size: 3,
             start: 0,
             end: 0,
@@ -145,7 +145,7 @@ describe('DealPreparationWorker', () => {
             selector: [1]
           }),
           jasmine.objectContaining({
-            path: 'b/2.txt',
+            path: path.join('b', '2.txt'),
             size: 27,
             start: 0,
             end: 9,
@@ -199,7 +199,7 @@ describe('DealPreparationWorker', () => {
       };
       spyOn(Scanner, 'scan').and.returnValue(f());
       await worker['scan']({
-        id: 'id',
+        id: '507f1f77bcf86cd799439011',
         name: 'name',
         path: 'tests/test_folder',
         minSize: 12,
@@ -212,9 +212,9 @@ describe('DealPreparationWorker', () => {
       expect(requests[0].fileList[0].path).toEqual('tests/test_folder/folder/0.txt');
       expect(requests[0].fileList[4999].path).toEqual('tests/test_folder/folder/4999.txt');
     })
-    it('should get the correct fileList', async () => {
+    fit('should get the correct fileList', async () => {
       await worker['scan']({
-        id: 'id',
+        id: '507f191e810c19729de860ea',
         name: 'name',
         path: path.join('tests', 'test_folder'),
         minSize: 12,
@@ -234,7 +234,7 @@ describe('DealPreparationWorker', () => {
        */
       expect(requests.length).toEqual(4);
       expect(requests[0]).toEqual(jasmine.objectContaining({
-        datasetId: 'id',
+        datasetId: '507f191e810c19729de860ea',
         datasetName: 'name',
         path: path.join('tests', 'test_folder'),
         index: 0,
@@ -252,7 +252,7 @@ describe('DealPreparationWorker', () => {
         status: 'active',
       }));
       expect(requests[1]).toEqual(jasmine.objectContaining({
-        datasetId: 'id',
+        datasetId: '507f191e810c19729de860ea',
         datasetName: 'name',
         path: path.join('tests', 'test_folder'),
         index: 1,
@@ -265,7 +265,7 @@ describe('DealPreparationWorker', () => {
         status: 'active',
       }));
       expect(requests[2]).toEqual(jasmine.objectContaining({
-        datasetId: 'id',
+        datasetId: '507f191e810c19729de860ea',
         datasetName: 'name',
         path: path.join('tests', 'test_folder'),
         index: 2,
@@ -285,7 +285,7 @@ describe('DealPreparationWorker', () => {
       // windows does not support symbolic link
       const dtxtsize = process.platform === 'win32' ? 7 : 9;
       expect(requests[3]).toEqual(jasmine.objectContaining({
-        datasetId: 'id',
+        datasetId: '507f191e810c19729de860ea',
         datasetName: 'name',
         path: path.join('tests', 'test_folder'),
         index: 3,
