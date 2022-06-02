@@ -212,7 +212,7 @@ describe('DealPreparationWorker', () => {
       expect(requests[0].fileList[0].path).toEqual('tests/test_folder/folder/0.txt');
       expect(requests[0].fileList[4999].path).toEqual('tests/test_folder/folder/4999.txt');
     })
-    fit('should get the correct fileList', async () => {
+    it('should get the correct fileList', async () => {
       await worker['scan']({
         id: '507f191e810c19729de860ea',
         name: 'name',

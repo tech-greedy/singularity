@@ -210,15 +210,15 @@ export default class DealPreparationService extends BaseService {
 
     await found.remove();
 
-    const outPath = path.resolve(process.env.NODE_CONFIG_DIR!, config.get('deal_preparation_worker.out_dir'));
     if (purge) {
-      for await (const { dataCid } of Datastore.GenerationRequestModel.find({ databaseId: found.id }, { dataCid: 1 })) {
+      const outPath = path.resolve(process.env.NODE_CONFIG_DIR!, config.get('deal_preparation_worker.out_dir'));
+      for await (const { dataCid } of Datastore.GenerationRequestModel.find({ datasetId: found.id }, { dataCid: 1 })) {
         const filename = path.join(outPath, dataCid + '.car');
         this.logger.info(`Removing file.`, { filename });
         await fs.rm(filename, { force: true });
       }
     }
-    await Datastore.GenerationRequestModel.remove({ databaseId: found.id });
+    await Datastore.GenerationRequestModel.remove({ datasetId: found.id });
 
     response.end();
   }

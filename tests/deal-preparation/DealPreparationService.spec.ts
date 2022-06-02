@@ -3,6 +3,9 @@ import Datastore from '../../src/common/Datastore';
 import DealPreparationService from '../../src/deal-preparation/DealPreparationService';
 import ErrorCode from '../../src/deal-preparation/ErrorCode';
 import Utils from '../Utils';
+import fs from 'fs/promises';
+import config from 'config';
+import path from 'path';
 
 describe('DealPreparationService', () => {
   let service: DealPreparationService;
@@ -407,6 +410,25 @@ describe('DealPreparationService', () => {
       generationRequestsChanged: 1
     });
   });
+  describe('DELETE /preparation/:id', () => {
+    it('should delete the entries and car files', async () => {
+      const scanning = await Datastore.ScanningRequestModel.create({
+        name: 'test-deletion'
+      });
+      const generation = await Datastore.GenerationRequestModel.create({
+        datasetId: scanning.id,
+        dataCid: 'bafy',
+      });
+      const filePath = path.resolve(process.env.NODE_CONFIG_DIR!, config.get('deal_preparation_worker.out_dir'), 'bafy.car');
+      await fs.writeFile(filePath, 'some data');
+      const response = await supertest(service['app'])
+        .delete('/preparation/test-deletion').send({ purge: true }).set('Accept', 'application/json');
+      expect(response.status).toEqual(200);
+      await expectAsync(Datastore.ScanningRequestModel.findById(scanning.id)).toBeResolvedTo(null);
+      await expectAsync(Datastore.GenerationRequestModel.findById(generation.id)).toBeResolvedTo(null);
+      await expectAsync(fs.access(filePath)).toBeRejected();
+    })
+  })
   describe('POST /preparation', () => {
     it('should return error if deal size is not allowed', async () => {
       const response = await supertest(service['app'])
