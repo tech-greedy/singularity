@@ -128,6 +128,62 @@ export default class DealTrackingService extends BaseService {
     } while (response.data['result']['deals'].length > 0);
   }
 
+  /**
+   * @param client
+   * @param lastDeal
+   */
+  /* Temporarily disabled in favor of filscan for more information
+  private async insertDealFromFilfox(client: string, lastDeal: number): Promise<void> {
+    this.logger.debug('Inserting new deals from filfox', { client, lastDeal });
+    let page = 0;
+    let response;
+    do {
+      let breakOuter = false;
+      // Exponential retry as filfox can throttle us
+      response = await retry(
+        async () => {
+          const url = `https://filfox.info/api/v1/deal/list?address=${client}&pageSize=100&page=${page}`;
+          this.logger.debug(`Fetching from ${url}`);
+          let r;
+          try {
+            r = await axios.get(url);
+          } catch (e) {
+            this.logger.warn(e);
+            throw e;
+          }
+          return r;
+        }, {
+        retries: 3,
+        minTimeout: 60_000
+      }
+      );
+      this.logger.debug(`Received ${response.data['deals'].length} deal entries.`);
+      for (const deal of response.data['deals']) {
+        if (deal['id'] <= lastDeal) {
+          breakOuter = true;
+          break;
+        }
+        await Datastore.DealStateModel.updateOne({
+          dealId: deal['id']
+        }, {
+          $setOnInsert: {
+            client,
+            provider: deal['provider'],
+            dealId: deal['id'],
+            state: 'published'
+          }
+        }, {
+          upsert: true
+        });
+      }
+      if (breakOuter) {
+        break;
+      }
+      page += 1;
+    } while (response.data['deals'].length > 0);
+  }
+  */
+
   private async updateDealFromLotus (client: string): Promise<void> {
     this.logger.debug('Start update deal state from lotus.', { client });
     const api = config.get<string>('deal_tracking_service.lotus_api');
