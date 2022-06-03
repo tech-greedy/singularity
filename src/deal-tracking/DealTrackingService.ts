@@ -85,9 +85,9 @@ export default class DealTrackingService extends BaseService {
             provider: deal['provider'],
             client: deal['client'],
             state: 'proposed'
-          })
+          });
 
-          if(proposedDeal) {
+          if (proposedDeal) {
             await Datastore.DealStateModel.updateOne({
               _id: proposedDeal._id
             }, {
@@ -95,8 +95,8 @@ export default class DealTrackingService extends BaseService {
                 dealId: deal['dealid'],
                 state: 'published'
               }
-            })
-            this.logger.debug(`Deal ${deal['dealid']} was proposed through singularity. Filling in deal ID.`)
+            });
+            this.logger.debug(`Deal ${deal['dealid']} was proposed through singularity. Filling in deal ID.`);
           } else {
             await Datastore.DealStateModel.updateOne({
               dealId: deal['dealid']
@@ -114,7 +114,7 @@ export default class DealTrackingService extends BaseService {
             }, {
               upsert: true
             });
-            this.logger.debug(`Deal ${deal['dealid']} updates to published.`)
+            this.logger.debug(`Deal ${deal['dealid']} updates to published.`);
           }
         }
         if (breakOuter) {
@@ -218,12 +218,12 @@ export default class DealTrackingService extends BaseService {
         await Datastore.DealStateModel.findByIdAndUpdate(dealState.id, {
           pieceCid, expiration, state: 'slashed'
         });
-        this.logger.warn(`Deal ${dealState.dealId} is slashed.`)
+        this.logger.warn(`Deal ${dealState.dealId} is slashed.`);
       } else if (dealActive) {
         await Datastore.DealStateModel.findByIdAndUpdate(dealState.id, {
           pieceCid, expiration, state: 'active'
         });
-        this.logger.info(`Deal ${dealState.dealId} is active on chain.`)
+        this.logger.info(`Deal ${dealState.dealId} is active on chain.`);
       }
     }
   }

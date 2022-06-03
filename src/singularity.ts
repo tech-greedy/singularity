@@ -261,7 +261,7 @@ preparation.command('generation-status').description('Check the status of a sing
     }
   });
 
-async function UpdateState(id: string, generation: string, action: string): Promise<AxiosResponse> {
+async function UpdateState (id: string, generation: string, action: string): Promise<AxiosResponse> {
   const url: string = config.get('connection.deal_preparation_service');
   let response!: AxiosResponse;
   try {
