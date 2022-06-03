@@ -1,12 +1,24 @@
 export interface FileInfo {
+  // Absolute
   path: string,
   size: number,
-  selector: number[],
   start: number,
   end: number,
 }
 
+export interface GeneratedFileInfo {
+  // Relative
+  path: string,
+  dir: boolean,
+  size: number,
+  start: number,
+  end: number,
+  selector: number[],
+  cid: string
+}
+
 export type FileList = FileInfo[];
+export type GeneratedFileList = GeneratedFileInfo[];
 
 /**
  * Each record represents one CAR file
@@ -17,7 +29,8 @@ export default interface GenerationRequest {
   datasetName: string,
   path: string,
   index: number,
-  fileList: FileList
+  fileList: FileList,
+  generatedFileList: GeneratedFileList,
   workerId?: string,
   status: 'active' | 'paused' | 'completed' | 'error',
   errorMessage?: string,

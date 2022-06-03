@@ -152,7 +152,7 @@ index.command('create')
   .argument('<id_or_name>', 'The dataset id or name')
   .action(async (id) => {
     const url: string = config.get('connection.index_service');
-    let response! : AxiosResponse;
+    let response!: AxiosResponse;
     try {
       response = await axios.get(`${url}/create/${id}`);
     } catch (error) {
@@ -185,7 +185,7 @@ preparation.command('create').description('Start deal preparation for a local da
     }
     const dealSize: string = options.dealSize;
     const url: string = config.get('connection.deal_preparation_service');
-    let response! : AxiosResponse;
+    let response!: AxiosResponse;
     try {
       response = await axios.post(`${url}/preparation`, {
         name: name,
@@ -204,14 +204,14 @@ preparation.command('status').description('Check the status of a deal preparatio
   .argument('<dataset>', 'The dataset id or name')
   .action(async (id, options) => {
     const url: string = config.get('connection.deal_preparation_service');
-    let response! : AxiosResponse;
+    let response!: AxiosResponse;
     try {
       response = await axios.get(`${url}/preparation/${id}`);
     } catch (error) {
       CliUtil.renderErrorAndExit(error);
     }
 
-    const data : GetPreparationDetailsResponse = response.data;
+    const data: GetPreparationDetailsResponse = response.data;
     if (options.json) {
       console.log(JSON.stringify(data, null, 2));
     } else {
@@ -227,7 +227,7 @@ preparation.command('list').description('List all deal preparation requests')
   .option('--json', 'Output with JSON format')
   .action(async (options) => {
     const url: string = config.get('connection.deal_preparation_service');
-    let response! : AxiosResponse;
+    let response!: AxiosResponse;
     try {
       response = await axios.get(`${url}/preparations`);
     } catch (error) {
@@ -243,13 +243,13 @@ preparation.command('generation-status').description('Check the status of a sing
   .argument('<generationId>', 'A unique id or index of the generation request')
   .action(async (id, options) => {
     const url: string = config.get('connection.deal_preparation_service');
-    let response! : AxiosResponse;
+    let response!: AxiosResponse;
     try {
       response = options.dataset ? await axios.get(`${url}/generation/${options.dataset}/${id}`) : await axios.get(`${url}/generation/${id}`);
     } catch (error) {
       CliUtil.renderErrorAndExit(error);
     }
-    const data = <GenerationRequest> response.data;
+    const data = <GenerationRequest>response.data;
     if (options.json) {
       console.log(JSON.stringify(data, null, 2));
     } else {
@@ -261,9 +261,9 @@ preparation.command('generation-status').description('Check the status of a sing
     }
   });
 
-async function UpdateState (id : string, generation: string, action: string) : Promise<AxiosResponse> {
+async function UpdateState(id: string, generation: string, action: string): Promise<AxiosResponse> {
   const url: string = config.get('connection.deal_preparation_service');
-  let response! : AxiosResponse;
+  let response!: AxiosResponse;
   try {
     if (generation) {
       response = await axios.post(`${url}/preparation/${id}/${generation}`, { action });
@@ -303,6 +303,18 @@ preparation.command('retry').description('Retry an errored preparation request a
     CliUtil.renderResponse(response.data, options.json);
   });
 
+preparation.command('remove').description('Remove all records from database for a dataset')
+  .option('--purge', 'Whether to also purge the car files')
+  .argument('<dataset>', 'The dataset id or name')
+  .action(async (id, options) => {
+    const url: string = config.get('connection.deal_preparation_service');
+    try {
+      await axios.delete(`${url}/preparation/${id}`, { data: { purge: options.purge } });
+    } catch (error) {
+      CliUtil.renderErrorAndExit(error);
+    }
+  });
+
 const replication = program.command('replication')
   .alias('repl')
   .description('Start replication for a local dataset');
@@ -319,7 +331,7 @@ replication.command('start')
   .option('-d, --duration <duration>', 'Duration in days for deal length.', '500')
   .option('-o, --offline <offline>', 'Propose as offline deal.', 'false')
   .action(async (datasetid, replica, criteria, client, options) => {
-    let response! : AxiosResponse;
+    let response!: AxiosResponse;
     try {
       console.log(options);
       const url: string = config.get('connection.deal_replication_service');
@@ -345,7 +357,7 @@ replication.command('status')
   .description('Check the status of a deal replication request')
   .argument('<id>', 'A unique id of the dataset')
   .action(async (id, options) => {
-    let response! : AxiosResponse;
+    let response!: AxiosResponse;
     try {
       const url: string = config.get('connection.deal_replication_service');
       response = await axios.get(`${url}/replication/${id}`);
@@ -359,7 +371,7 @@ replication.command('status')
 replication.command('list')
   .description('List all deal replication requests')
   .action(async (options) => {
-    let response! : AxiosResponse;
+    let response!: AxiosResponse;
     try {
       const url: string = config.get('connection.deal_replication_service');
       response = await axios.get(`${url}/replications`);

@@ -4,7 +4,7 @@ import { randomUUID } from 'crypto';
 import BaseService from '../common/BaseService';
 import Datastore from '../common/Datastore';
 import { Category } from '../common/Logger';
-import GenerationRequest from '../common/model/GenerationRequest';
+import GenerationRequest, { FileInfo, GeneratedFileList } from '../common/model/GenerationRequest';
 import ScanningRequest from '../common/model/ScanningRequest';
 import Scanner from './Scanner';
 import config from 'config';
@@ -16,7 +16,7 @@ interface IpldNode {
   Name: string,
   Hash: string,
   Size: number,
-  Link: IpldNode[]
+  Link: IpldNode[] | null
 }
 
 interface GenerateCarOutput {
@@ -52,7 +52,10 @@ export default class DealPreparationWorker extends BaseService {
     this.logger.debug(`Started scanning.`, { id: request.id, name: request.name, path: request.path, minSize: request.minSize, maxSize: request.maxSize });
     let index = 0;
     for await (const fileList of Scanner.scan(request.path, request.minSize, request.maxSize)) {
-      Scanner.buildSelector(request.path, fileList);
+      const existing = await Datastore.GenerationRequestModel.findOne({ datasetId: request.id, index }, { _id: 1 });
+      if (existing) {
+        continue;
+      }
       const generationRequest = await Datastore.GenerationRequestModel.create({
         datasetId: request.id,
         datasetName: request.name,
@@ -68,9 +71,13 @@ export default class DealPreparationWorker extends BaseService {
               $each: fileList.slice(i, i + 1000)
             }
           }
-        });
+        }, { projection: { _id: 1 } });
       }
       index++;
+      if ((await Datastore.ScanningRequestModel.findById(request.id))?.status === 'paused') {
+        this.logger.info(`Scanning request has been paused.`);
+        return;
+      }
     }
     this.logger.debug(`Finished scanning. Inserted ${index} tasks.`);
   }
@@ -132,7 +139,10 @@ export default class DealPreparationWorker extends BaseService {
       workerId: null,
       status: 'active'
     }, {
-      workerId: this.workerId
+      workerId: this.workerId,
+      generatedFileList: []
+    }, {
+      new: true
     });
     if (newGenerationWork) {
       this.logger.info(`${this.workerId} - Polled a new generation request.`,
@@ -145,25 +155,87 @@ export default class DealPreparationWorker extends BaseService {
       const [stdout, stderr, statusCode] = result!;
       if (statusCode !== 0) {
         this.logger.error(`${this.workerId} - Encountered an error.`, { stderr });
-        await Datastore.GenerationRequestModel.findByIdAndUpdate(newGenerationWork.id, { status: 'error', errorMessage: stderr });
+        await Datastore.GenerationRequestModel.findByIdAndUpdate(newGenerationWork.id, { status: 'error', errorMessage: stderr }, { projection: { _id: 1 } });
         return true;
       }
 
       const output :GenerateCarOutput = JSON.parse(stdout);
       const carFile = path.join(this.outPath, output.DataCid + '.car');
       const carFileStat = await fs.stat(carFile);
+      const fileMap = new Map<string, FileInfo>();
+      for (const fileInfo of newGenerationWork.fileList) {
+        fileMap.set(path.relative(newGenerationWork.path, fileInfo.path), fileInfo);
+      }
+      const generatedFileList: GeneratedFileList = [];
+      await this.populateGeneratedFileList(fileMap, output.Ipld, [], [], generatedFileList);
+      await Datastore.GenerationRequestModel.findByIdAndUpdate(newGenerationWork.id, {
+        generatedFileList: generatedFileList.slice(0, 1000)
+      }, {
+        projection: { _id: 1 }
+      });
+      for (let i = 1000; i < generatedFileList.length; i += 1000) {
+        await Datastore.GenerationRequestModel.findByIdAndUpdate(newGenerationWork.id, {
+          $push: {
+            generatedFileList: {
+              $each: generatedFileList.slice(i, i + 1000)
+            }
+          }
+        }, {
+          projection: { _id: 1 }
+        });
+      }
       await Datastore.GenerationRequestModel.findByIdAndUpdate(newGenerationWork.id, {
         status: 'completed',
         dataCid: output.DataCid,
         pieceSize: output.PieceSize,
         pieceCid: output.PieceCid,
-        carSize: carFileStat.size
+        carSize: carFileStat.size,
+        fileList: []
+      }, {
+        projection: { _id: 1 }
       });
       this.logger.info(`${this.workerId} - Finished Generation of dataset.`,
         { id: newGenerationWork.id, datasetName: newGenerationWork.datasetName, index: newGenerationWork.index, timeSpentInMs: timeSpentInMs });
     }
 
     return newGenerationWork != null;
+  }
+
+  private async populateGeneratedFileList (
+    fileMap: Map<string, FileInfo>,
+    ipld: IpldNode, segments: string[],
+    selector: number[],
+    list: GeneratedFileList) : Promise<void> {
+    const relPath = segments.length > 0 ? path.join(...segments) : '';
+    if (ipld.Link == null) {
+      const fileInfo = fileMap.get(relPath)!;
+      list.push({
+        path: relPath,
+        dir: false,
+        size: fileInfo.size,
+        start: fileInfo.start,
+        end: fileInfo.end,
+        cid: ipld.Hash,
+        selector: [...selector]
+      });
+    } else {
+      list.push({
+        path: relPath,
+        dir: true,
+        size: 0,
+        start: 0,
+        end: 0,
+        cid: ipld.Hash,
+        selector: [...selector]
+      });
+      for (let linkId = 0; linkId < ipld.Link.length; ++linkId) {
+        selector.push(linkId);
+        segments.push(ipld.Link[linkId].Name);
+        await this.populateGeneratedFileList(fileMap, ipld.Link[linkId], segments, selector, list);
+        selector.pop();
+        segments.pop();
+      }
+    }
   }
 
   private readonly PollInterval = 5000;
