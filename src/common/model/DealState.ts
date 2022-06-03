@@ -15,6 +15,6 @@ export default interface DealState {
   state: 'reserved' | 'proposed' | 'published' | 'active' | 'slashed' | 'error',
   replicationRequestId: string,
   datasetId: string,
-  dealId: number, // use 0 to represent unknown,
+  dealId?: number,
   errorMessage?: string// any useful info returned by boost / lotus
 }

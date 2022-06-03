@@ -4,8 +4,6 @@ import BaseService from '../common/BaseService';
 import Datastore from '../common/Datastore';
 import { Category } from '../common/Logger';
 import ReplicationRequest from '../common/model/ReplicationRequest';
-import fs from 'fs';
-import path from 'path';
 import config from 'config';
 import { create, all } from 'mathjs';
 const mathconfig = {};
@@ -141,13 +139,7 @@ export default class DealReplicationWorker extends BaseService {
           downloadUrl += '/';
         }
         downloadUrl += carFile.dataCid + '.car';
-
-        // determine car file size
-        let carSize = carFile.carSize;
-        if (carSize === undefined) {
-          const fileStat = fs.statSync(path.resolve(config.get('deal_preparation_worker.out_dir')) + '/' + carFile.dataCid + '.car');
-          carSize = fileStat.size;
-        }
+        // TODO do a HEAD on the link to preliminary validate, if invalid, throw exception and mark state
 
         // calculate duration
         const durationInEpoch = 2880 * model.duration;
@@ -155,7 +147,7 @@ export default class DealReplicationWorker extends BaseService {
         let dealCmd = '';
         if (useLotus) {
           if (model.isOffline) {
-            const unpaddedSize = parseInt(carFile.pieceSize + '') * 127 / 128;
+            const unpaddedSize = carFile.pieceSize! * 127 / 128;
             dealCmd = `${lotusCMD} client deal --manual-piece-cid=${carFile.pieceCid} --manual-piece-size=${unpaddedSize} ` +
               `--manual-stateless-deal --from=${model.client} --verified-deal=${model.isVerfied} ` +
               `${carFile.dataCid} ${miner} ${priceInFil.toNumber()} ${durationInEpoch}`;
@@ -168,7 +160,7 @@ export default class DealReplicationWorker extends BaseService {
           if (model.isOffline) {
             propose = `offline-deal`;
           }
-          dealCmd = `${boostCMD} ${propose} --provider=${miner}  --commp=${carFile.pieceCid} --car-size=${carSize} ` +
+          dealCmd = `${boostCMD} ${propose} --provider=${miner}  --commp=${carFile.pieceCid} --car-size=${carFile.carSize} ` +
             `--piece-size=${carFile.pieceSize} --payload-cid=${carFile.dataCid} --storage-price-per-epoch=${priceInAtto} ` +
             `--verified=${model.isVerfied} --wallet=${model.client} --duration=${durationInEpoch}`;
         }
@@ -177,30 +169,38 @@ export default class DealReplicationWorker extends BaseService {
         let dealCid = 'unknown';
         let errorMsg = '';
         let state = 'proposed';
-        try {
-          const cmdOut = await exec(dealCmd);
-          this.logger.info(cmdOut.stdout);
-          if (useLotus) {
-            if (cmdOut.stdout.startsWith('baf')) {
-              dealCid = cmdOut.stdout;
+        let retryCount = 0;
+        do {
+          try {
+            const cmdOut = await exec(dealCmd);
+            this.logger.info(cmdOut.stdout);
+            if (useLotus) {
+              if (cmdOut.stdout.startsWith('baf')) {
+                dealCid = cmdOut.stdout;
+                break; // success, break from while loop
+              } else {
+                errorMsg = cmdOut.stdout + cmdOut.stderr;
+                state = 'error';
+              }
             } else {
-              errorMsg = cmdOut.stdout + cmdOut.stderr;
-              state = 'error';
+              const match = boostResultUUIDMatcher.exec(cmdOut.stdout);
+              if (match != null && match.length > 1) {
+                dealCid = match[1];
+                break; // success, break from while loop
+              } else {
+                errorMsg = cmdOut.stdout + cmdOut.stderr;
+                state = 'error';
+              }
             }
-          } else {
-            const match = boostResultUUIDMatcher.exec(cmdOut.stdout);
-            if (match != null && match.length > 1) {
-              dealCid = match[1];
-            } else {
-              errorMsg = cmdOut.stdout + cmdOut.stderr;
-              state = 'error';
-            }
+          } catch (error) {
+            this.logger.error('Deal making failed', error);
+            errorMsg = '' + error;
+            state = 'error';
           }
-        } catch (error) {
-          this.logger.error('Deal making failed', error);
-          errorMsg = '' + error;
-          state = 'error';
-        }
+          await new Promise(resolve => setTimeout(resolve, 30000));
+          this.logger.info('Waiting 30 seconds to retry');
+          retryCount++;
+        } while (retryCount < 3);
         await Datastore.DealStateModel.create({
           client: model.client,
           provider: miner,
@@ -214,7 +214,6 @@ export default class DealReplicationWorker extends BaseService {
           state: state,
           replicationRequestId: model.id,
           datasetId: model.datasetId,
-          dealId: 0,
           errorMessage: errorMsg
         });
       });

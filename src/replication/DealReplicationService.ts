@@ -20,6 +20,7 @@ export default class DealReplicationService extends BaseService {
       this.handleCreateReplicationRequest = this.handleCreateReplicationRequest.bind(this);
       this.handleUpdateReplicationRequest = this.handleUpdateReplicationRequest.bind(this);
       this.handleListReplicationRequests = this.handleListReplicationRequests.bind(this);
+      this.handleGetReplicationRequest = this.handleGetReplicationRequest.bind(this);
       if (!this.enabled) {
         this.logger.warn('Deal Replication Service is not enabled. Exit now...');
         return;

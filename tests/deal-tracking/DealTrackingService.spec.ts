@@ -38,11 +38,11 @@ describe('DealTrackingService', () => {
         dealId: 1000000,
         state: 'published'
       });
-      // const insertSpy = spyOn<any>(service, 'insertDealFromFilfox').and.stub();
+      const insertSpy = spyOn<any>(service, 'insertDealFromFilscan').and.stub();
       const updateSpy = spyOn<any>(service, 'updateDealFromLotus').and.stub();
       await service['dealTracking']();
-      // expect(insertSpy).toHaveBeenCalledWith('client1', 1000000);
-      // expect(insertSpy).toHaveBeenCalledWith('client2', 0);
+      expect(insertSpy).toHaveBeenCalledWith('client1', 1000000);
+      expect(insertSpy).toHaveBeenCalledWith('client2', 0);
       expect(updateSpy).toHaveBeenCalledWith('client1');
       expect(updateSpy).toHaveBeenCalledWith('client2');
     })
@@ -170,10 +170,10 @@ describe('DealTrackingService', () => {
       }))
     })
   })
-  /* Temporarily disabled in favor of filscan for more information
-  describe('insertDealFromFilfox', () => {
+  
+  xdescribe('insertDealFromFilscan', () => {
     xit('should download all deal ids for a client - real network call', async () => {
-      await service['insertDealFromFilfox']('f3vfs6f7tagrcpnwv65wq3leznbajqyg77bmijrpvoyjv3zjyi3urq25vigfbs3ob6ug5xdihajumtgsxnz2pa', 0);
+      await service['insertDealFromFilscan']('f3vfs6f7tagrcpnwv65wq3leznbajqyg77bmijrpvoyjv3zjyi3urq25vigfbs3ob6ug5xdihajumtgsxnz2pa', 0);
       const stored = await Datastore.DealStateModel.find({});
       expect(stored.length).toEqual(767);
       expect(stored[1].dealId).toEqual(766);
@@ -204,7 +204,7 @@ describe('DealTrackingService', () => {
           ]
         }
       }));
-      await service['insertDealFromFilfox']('test_client', 0);
+      await service['insertDealFromFilscan']('test_client', 0);
       expect(spy).toHaveBeenCalledTimes(3);
       const stored = await Datastore.DealStateModel.find({});
       expect(stored.length).toEqual(1);
@@ -236,7 +236,7 @@ describe('DealTrackingService', () => {
           ]
         }
       }));
-      await service['insertDealFromFilfox']('test_client', 100);
+      await service['insertDealFromFilscan']('test_client', 100);
       expect(spy).toHaveBeenCalledTimes(2);
       const stored = await Datastore.DealStateModel.find({});
       expect(stored.length).toEqual(1);
@@ -267,7 +267,7 @@ describe('DealTrackingService', () => {
           ]
         }
       }));
-      await service['insertDealFromFilfox']('test_client', 0);
+      await service['insertDealFromFilscan']('test_client', 0);
       expect(spy).toHaveBeenCalledTimes(3);
       expect(spy).toHaveBeenCalledWith('https://filfox.info/api/v1/deal/list?address=test_client&pageSize=100&page=0');
       expect(spy).toHaveBeenCalledWith('https://filfox.info/api/v1/deal/list?address=test_client&pageSize=100&page=1');
@@ -276,5 +276,4 @@ describe('DealTrackingService', () => {
       expect(stored.length).toEqual(2);
     })
   })
-  */
 })
