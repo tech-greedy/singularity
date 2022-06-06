@@ -410,6 +410,47 @@ describe('DealPreparationService', () => {
       generationRequestsChanged: 1
     });
   });
+  it('should change status for all generation requests for a scanning request', async () => {
+    const scanning1 = await Datastore.ScanningRequestModel.create({
+      name: 'name',
+      status: 'active'
+    });
+    const scanning2 = await Datastore.ScanningRequestModel.create({
+      name: 'name2',
+      status: 'active'
+    });
+    const g1 = await Datastore.GenerationRequestModel.create({
+      datasetId: scanning1.id,
+      status: 'active'
+    });
+    const g2 = await Datastore.GenerationRequestModel.create({
+      datasetId: scanning2.id,
+      status: 'active'
+    });
+    const g3 = await Datastore.GenerationRequestModel.create({
+      datasetId: scanning2.id,
+      status: 'active'
+    });
+    const response = await supertest(service['app'])
+      .post(`/preparation/${scanning2.id}`)
+      .send({ action: 'pause' }).set('Accept', 'application/json');
+    expect(response.status).toEqual(200);
+    expect(await Datastore.ScanningRequestModel.findById(scanning1.id)).toEqual(jasmine.objectContaining({
+      status: 'active'
+    }));
+    expect(await Datastore.ScanningRequestModel.findById(scanning2.id)).toEqual(jasmine.objectContaining({
+      status: 'paused'
+    }));
+    expect(await Datastore.GenerationRequestModel.findById(g1.id)).toEqual(jasmine.objectContaining({
+      status: 'active'
+    }));
+    expect(await Datastore.GenerationRequestModel.findById(g2.id)).toEqual(jasmine.objectContaining({
+      status: 'paused'
+    }));
+    expect(await Datastore.GenerationRequestModel.findById(g3.id)).toEqual(jasmine.objectContaining({
+      status: 'paused'
+    }));
+  })
   describe('DELETE /preparation/:id', () => {
     it('should delete the entries and car files', async () => {
       const scanning = await Datastore.ScanningRequestModel.create({

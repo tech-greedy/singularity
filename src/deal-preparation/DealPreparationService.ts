@@ -244,7 +244,7 @@ export default class DealPreparationService extends BaseService {
     };
 
     const changed = (await Datastore.ScanningRequestModel.findOneAndUpdate({
-      id: found.id,
+      _id: found.id,
       ...actionMap[action][0]
     }, actionMap[action][1])) != null
       ? 1
@@ -254,21 +254,21 @@ export default class DealPreparationService extends BaseService {
     let changedGeneration;
     if (!generation) {
       changedGenerations = (await Datastore.GenerationRequestModel.updateMany({
-        id: found.id,
+        datasetId: found.id,
         ...actionMap[action][0]
       }, actionMap[action][1])).modifiedCount;
     } else {
       const generationIsInt = !isNaN(parseInt(generation));
       if (ObjectId.isValid(generation)) {
         changedGeneration = (await Datastore.GenerationRequestModel.findOneAndUpdate(
-          { id: generation, ...actionMap[action][0] },
+          { _id: generation, ...actionMap[action][0] },
           actionMap[action][1],
           { projection: { _id: 1 } }))
           ? 1
           : 0;
       } else if (generationIsInt) {
         changedGeneration = (await Datastore.GenerationRequestModel.findOneAndUpdate(
-          { index: generation, ...actionMap[action][0] },
+          { datasetId: found.id, index: generation, ...actionMap[action][0] },
           actionMap[action][1],
           { projection: { _id: 1 } }))
           ? 1
