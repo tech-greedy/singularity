@@ -29,7 +29,7 @@ export default interface GenerationRequest {
   fileList: FileList,
   generatedFileList: GeneratedFileList,
   workerId?: string,
-  status: 'active' | 'paused' | 'completed' | 'error',
+  status: 'active' | 'paused' | 'completed' | 'error' | 'created',
   errorMessage?: string,
   dataCid?: string,
   carSize?: number,
