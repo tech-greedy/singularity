@@ -251,7 +251,7 @@ export default class DealPreparationWorker extends BaseService {
     try {
       hasDoneWork = await this.pollWork();
     } catch (error) {
-      this.logger.crit(this.workerId, { error });
+      this.logger.error(this.workerId, { error });
     }
     if (hasDoneWork) {
       setTimeout(this.startPollWork, this.ImmediatePollInterval);
