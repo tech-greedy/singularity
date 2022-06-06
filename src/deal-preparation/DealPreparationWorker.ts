@@ -79,6 +79,7 @@ export default class DealPreparationWorker extends BaseService {
       }
     }
     this.logger.debug(`Finished scanning. Inserted ${index} tasks.`);
+    await Datastore.ScanningRequestModel.findByIdAndUpdate(request.id, { status: 'completed' });
   }
 
   private async generate (request: GenerationRequest): Promise<[stdout: string, stderr: string, statusCode: number | null]> {
@@ -127,7 +128,6 @@ export default class DealPreparationWorker extends BaseService {
         }
         throw err;
       }
-      await Datastore.ScanningRequestModel.findByIdAndUpdate(newScanningWork.id, { status: 'completed' });
     }
 
     return newScanningWork != null;
