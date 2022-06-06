@@ -51,9 +51,13 @@ export default class DealPreparationWorker extends BaseService {
     this.logger.debug(`Started scanning.`, { id: request.id, name: request.name, path: request.path, minSize: request.minSize, maxSize: request.maxSize });
     let index = 0;
     for await (const fileList of Scanner.scan(request.path, request.minSize, request.maxSize)) {
-      const existing = await Datastore.GenerationRequestModel.findOne({ datasetId: request.id, index }, { _id: 1 });
+      const existing = await Datastore.GenerationRequestModel.findOne({ datasetId: request.id, index }, { _id: 1, status: 1 });
       if (existing) {
-        continue;
+        if (existing.status === 'created') {
+          await Datastore.GenerationRequestModel.findByIdAndDelete(existing.id, { projection: { _id: 1 } });
+        } else {
+          continue;
+        }
       }
       const generationRequest = await Datastore.GenerationRequestModel.create({
         datasetId: request.id,
@@ -61,7 +65,7 @@ export default class DealPreparationWorker extends BaseService {
         path: request.path,
         index,
         fileList: fileList.slice(0, 1000),
-        status: 'active'
+        status: 'created'
       });
       for (let i = 1000; i < fileList.length; i += 1000) {
         await Datastore.GenerationRequestModel.findByIdAndUpdate(generationRequest.id, {
@@ -72,6 +76,9 @@ export default class DealPreparationWorker extends BaseService {
           }
         }, { projection: { _id: 1 } });
       }
+      await Datastore.GenerationRequestModel.findByIdAndUpdate(generationRequest.id, {
+        status: 'active'
+      }, { projection: { _id: 1 } });
       index++;
       if ((await Datastore.ScanningRequestModel.findById(request.id))?.status === 'paused') {
         this.logger.info(`Scanning request has been paused.`);
