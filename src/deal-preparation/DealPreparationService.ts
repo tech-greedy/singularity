@@ -218,7 +218,7 @@ export default class DealPreparationService extends BaseService {
         await fs.rm(filename, { force: true });
       }
     }
-    await Datastore.GenerationRequestModel.remove({ datasetId: found.id });
+    await Datastore.GenerationRequestModel.deleteMany({ datasetId: found.id });
 
     response.end();
   }
