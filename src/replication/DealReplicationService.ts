@@ -61,7 +61,7 @@ export default class DealReplicationService extends BaseService {
       const result: GetReplicationDetailsResponse = {
         id: found.id,
         datasetId: found.datasetId,
-        minReplicas: found.minReplicas,
+        maxReplicas: found.maxReplicas,
         criteria: found.criteria,
         client: found.client,
         status: found.status
@@ -77,7 +77,7 @@ export default class DealReplicationService extends BaseService {
         result.push({
           id: r.id,
           datasetId: r.datasetId,
-          minReplicas: r.minReplicas,
+          maxReplicas: r.maxReplicas,
           criteria: r.criteria,
           client: r.client,
           status: r.status,
@@ -139,7 +139,8 @@ export default class DealReplicationService extends BaseService {
         maxPrice,
         isVerfied,
         duration,
-        isOffline
+        isOffline,
+        maxNumberOfDeals
       } = <CreateReplicationRequest>request.body;
       this.logger.info(`Received request to replicate dataset "${datasetId}" from client "${client}.`);
       let realDatasetId = datasetId;
@@ -162,7 +163,7 @@ export default class DealReplicationService extends BaseService {
 
       const replicationRequest = new Datastore.ReplicationRequestModel();
       replicationRequest.datasetId = realDatasetId;
-      replicationRequest.minReplicas = replica;
+      replicationRequest.maxReplicas = replica;
       replicationRequest.criteria = criteria;
       replicationRequest.client = client;
       replicationRequest.urlPrefix = urlPrefix;
@@ -170,7 +171,7 @@ export default class DealReplicationService extends BaseService {
       replicationRequest.isVerfied = isVerfied === 'true';
       replicationRequest.duration = duration;
       replicationRequest.isOffline = isOffline === 'true';
-      replicationRequest.maxNumberOfDeals = -1;
+      replicationRequest.maxNumberOfDeals = maxNumberOfDeals;
       replicationRequest.status = 'active';
       try {
         await replicationRequest.save();

@@ -330,6 +330,7 @@ replication.command('start')
   .option('-r, --verified <verified>', 'Whether to propose deal as verified. true|false.', 'true')
   .option('-d, --duration <duration>', 'Duration in days for deal length.', '500')
   .option('-o, --offline <offline>', 'Propose as offline deal.', 'false')
+  .option('-m, --max-deals <maxdeals>', 'Max number of deals in this replication request per SP.', '0')
   .action(async (datasetid, replica, criteria, client, options) => {
     let response!: AxiosResponse;
     try {
@@ -343,8 +344,9 @@ replication.command('start')
         urlPrefix: options.urlPrefix,
         maxPrice: options.price,
         isVerfied: options.verified,
-        duration: options.duration,
-        isOffline: options.offline
+        duration: options.duration * 2880, // convert to epoch
+        isOffline: options.offline,
+        maxNumberOfDeals: options.maxdeals
       });
     } catch (error) {
       CliUtil.renderErrorAndExit(error);

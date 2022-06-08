@@ -12,7 +12,7 @@ export default interface DealState {
   duration: number,
   price: number, // unit is Fil
   verified: boolean,
-  state: 'reserved' | 'proposed' | 'published' | 'active' | 'slashed' | 'error',
+  state: 'proposed' | 'published' | 'active' | 'slashed' | 'error',
   replicationRequestId: string,
   datasetId: string,
   dealId?: number,

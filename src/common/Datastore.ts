@@ -86,7 +86,7 @@ export default class Datastore {
   private static setupReplicationRequestSchema () {
     const replicationRequestSchema = new Schema<ReplicationRequest>({
       datasetId: Schema.Types.String,
-      minReplicas: Schema.Types.Number,
+      maxReplicas: Schema.Types.Number,
       criteria: Schema.Types.String,
       client: Schema.Types.String,
       urlPrefix: Schema.Types.String,
