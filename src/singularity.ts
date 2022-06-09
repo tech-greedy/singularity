@@ -346,7 +346,7 @@ replication.command('start')
         isVerfied: options.verified,
         duration: options.duration * 2880, // convert to epoch
         isOffline: options.offline,
-        maxNumberOfDeals: options.maxdeals
+        maxNumberOfDeals: options.maxDeals
       });
     } catch (error) {
       CliUtil.renderErrorAndExit(error);

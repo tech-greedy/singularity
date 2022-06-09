@@ -97,6 +97,8 @@ export default class Datastore {
       isOffline: Schema.Types.Boolean,
       status: Schema.Types.String,
       errorMessage: Schema.Types.String
+    }, {
+      timestamps: true
     });
     Datastore.ReplicationRequestModel = mongoose.model<ReplicationRequest>('ReplicationRequest', replicationRequestSchema);
   }
@@ -117,6 +119,8 @@ export default class Datastore {
       datasetId: Schema.Types.String,
       dealId: Schema.Types.Number,
       errorMessage: Schema.Types.String
+    }, {
+      timestamps: true
     });
     // TODO create index if needed
     Datastore.DealStateModel = mongoose.model<DealState>('DealState', dealStateSchema);
@@ -155,6 +159,8 @@ export default class Datastore {
       carSize: Schema.Types.Number,
       pieceCid: Schema.Types.String,
       pieceSize: Schema.Types.Number
+    }, {
+      timestamps: true
     });
     Datastore.GenerationRequestModel = mongoose.model<GenerationRequest>('GenerationRequest', generationRequestSchema);
   }
@@ -174,6 +180,8 @@ export default class Datastore {
       },
       status: Schema.Types.String,
       errorMessage: Schema.Types.String
+    }, {
+      timestamps: true
     });
     Datastore.ScanningRequestModel = mongoose.model<ScanningRequest>('ScanningRequest', scanningRequestSchema);
   }

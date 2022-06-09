@@ -157,12 +157,24 @@ export default class DealReplicationWorker extends BaseService {
           break;
         }
 
-        // check if the car has enough replica
-        const existingDeals = await Datastore.DealStateModel.count({
+        // check if the car has already dealt or have enough replica
+        const existingDeals = await Datastore.DealStateModel.find({
           state: { $nin: ['slashed', 'error'] },
           pieceCid: carFile.pieceCid
         });
-        if (existingDeals >= existingRec.maxReplicas) {
+        let alreadyDealt = false;
+        for (let k = 0; k < existingDeals.length; k++) {
+          const deal = existingDeals[k];
+          if (deal.provider === miner) {
+            this.logger.warn(`This pieceCID ${carFile.pieceCid} has already been dealt with ${miner}. ` +
+              `Deal CID ${deal.dealCid}.`);
+            alreadyDealt = true;
+          }
+        }
+        if (alreadyDealt) {
+          continue;
+        }
+        if (existingDeals.length >= existingRec.maxReplicas) {
           this.logger.warn(`This pieceCID ${carFile.pieceCid} has reached enough ` +
             `replica (${existingRec.maxReplicas}) planned by the request ${existingRec.id}.`);
           continue;
@@ -254,8 +266,9 @@ export default class DealReplicationWorker extends BaseService {
             errorMsg = '' + error;
             state = 'error';
           }
-          await new Promise(resolve => setTimeout(resolve, 30000));
           this.logger.info('Waiting 30 seconds to retry');
+          // TODO expoential back off
+          await new Promise(resolve => setTimeout(resolve, 30000));
           retryCount++;
         } while (retryCount < 3);
         await Datastore.DealStateModel.create({
@@ -273,17 +286,23 @@ export default class DealReplicationWorker extends BaseService {
           datasetId: model.datasetId,
           errorMessage: errorMsg
         });
-        csvArray.push({
-          provider: miner,
-          deal_cid: dealCid,
-          filename: carFilename,
-          piece_cid: carFile.pieceCid,
-          url: downloadUrl
-        });
+        if (dealCid !== 'unknown') {
+          csvArray.push({
+            provider: miner,
+            deal_cid: dealCid,
+            filename: carFilename,
+            piece_cid: carFile.pieceCid,
+            url: downloadUrl
+          });
+        }
       }
       if (csvArray.length > 0) {
         const csv = new ObjectsToCsv(csvArray);
-        await csv.toDisk(`/tmp/${miner}_${model.id}.csv`, { append: true });
+        const csvFilename = `/tmp/${miner}_${model.id}.csv`;
+        await csv.toDisk(csvFilename, { append: true });
+        this.logger.info(`CSV written to ${csvFilename}`);
+      } else {
+        this.logger.warn(`No deal made. Skip create CSV.`);
       }
     }
   }
