@@ -7,7 +7,6 @@ import { Category } from '../common/Logger';
 import GenerationRequest, { FileInfo, GeneratedFileList } from '../common/model/GenerationRequest';
 import ScanningRequest from '../common/model/ScanningRequest';
 import Scanner from './Scanner';
-import config from 'config';
 import fs from 'fs-extra';
 import path from 'path';
 
@@ -27,15 +26,12 @@ interface GenerateCarOutput {
 
 export default class DealPreparationWorker extends BaseService {
   private readonly workerId: string;
-  private readonly outPath: string;
 
   public constructor () {
     super(Category.DealPreparationWorker);
     this.workerId = randomUUID();
     this.startHealthCheck = this.startHealthCheck.bind(this);
     this.startPollWork = this.startPollWork.bind(this);
-    this.outPath = path.resolve(process.env.NODE_CONFIG_DIR!, config.get('deal_preparation_worker.out_dir'));
-    fs.mkdirSync(this.outPath, { recursive: true });
   }
 
   public start (): void {
@@ -63,6 +59,7 @@ export default class DealPreparationWorker extends BaseService {
         datasetId: request.id,
         datasetName: request.name,
         path: request.path,
+        outDir: request.outDir,
         index,
         fileList: fileList.slice(0, 1000),
         status: 'created'
@@ -96,8 +93,9 @@ export default class DealPreparationWorker extends BaseService {
       Start: file.start,
       End: file.end
     })));
-    this.logger.debug(`Spawning generate-car.`, { outPath: this.outPath, parentPath: request.path });
-    const child = spawn('generate-car', ['-o', this.outPath, '-p', request.path], {
+    await fs.mkdir(request.outDir, { recursive: true });
+    this.logger.debug(`Spawning generate-car.`, { outPath: request.outDir, parentPath: request.path });
+    const child = spawn('generate-car', ['-o', request.outDir, '-p', request.path], {
       stdio: ['pipe', 'pipe', 'pipe']
     });
     (async () => {
@@ -164,7 +162,7 @@ export default class DealPreparationWorker extends BaseService {
       }
 
       const output :GenerateCarOutput = JSON.parse(stdout);
-      const carFile = path.join(this.outPath, output.DataCid + '.car');
+      const carFile = path.join(newGenerationWork.outDir, output.DataCid + '.car');
       const carFileStat = await fs.stat(carFile);
       const fileMap = new Map<string, FileInfo>();
       for (const fileInfo of newGenerationWork.fileList) {

@@ -21,6 +21,8 @@ bind = "0.0.0.0"
 port = 7001
 minDealSizeRatio = 0.55
 maxDealSizeRatio = 0.95
+# Whether to cleanup temporary CAR files
+enable_cleanup = true
 
 [database]
 # Start a built-in MongoDB server shipped with this software
@@ -35,10 +37,6 @@ local_port = 37000
 enabled = true
 # Number of workers to start, one worker consumes 2 - 2.5 CPUs
 num_workers = 2
-# Whether to cleanup temporary CAR files
-enable_cleanup = true
-# Path to store generated CAR files
-out_dir = "./cars"
 
 [index_service]
 enabled = true

@@ -55,9 +55,32 @@ export default class DealPreparationService extends BaseService {
     const bind = config.get<string>('deal_preparation_service.bind');
     const port = config.get<number>('deal_preparation_service.port');
     this.startCleanupHealthCheck();
+    if (config.get('deal_preparation_service.enable_cleanup')) {
+      this.cleanupIncompleteFiles();
+    }
     this.app!.listen(port, bind, () => {
       this.logger.info(`Service started listening at http://${bind}:${port}`);
     });
+  }
+
+  private async cleanupIncompleteFiles () : Promise<void> {
+    let dirs = (await Datastore.ScanningRequestModel.find()).map(r => r.outDir);
+    dirs = [...new Set(dirs)];
+    for (const dir of dirs) {
+      try {
+        await fs.access(dir, constants.F_OK);
+        for (const file of await fs.readdir(dir)) {
+          const regex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.car$/;
+          if (regex.test(file)) {
+            const fullPath = path.join(dir, file);
+            this.logger.info(`Removing temporary file ${fullPath}`);
+            await fs.rm(fullPath);
+          }
+        }
+      } catch (e) {
+        this.logger.warn(`${dir} cannot be read during cleanup.`);
+      }
+    }
   }
 
   private async cleanupHealthCheck (): Promise<void> {
@@ -109,6 +132,7 @@ export default class DealPreparationService extends BaseService {
       datasetName: found.datasetName,
       path: found.path,
       index: found.index,
+      outDir: found.outDir,
       fileList: found.fileList.map((f) => ({
         path: f.path,
         size: f.size,
@@ -150,6 +174,7 @@ export default class DealPreparationService extends BaseService {
       path: found.path,
       minSize: found.minSize,
       maxSize: found.maxSize,
+      outDir: found.outDir,
       scanningStatus: found.status,
       errorMessage: found.errorMessage,
       generationTotal: await Datastore.GenerationRequestModel.count({ datasetId: found.id }),
@@ -185,6 +210,7 @@ export default class DealPreparationService extends BaseService {
         path: r.path,
         minSize: r.minSize,
         maxSize: r.maxSize,
+        outDir: r.outDir,
         scanningStatus: r.status,
         errorMessage: r.errorMessage,
         generationTotal: await Datastore.GenerationRequestModel.count({ datasetId: r.id }),
@@ -208,16 +234,15 @@ export default class DealPreparationService extends BaseService {
       return;
     }
 
-    await found.remove();
-
     if (purge) {
-      const outPath = path.resolve(process.env.NODE_CONFIG_DIR!, config.get('deal_preparation_worker.out_dir'));
       for await (const { dataCid } of Datastore.GenerationRequestModel.find({ datasetId: found.id }, { dataCid: 1 })) {
-        const filename = path.join(outPath, dataCid + '.car');
+        const filename = path.join(found.outDir, dataCid + '.car');
         this.logger.info(`Removing file.`, { filename });
         await fs.rm(filename, { force: true });
       }
     }
+
+    await found.remove();
     await Datastore.GenerationRequestModel.deleteMany({ datasetId: found.id });
 
     response.end();
@@ -295,7 +320,8 @@ export default class DealPreparationService extends BaseService {
     const {
       name,
       path,
-      dealSize
+      dealSize,
+      outDir
     } = <CreatePreparationRequest>request.body;
     this.logger.info(`Received request to start preparing dataset.`, { name, path, dealSize });
     const dealSizeNumber = xbytes.parseSize(dealSize);
@@ -309,6 +335,7 @@ export default class DealPreparationService extends BaseService {
     const maxSize = Math.floor(dealSizeNumber * config.get<number>('deal_preparation_service.maxDealSizeRatio'));
     try {
       await fs.access(path, constants.F_OK);
+      await fs.access(outDir, constants.F_OK);
     } catch (_) {
       this.sendError(response, ErrorCode.PATH_NOT_ACCESSIBLE);
       return;
@@ -320,6 +347,7 @@ export default class DealPreparationService extends BaseService {
     scanningRequest.maxSize = maxSize;
     scanningRequest.path = path;
     scanningRequest.status = 'active';
+    scanningRequest.outDir = outDir;
     try {
       await scanningRequest.save();
     } catch (e: any) {
@@ -335,6 +363,7 @@ export default class DealPreparationService extends BaseService {
       minSize,
       maxSize,
       path,
+      outDir,
       status: scanningRequest.status
     }));
   }
