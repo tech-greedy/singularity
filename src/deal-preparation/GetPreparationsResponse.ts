@@ -4,6 +4,7 @@ export interface GetPreparationsResponseItem {
   path: string,
   minSize: number,
   maxSize: number,
+  outDir: string,
   scanningStatus: 'active' | 'error' | 'completed' | 'paused',
   errorMessage?: string,
   generationCompleted: number,

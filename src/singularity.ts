@@ -228,11 +228,11 @@ preparation.command('generation-status').description('Check the status of a sing
     if (options.json) {
       console.log(JSON.stringify(data, null, 2));
     } else {
-      const { fileList, ...summary } = data;
+      const { fileList, generatedFileList, ...summary } = data;
       console.log('Generation Request Summary');
       console.table([summary]);
       console.log('File Lists');
-      console.table(fileList);
+      console.table(fileList.length > 0 ? fileList : generatedFileList);
     }
   });
 
