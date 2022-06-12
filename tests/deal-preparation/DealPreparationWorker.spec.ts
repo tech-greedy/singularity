@@ -3,6 +3,7 @@ import Utils from '../Utils';
 import Datastore from '../../src/common/Datastore';
 import DealPreparationWorker from '../../src/deal-preparation/DealPreparationWorker';
 import Scanner from '../../src/deal-preparation/Scanner';
+import * as fs from 'fs/promises';
 import { FileList } from '../../src/common/model/GenerationRequest';
 
 describe('DealPreparationWorker', () => {
@@ -15,6 +16,13 @@ describe('DealPreparationWorker', () => {
     await Datastore.ScanningRequestModel.remove();
     await Datastore.GenerationRequestModel.remove();
   });
+  afterAll(async () => {
+    for (const file of await fs.readdir('.')) {
+      if (file.endsWith('.car')) {
+        await fs.rm(file);
+      }
+    }
+  })
   describe('startPollWork', () => {
     it('should immediately start next job if Scan work finishes', async () => {
       const spy = spyOn(global,'setTimeout');
@@ -61,6 +69,7 @@ describe('DealPreparationWorker', () => {
         path: 'tests/test_folder',
         index: 0,
         status: 'active',
+        outDir: '.',
         fileList: [
           {
             path: 'tests/test_folder/not_exists.txt',
@@ -84,6 +93,7 @@ describe('DealPreparationWorker', () => {
         path: 'tests/test_folder',
         index: 0,
         status: 'active',
+        outDir: '.',
         fileList: [
           {
             path: 'tests/test_folder/a/1.txt',
@@ -204,7 +214,8 @@ describe('DealPreparationWorker', () => {
         path: 'tests/test_folder',
         minSize: 12,
         maxSize: 16,
-        status: 'active'
+        status: 'active',
+        outDir: '.'
       });
       const requests = await Datastore.GenerationRequestModel.find({}, null, { sort: { index: 1 } });
       expect(requests.length).toEqual(1);
@@ -219,7 +230,8 @@ describe('DealPreparationWorker', () => {
         path: path.join('tests', 'test_folder'),
         minSize: 12,
         maxSize: 16,
-        status: 'active'
+        status: 'active',
+        outDir: '.'
       });
       const requests = await Datastore.GenerationRequestModel.find({}, null, { sort: { index: 1 } });
       /**

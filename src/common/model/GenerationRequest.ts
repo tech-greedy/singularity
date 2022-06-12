@@ -25,6 +25,7 @@ export default interface GenerationRequest {
   datasetId: string
   datasetName: string,
   path: string,
+  outDir: string,
   index: number,
   fileList: FileList,
   generatedFileList: GeneratedFileList,

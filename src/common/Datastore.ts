@@ -129,6 +129,7 @@ export default class Datastore {
       path: Schema.Types.String,
       index: Schema.Types.Number,
       fileList: [fileInfoSchema],
+      outDir: Schema.Types.String,
       generatedFileList: [generatedFileInfoSchema],
       workerId: {
         type: Schema.Types.String,
@@ -153,6 +154,7 @@ export default class Datastore {
       path: Schema.Types.String,
       minSize: Schema.Types.Number,
       maxSize: Schema.Types.Number,
+      outDir: Schema.Types.String,
       workerId: {
         type: Schema.Types.String,
         index: 1
