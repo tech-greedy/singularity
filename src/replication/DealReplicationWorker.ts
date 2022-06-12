@@ -134,6 +134,7 @@ export default class DealReplicationWorker extends BaseService {
       });
 
       let dealsMadePerSP = 0;
+      let retryTimeout = config.get<number>('min_retry_wait_ms'); // 30s, 60s, 120s ...
       const csvArray = [];
       for (let j = 0; j < cars.length; j++) {
         const carFile = cars[j];
@@ -244,7 +245,6 @@ export default class DealReplicationWorker extends BaseService {
             if (useLotus) {
               if (cmdOut.stdout.startsWith('baf')) {
                 dealCid = cmdOut.stdout;
-                dealsMadePerSP++;
                 break; // success, break from while loop
               } else {
                 errorMsg = cmdOut.stdout + cmdOut.stderr;
@@ -254,7 +254,6 @@ export default class DealReplicationWorker extends BaseService {
               const match = boostResultUUIDMatcher.exec(cmdOut.stdout);
               if (match != null && match.length > 1) {
                 dealCid = match[1];
-                dealsMadePerSP++;
                 break; // success, break from while loop
               } else {
                 errorMsg = cmdOut.stdout + cmdOut.stderr;
@@ -266,11 +265,17 @@ export default class DealReplicationWorker extends BaseService {
             errorMsg = '' + error;
             state = 'error';
           }
-          this.logger.info('Waiting 30 seconds to retry');
-          // TODO expoential back off
-          await new Promise(resolve => setTimeout(resolve, 30000));
+          this.logger.info(`Waiting ${retryTimeout} ms to retry`);
+          await new Promise(resolve => setTimeout(resolve, retryTimeout));
+          retryTimeout *= 2; // expoential back off
           retryCount++;
-        } while (retryCount < 3);
+        } while (retryCount < config.get<number>('max_retry_count'));
+        if (state === 'proposed') {
+          dealsMadePerSP++;
+          if (retryTimeout > config.get<number>('min_retry_wait_ms')) {
+            retryTimeout /= 2; // expoential back "on"
+          }
+        }
         await Datastore.DealStateModel.create({
           client: model.client,
           provider: miner,
