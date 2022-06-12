@@ -68,6 +68,23 @@ If the service crashes or is interrupted, there may be incomplete CAR files gene
 #### out_dir
 This will be deprecated
 
+# Deployment
+Since the tool is modularized, it can be deployed in different ways and have different components enabled or disabled.
+
+Below are configurations for commonly used deployment topology.
+## Use Standalone MongoDb database
+1. Setup your own MongoDb instance
+2. In [default.toml](./config/default.toml) from your repo
+   1. change `database.start_local` to false
+   2. change `connection.database` to the connection string of your own MongoDb database
+### Deal Preparation Only
+In [default.toml](./config/default.toml) from your repo
+1. change `index_service.enabled` to false
+2. change `ipfs.enabled` to false
+3. change `http_hosting_service.enabled` to false
+4. change `hdeal_tracking_service.enabled` to false
+
+
 # Usage
 ```shell
 $ singularity
