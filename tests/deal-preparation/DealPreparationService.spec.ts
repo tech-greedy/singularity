@@ -450,6 +450,24 @@ describe('DealPreparationService', () => {
       status: 'paused'
     }));
   })
+  describe('cleanupIncompleteFiles', () => {
+    it('should delete the incomplete files', async () => {
+      await Datastore.ScanningRequestModel.create({
+        name: 'test-deletion',
+        outDir: '.',
+      });
+      await fs.writeFile('./d715461e-8d42-4a53-9b33-e17ed4247304.car', 'something');
+      await service['cleanupIncompleteFiles']();
+      await expectAsync(fs.access('./d715461e-8d42-4a53-9b33-e17ed4247304.car')).toBeRejected();
+    })
+    it('should skip nonexisting folders', async () => {
+      await Datastore.ScanningRequestModel.create({
+        name: 'test-deletion',
+        outDir: './non-existing',
+      });
+      await expectAsync(service['cleanupIncompleteFiles']()).toBeResolved();
+    })
+  })
   describe('DELETE /preparation/:id', () => {
     it('should delete the entries and car files', async () => {
       const scanning = await Datastore.ScanningRequestModel.create({
