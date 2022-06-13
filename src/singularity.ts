@@ -4,7 +4,7 @@ import { homedir } from 'os';
 import path from 'path';
 import cluster from 'node:cluster';
 process.env.NODE_CONFIG_DIR = process.env.SINGULARITY_PATH || path.join(homedir(), '.singularity');
-import { Argument, Command } from 'commander';
+import { Argument, Command, Option } from 'commander';
 import packageJson from '../package.json';
 import Datastore from './common/Datastore';
 import DealPreparationService from './deal-preparation/DealPreparationService';
@@ -151,6 +151,8 @@ preparation.command('create').description('Start deal preparation for a local da
   .argument('<datasetPath>', 'Directory path to the dataset')
   .argument('<outDir>', 'The output Directory to save CAR files')
   .option('-s, --deal-size <deal_size>', 'Target deal size, i.e. 32GiB', '32 GiB')
+  .addOption(new Option('-m, --min-ratio <min_ratio>', 'Min ratio of deal to sector size, i.e. 0.55').argParser(parseFloat))
+  .addOption(new Option('-M, --max-ratio <max_ratio>', 'Max ratio of deal to sector size, i.e. 0.95').argParser(parseFloat))
   .action(async (name, p, outDir, options) => {
     if (!await fs.pathExists(p)) {
       logger.error(`Dataset path "${p}" does not exist.`);
@@ -164,7 +166,9 @@ preparation.command('create').description('Start deal preparation for a local da
         name: name,
         path: path.resolve(p),
         dealSize: dealSize,
-        outDir: path.resolve(outDir)
+        outDir: path.resolve(outDir),
+        minRatio: options.minRatio,
+        maxRatio: options.maxRatio
       });
     } catch (error) {
       CliUtil.renderErrorAndExit(error);

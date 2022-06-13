@@ -49,8 +49,11 @@ Service to manage preparation requests
 #### enabled, bind, port
 Whether to enable the service and which IP and port to bind the service to
 
+#### enable_cleanup
+If the service crashes or is interrupted, there may be incomplete CAR files generated. Enabling this can clean them up.
+
 #### minDealSizeRatio, maxDealSizeRatio
-The min/max ratio of CAR file size divided by the target deal size. The dataset splitting is performed with below logic
+The default min/max ratio of CAR file size divided by the target deal size. The dataset splitting is performed with below logic
 1. Perform a Glob pattern match and get all files in sorted order
 2. Iterate through all the files and keep accumulating file sizes into a chunk
 3. Once the size of a chunk is between min and max ratio, pack this chunk to a CAR file and start with a new chunk
@@ -61,9 +64,6 @@ Worker to scan the dataset, make plan and generate Car file and CIDs
 
 #### enabled, num_workers
 Whether to enable the worker and how many worker instances. As a rule of thumb, use `min(cpu_cores / 2.5, io_MBps / 50)`
-
-#### enable_cleanup
-If the service crashes or is interrupted, there may be incomplete CAR files generated. Enabling this can clean them up.
 
 #### out_dir
 This will be deprecated

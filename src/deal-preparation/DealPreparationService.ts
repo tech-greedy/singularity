@@ -318,7 +318,9 @@ export default class DealPreparationService extends BaseService {
       name,
       path,
       dealSize,
-      outDir
+      outDir,
+      minRatio,
+      maxRatio
     } = <CreatePreparationRequest>request.body;
     this.logger.info(`Received request to start preparing dataset.`, { name, path, dealSize });
     const dealSizeNumber = xbytes.parseSize(dealSize);
@@ -327,9 +329,29 @@ export default class DealPreparationService extends BaseService {
       this.sendError(response, ErrorCode.DEAL_SIZE_NOT_ALLOWED);
       return;
     }
+    if (minRatio && (minRatio < 0.5 || minRatio > 0.95)) {
+      this.sendError(response, ErrorCode.MIN_RATIO_INVALID);
+      return;
+    }
+    if (maxRatio && (maxRatio < 0.5 || maxRatio > 0.95)) {
+      this.sendError(response, ErrorCode.MAX_RATIO_INVALID);
+      return;
+    }
+    if (minRatio && maxRatio && minRatio >= maxRatio) {
+      this.sendError(response, ErrorCode.MAX_RATIO_INVALID);
+      return;
+    }
 
-    const minSize = Math.floor(dealSizeNumber * config.get<number>('deal_preparation_service.minDealSizeRatio'));
-    const maxSize = Math.floor(dealSizeNumber * config.get<number>('deal_preparation_service.maxDealSizeRatio'));
+    let minSize = Math.floor(dealSizeNumber * config.get<number>('deal_preparation_service.minDealSizeRatio'));
+    if (minRatio) {
+      minSize = minRatio * dealSizeNumber;
+    }
+    minSize = Math.round(minSize);
+    let maxSize = Math.floor(dealSizeNumber * config.get<number>('deal_preparation_service.maxDealSizeRatio'));
+    if (maxRatio) {
+      maxSize = maxRatio * dealSizeNumber;
+    }
+    maxSize = Math.round(maxSize);
     try {
       await fs.access(path, constants.F_OK);
       await fs.access(outDir, constants.F_OK);
