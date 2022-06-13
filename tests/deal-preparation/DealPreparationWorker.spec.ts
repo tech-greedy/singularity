@@ -4,7 +4,7 @@ import Datastore from '../../src/common/Datastore';
 import DealPreparationWorker from '../../src/deal-preparation/DealPreparationWorker';
 import Scanner from '../../src/deal-preparation/Scanner';
 import * as fs from 'fs/promises';
-import { FileList } from '../../src/common/model/GenerationRequest';
+import { FileList } from '../../src/common/model/InputFileList';
 
 describe('DealPreparationWorker', () => {
   let worker: DealPreparationWorker;
@@ -15,6 +15,8 @@ describe('DealPreparationWorker', () => {
   beforeEach(async () => {
     await Datastore.ScanningRequestModel.remove();
     await Datastore.GenerationRequestModel.remove();
+    await Datastore.InputFileListModel.remove();
+    await Datastore.OutputFileListModel.remove();
   });
   afterAll(async () => {
     for (const file of await fs.readdir('.')) {
@@ -70,6 +72,10 @@ describe('DealPreparationWorker', () => {
         index: 0,
         status: 'active',
         outDir: '.',
+      });
+      await Datastore.InputFileListModel.create({
+        generationId: created.id,
+        index: 0,
         fileList: [
           {
             path: 'tests/test_folder/not_exists.txt',
@@ -78,7 +84,7 @@ describe('DealPreparationWorker', () => {
             end: 0
           }
         ]
-      });
+      })
       await worker['pollWork']();
       const found = await Datastore.GenerationRequestModel.findById(created.id);
       expect<any>(found).toEqual(jasmine.objectContaining({
@@ -94,12 +100,14 @@ describe('DealPreparationWorker', () => {
         index: 0,
         status: 'active',
         outDir: '.',
+      });
+      await Datastore.InputFileListModel.create({
+        generationId: created.id,
+        index: 0,
         fileList: [
           {
             path: 'tests/test_folder/a/1.txt',
             size: 3,
-            start: 0,
-            end: 0,
           },
           {
             path: 'tests/test_folder/b/2.txt',
@@ -108,7 +116,7 @@ describe('DealPreparationWorker', () => {
             end: 9,
           }
         ]
-      });
+      })
       await worker['pollWork']();
       const found = await Datastore.GenerationRequestModel.findById(created.id);
       expect(found).toEqual(jasmine.objectContaining({
@@ -116,22 +124,21 @@ describe('DealPreparationWorker', () => {
         dataCid: 'bafybeih2nwd66s7rstnbj4grzjw7re4lyhmx3auvphibbz7nalo4ygfypq',
         pieceCid: 'baga6ea4seaqoqixvkneyg6tzwfoqsmw33xdva3aywkawp6n5jd5tffjdmqrn6gy',
         pieceSize: 512,
-        fileList: [],
+      }));
+      const generatedFileList = await Datastore.OutputFileListModel.findOne({
+        generatedId: created.id
+      });
+      expect(generatedFileList).toEqual(jasmine.objectContaining({
+        index: 0,
         generatedFileList: [
           jasmine.objectContaining({
             path: '',
-            size: 0,
-            start: 0,
-            end: 0,
             dir: true,
             cid: 'bafybeih2nwd66s7rstnbj4grzjw7re4lyhmx3auvphibbz7nalo4ygfypq',
             selector: []
           }),
           jasmine.objectContaining({
             path: 'a',
-            size: 0,
-            start: 0,
-            end: 0,
             dir: true,
             cid: 'bafybeifd34zco7545dzqflv7djpi3q2l2egi4l4coohgftgjssn4zoeu2y',
             selector: [0]
@@ -139,17 +146,12 @@ describe('DealPreparationWorker', () => {
           jasmine.objectContaining({
             path: path.join('a', '1.txt'),
             size: 3,
-            start: 0,
-            end: 0,
             dir: false,
             cid: 'bafkreiey5jxe6ilpf62lnh77tm5ejbbmhbugzjuf6p2v3remlu73ced34q',
             selector: [0, 0],
           }),
           jasmine.objectContaining({
             path: 'b',
-            size: 0,
-            start: 0,
-            end: 0,
             dir: true,
             cid: 'bafybeif7zaqg45xk5zvwybbfgeiotkzvjmd4bpjasb4aevne57dpt67com',
             selector: [1]
@@ -164,7 +166,7 @@ describe('DealPreparationWorker', () => {
             selector: [1, 0]
           }),
         ]
-      }));
+      }))
     })
     it('should insert the database with fileLists', async () => {
       const created = await Datastore.ScanningRequestModel.create({
@@ -219,9 +221,12 @@ describe('DealPreparationWorker', () => {
       });
       const requests = await Datastore.GenerationRequestModel.find({}, null, { sort: { index: 1 } });
       expect(requests.length).toEqual(1);
-      expect(requests[0].fileList.length).toEqual(5000);
-      expect(requests[0].fileList[0].path).toEqual('tests/test_folder/folder/0.txt');
-      expect(requests[0].fileList[4999].path).toEqual('tests/test_folder/folder/4999.txt');
+      const list = await Datastore.InputFileListModel.find({generationId: requests[0].id}, null, {sort: {index: 1}});
+      expect(list.length).toEqual(5);
+      expect(list[0].fileList.length).toEqual(1000);
+      expect(list[0].fileList[0].path).toEqual('tests/test_folder/folder/0.txt');
+      expect(list[4].index).toEqual(4);
+      expect(list[4].fileList[999].path).toEqual('tests/test_folder/folder/4999.txt');
     })
     it('should get the correct fileList', async () => {
       await worker['scan']({
@@ -250,37 +255,42 @@ describe('DealPreparationWorker', () => {
         datasetName: 'name',
         path: path.join('tests', 'test_folder'),
         index: 0,
+        status: 'active',
+      }));
+      expect(await Datastore.InputFileListModel.findOne({generationId: requests[0].id})).toEqual(jasmine.objectContaining({
         fileList: [jasmine.objectContaining({
           path: path.join('tests', 'test_folder', 'a', '1.txt'),
           size: 3,
-          start: 0,
-          end: 0,
         }), jasmine.objectContaining({
           path: path.join('tests', 'test_folder', 'b', '2.txt'),
           size: 27,
           start: 0,
           end: 9,
         })],
-        status: 'active',
-      }));
+      }))
       expect(requests[1]).toEqual(jasmine.objectContaining({
         datasetId: '507f191e810c19729de860ea',
         datasetName: 'name',
         path: path.join('tests', 'test_folder'),
         index: 1,
+        status: 'active',
+      }));
+      expect(await Datastore.InputFileListModel.findOne({generationId: requests[1].id})).toEqual(jasmine.objectContaining({
         fileList: [jasmine.objectContaining({
           path: path.join('tests', 'test_folder', 'b', '2.txt'),
           size: 27,
           start: 9,
           end: 21,
         })],
-        status: 'active',
       }));
       expect(requests[2]).toEqual(jasmine.objectContaining({
         datasetId: '507f191e810c19729de860ea',
         datasetName: 'name',
         path: path.join('tests', 'test_folder'),
         index: 2,
+        status: 'active',
+      }));
+      expect(await Datastore.InputFileListModel.findOne({generationId: requests[2].id})).toEqual(jasmine.objectContaining({
         fileList: [jasmine.objectContaining({
           path: path.join('tests', 'test_folder', 'b', '2.txt'),
           size: 27,
@@ -289,10 +299,7 @@ describe('DealPreparationWorker', () => {
         }), jasmine.objectContaining({
           path: path.join('tests', 'test_folder', 'c', '3.txt'),
           size: 9,
-          start: 0,
-          end: 0,
         })],
-        status: 'active',
       }));
       // windows does not support symbolic link
       const dtxtsize = process.platform === 'win32' ? 7 : 9;
@@ -301,13 +308,13 @@ describe('DealPreparationWorker', () => {
         datasetName: 'name',
         path: path.join('tests', 'test_folder'),
         index: 3,
+        status: 'active',
+      }));
+      expect(await Datastore.InputFileListModel.findOne({generationId: requests[3].id})).toEqual(jasmine.objectContaining({
         fileList: [jasmine.objectContaining({
           path: path.join('tests', 'test_folder', 'd.txt'),
           size: dtxtsize,
-          start: 0,
-          end: 0,
-        })],
-        status: 'active',
+        })]
       }));
     })
   })

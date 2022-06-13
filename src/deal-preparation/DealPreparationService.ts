@@ -15,7 +15,6 @@ import GetPreparationDetailsResponse from './GetPreparationDetailsResponse';
 import { GetPreparationsResponse } from './GetPreparationsResponse';
 import UpdatePreparationRequest from './UpdatePreparationRequest';
 import { ObjectId } from 'mongodb';
-import GenerationRequest from '../common/model/GenerationRequest';
 
 export default class DealPreparationService extends BaseService {
   private static AllowedDealSizes: number[] = DealPreparationService.initAllowedDealSizes();
@@ -126,28 +125,26 @@ export default class DealPreparationService extends BaseService {
       return;
     }
 
-    const result : GenerationRequest = {
+    const fileList = (await Datastore.InputFileListModel.find({
+      generationId: found.id
+    })).map(r => r.fileList).flat().map(r => ({
+      path: r.path, size: r.size, start: r.start, end: r.end
+    }));
+    const generatedFileList = (await Datastore.OutputFileListModel.find({
+      generationId: found.id
+    })).map(r => r.generatedFileList).flat().map(r => ({
+      path: r.path, size: r.size, start: r.start, end: r.end, dir: r.dir, selector: r.selector, cid: r.cid
+    }));
+
+    const result = {
       id: found.id,
       datasetId: found.datasetId,
       datasetName: found.datasetName,
       path: found.path,
       index: found.index,
       outDir: found.outDir,
-      fileList: found.fileList.map((f) => ({
-        path: f.path,
-        size: f.size,
-        start: f.start,
-        end: f.end
-      })),
-      generatedFileList: found.generatedFileList.map((f) => ({
-        path: f.path,
-        size: f.size,
-        start: f.start,
-        end: f.end,
-        dir: f.dir,
-        selector: f.selector,
-        cid: f.cid
-      })),
+      fileList,
+      generatedFileList,
       workerId: found.workerId,
       status: found.status,
       errorMessage: found.errorMessage,

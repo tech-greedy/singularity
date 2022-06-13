@@ -67,11 +67,15 @@ describe('IndexService', () => {
         status: 'completed',
         path: path.join('base', 'path')
       });
-      await Datastore.GenerationRequestModel.create({
+      const generation1 = await Datastore.GenerationRequestModel.create({
         datasetId: scanningRequest.id,
         status: 'completed',
         pieceCid: 'piece1',
         dataCid: 'data1',
+      });
+      await Datastore.OutputFileListModel.create({
+        generationId: generation1.id,
+        index: 0,
         generatedFileList: [
           {
             path: path.join('a', 'b.mp4'),
@@ -88,12 +92,15 @@ describe('IndexService', () => {
             end: 50
           },
         ]
-      });
-      await Datastore.GenerationRequestModel.create({
+      })
+      const generation2 = await Datastore.GenerationRequestModel.create({
         datasetId: scanningRequest.id,
         status: 'completed',
         pieceCid: 'piece2',
         dataCid: 'data2',
+      });
+      await Datastore.OutputFileListModel.create({
+        generationId: generation2.id,
         generatedFileList: [
           {
             path: path.join('a', 'c.mp4'),

@@ -4,11 +4,13 @@ import { randomUUID } from 'crypto';
 import BaseService from '../common/BaseService';
 import Datastore from '../common/Datastore';
 import { Category } from '../common/Logger';
-import GenerationRequest, { FileInfo, GeneratedFileList } from '../common/model/GenerationRequest';
+import GenerationRequest from '../common/model/GenerationRequest';
 import ScanningRequest from '../common/model/ScanningRequest';
 import Scanner from './Scanner';
 import fs from 'fs-extra';
 import path from 'path';
+import { GeneratedFileList } from '../common/model/OutputFileList';
+import { FileInfo } from '../common/model/InputFileList';
 
 interface IpldNode {
   Name: string,
@@ -61,17 +63,22 @@ export default class DealPreparationWorker extends BaseService {
         path: request.path,
         outDir: request.outDir,
         index,
-        fileList: fileList.slice(0, 1000),
         status: 'created'
       });
-      for (let i = 1000; i < fileList.length; i += 1000) {
-        await Datastore.GenerationRequestModel.findByIdAndUpdate(generationRequest.id, {
-          $push: {
-            fileList: {
-              $each: fileList.slice(i, i + 1000)
-            }
+      for (let i = 0; i < fileList.length; i += 1000) {
+        await Datastore.InputFileListModel.updateOne({
+          generationId: generationRequest.id,
+          index: i / 1000
+        },
+        {
+          $setOnInsert: {
+            fileList: fileList.slice(i, i + 1000)
           }
-        }, { projection: { _id: 1 } });
+        },
+        {
+          upsert: true,
+          projection: { _id: 1 }
+        });
       }
       await Datastore.GenerationRequestModel.findByIdAndUpdate(generationRequest.id, {
         status: 'active'
@@ -86,13 +93,7 @@ export default class DealPreparationWorker extends BaseService {
     await Datastore.ScanningRequestModel.findByIdAndUpdate(request.id, { status: 'completed' });
   }
 
-  private async generate (request: GenerationRequest): Promise<[stdout: string, stderr: string, statusCode: number | null]> {
-    const input = JSON.stringify(request.fileList.map(file => ({
-      Path: file.path,
-      Size: file.size,
-      Start: file.start,
-      End: file.end
-    })));
+  private async generate (request: GenerationRequest, input: string): Promise<[stdout: string, stderr: string, statusCode: number | null]> {
     await fs.mkdir(request.outDir, { recursive: true });
     this.logger.debug(`Spawning generate-car.`, { outPath: request.outDir, parentPath: request.path });
     const child = spawn('generate-car', ['-o', request.outDir, '-p', request.path], {
@@ -151,7 +152,16 @@ export default class DealPreparationWorker extends BaseService {
     if (newGenerationWork) {
       this.logger.info(`${this.workerId} - Polled a new generation request.`,
         { id: newGenerationWork.id, datasetName: newGenerationWork.datasetName, index: newGenerationWork.index });
-      const result = await this.generate(newGenerationWork);
+      const fileList = (await Datastore.InputFileListModel.find({
+        generationId: newGenerationWork.id
+      }, null, { sort: { index: 1 } })).map(r => r.fileList).flat();
+      const input = JSON.stringify(fileList.map(file => ({
+        Path: file.path,
+        Size: file.size,
+        Start: file.start,
+        End: file.end
+      })));
+      const result = await this.generate(newGenerationWork, input);
 
       // Parse the output and update the database
       const [stdout, stderr, statusCode] = result!;
@@ -165,24 +175,23 @@ export default class DealPreparationWorker extends BaseService {
       const carFile = path.join(newGenerationWork.outDir, output.DataCid + '.car');
       const carFileStat = await fs.stat(carFile);
       const fileMap = new Map<string, FileInfo>();
-      for (const fileInfo of newGenerationWork.fileList) {
+      for (const fileInfo of fileList) {
         fileMap.set(path.relative(newGenerationWork.path, fileInfo.path), fileInfo);
       }
       const generatedFileList: GeneratedFileList = [];
       await this.populateGeneratedFileList(fileMap, output.Ipld, [], [], generatedFileList);
-      await Datastore.GenerationRequestModel.findByIdAndUpdate(newGenerationWork.id, {
-        generatedFileList: generatedFileList.slice(0, 1000)
-      }, {
-        projection: { _id: 1 }
-      });
-      for (let i = 1000; i < generatedFileList.length; i += 1000) {
-        await Datastore.GenerationRequestModel.findByIdAndUpdate(newGenerationWork.id, {
-          $push: {
-            generatedFileList: {
-              $each: generatedFileList.slice(i, i + 1000)
-            }
+      for (let i = 0; i < generatedFileList.length; i += 1000) {
+        await Datastore.OutputFileListModel.updateOne({
+          generationId: newGenerationWork.id,
+          index: i / 1000
+        },
+        {
+          $setOnInsert: {
+            generatedFileList: generatedFileList.slice(i, i + 1000)
           }
-        }, {
+        },
+        {
+          upsert: true,
           projection: { _id: 1 }
         });
       }
@@ -191,10 +200,12 @@ export default class DealPreparationWorker extends BaseService {
         dataCid: output.DataCid,
         pieceSize: output.PieceSize,
         pieceCid: output.PieceCid,
-        carSize: carFileStat.size,
-        fileList: []
+        carSize: carFileStat.size
       }, {
         projection: { _id: 1 }
+      });
+      await Datastore.InputFileListModel.deleteMany({
+        generationId: newGenerationWork.id
       });
       this.logger.info(`${this.workerId} - Finished Generation of dataset.`,
         { id: newGenerationWork.id, datasetName: newGenerationWork.datasetName, index: newGenerationWork.index });
@@ -224,9 +235,6 @@ export default class DealPreparationWorker extends BaseService {
       list.push({
         path: relPath,
         dir: true,
-        size: 0,
-        start: 0,
-        end: 0,
         cid: ipld.Hash,
         selector: [...selector]
       });

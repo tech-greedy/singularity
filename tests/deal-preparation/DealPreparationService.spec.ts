@@ -16,6 +16,8 @@ describe('DealPreparationService', () => {
   beforeEach(async () => {
     await Datastore.ScanningRequestModel.remove();
     await Datastore.GenerationRequestModel.remove();
+    await Datastore.InputFileListModel.remove();
+    await Datastore.OutputFileListModel.remove();
   });
   describe('cleanupHealthCheck', () => {
     it('should clean up scanningrequest and generationrequest table', async () => {
@@ -130,13 +132,30 @@ describe('DealPreparationService', () => {
         dataCid: 'dataCid',
         pieceCid: 'pieceCid',
         pieceSize: 10,
+      });
+      await Datastore.InputFileListModel.create({
+        generationId: generationRequest.id,
+        index: 0,
         fileList: [{
           path: '/data/file1.mp4',
           start: 0,
           end: 0,
           size: 100
         }]
-      });
+      })
+      await Datastore.OutputFileListModel.create({
+        generationId: generationRequest.id,
+        index: 0,
+        generatedFileList: [{
+          path: '/data/file1.mp4',
+          start: 0,
+          end: 0,
+          size: 100,
+          cid: 'cid',
+          selector: [],
+          dir: false
+        }]
+      })
       const response = await (supertest(service['app']))
         .get('/generation/' + generationRequest.id);
       expect(response.status).toEqual(200);
@@ -154,6 +173,16 @@ describe('DealPreparationService', () => {
         start: 0,
         end: 0,
         size: 100
+      }));
+      expect(response.body.generatedFileList.length).toEqual(1);
+      expect(response.body.generatedFileList[0]).toEqual(jasmine.objectContaining({
+        path: '/data/file1.mp4',
+        start: 0,
+        end: 0,
+        size: 100,
+        cid: 'cid',
+        selector: [],
+        dir: false
       }));
     });
   });
