@@ -18,7 +18,6 @@ import DealTrackingService from './deal-tracking/DealTrackingService';
 import GetPreparationDetailsResponse from './deal-preparation/GetPreparationDetailsResponse';
 import fs from 'fs-extra';
 import Logger, { Category } from './common/Logger';
-import GenerationRequest from './common/model/GenerationRequest';
 import { Worker } from 'cluster';
 import * as IpfsCore from 'ipfs-core';
 
@@ -224,7 +223,7 @@ preparation.command('generation-status').description('Check the status of a sing
     } catch (error) {
       CliUtil.renderErrorAndExit(error);
     }
-    const data = <GenerationRequest> response.data;
+    const data = response.data;
     if (options.json) {
       console.log(JSON.stringify(data, null, 2));
     } else {

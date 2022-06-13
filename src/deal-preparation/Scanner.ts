@@ -1,5 +1,5 @@
 import rrdir from 'rrdir';
-import { FileList } from '../common/model/GenerationRequest';
+import { FileList } from '../common/model/InputFileList';
 
 export default class Scanner {
   public static async * scan (root: string, minSize: number, maxSize: number): AsyncGenerator<FileList> {
@@ -18,8 +18,6 @@ export default class Scanner {
       if (newSize <= maxSize) {
         currentList.push({
           size: entry.stats!.size,
-          start: 0,
-          end: 0,
           path: entry.path
         });
         currentSize = newSize;
