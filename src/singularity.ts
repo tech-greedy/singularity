@@ -215,6 +215,31 @@ preparation.command('list').description('List all deal preparation requests')
     CliUtil.renderResponse(response.data, options.json);
   });
 
+preparation.command('generation-manifest').description('Get the Slingshot v3.x manifest data for a single deal generation request')
+  .option('--dataset <dataset>', 'The dataset id or name, required if looking for generation request using index')
+  .option('--pretty', 'Whether to add indents to output JSON')
+  .requiredOption('-l, --url-prefix <urlPrefix>', 'The prefix of the download link, which will be followed by datacid.car, i.e. http://download.mysite.org/')
+  .argument('<generationId>', 'A unique id or index of the generation request')
+  .action(async (id, options) => {
+    const url: string = config.get('connection.deal_preparation_service');
+    let response! : AxiosResponse;
+    try {
+      response = options.dataset ? await axios.get(`${url}/generation-manifest/${options.dataset}/${id}`) : await axios.get(`${url}/generation-manifest/${id}`);
+    } catch (error) {
+      CliUtil.renderErrorAndExit(error);
+    }
+    const data = response.data;
+    if (!options.urlPrefix.endsWith('/')) {
+      options.urlPrefix = options.urlPrefix + '/';
+    }
+    data.car_file_link = options.urlPrefix + data.payload_cid + '.car';
+    if (options.pretty) {
+      console.log(JSON.stringify(data, null, 2));
+    } else {
+      console.log(JSON.stringify(data));
+    }
+  });
+
 preparation.command('generation-status').description('Check the status of a single deal generation request')
   .option('--json', 'Output with JSON format')
   .option('--dataset <dataset>', 'The dataset id or name, required if looking for generation request using index')
