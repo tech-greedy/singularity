@@ -520,6 +520,48 @@ describe('DealPreparationService', () => {
     })
   })
   describe('POST /preparation', () => {
+    it('should return error if min ratio too small', async () => {
+      const response = await supertest(service['app'])
+        .post('/preparation').send({
+          name: 'name',
+          path: '.',
+          dealSize: '32GiB',
+          minRatio: 0.4,
+          maxRatio: 0.6,
+        }).set('Accept', 'application/json');
+      expect(response.status).toEqual(400);
+      expect(response.body).toEqual({
+        error: ErrorCode.MIN_RATIO_INVALID
+      });
+    });
+    it('should return error if max ratio too large', async () => {
+      const response = await supertest(service['app'])
+        .post('/preparation').send({
+          name: 'name',
+          path: '.',
+          dealSize: '32GiB',
+          minRatio: 0.6,
+          maxRatio: 1.2,
+        }).set('Accept', 'application/json');
+      expect(response.status).toEqual(400);
+      expect(response.body).toEqual({
+        error: ErrorCode.MAX_RATIO_INVALID
+      });
+    });
+    it('should return error if max ratio too small', async () => {
+      const response = await supertest(service['app'])
+        .post('/preparation').send({
+          name: 'name',
+          path: '.',
+          dealSize: '32GiB',
+          minRatio: 0.6,
+          maxRatio: 0.55,
+        }).set('Accept', 'application/json');
+      expect(response.status).toEqual(400);
+      expect(response.body).toEqual({
+        error: ErrorCode.MAX_RATIO_INVALID
+      });
+    });
     it('should return error if deal size is not allowed', async () => {
       const response = await supertest(service['app'])
         .post('/preparation').send({

@@ -3,4 +3,6 @@ export default interface CreatePreparationRequest {
   path : string,
   dealSize : string,
   outDir: string,
+  minRatio?: number,
+  maxRatio?: number,
 }
