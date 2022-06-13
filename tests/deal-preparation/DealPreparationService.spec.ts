@@ -107,6 +107,53 @@ describe('DealPreparationService', () => {
       }));
     })
   })
+  describe('GET /generation-manifest/:id', () => {
+    it('should return slingshot compliant manifest', async () => {
+      const generationRequest = await Datastore.GenerationRequestModel.create({
+        datasetId: 'datasetId',
+        status: 'completed',
+        index: 0,
+        dataCid: 'dataCid',
+        pieceCid: 'pieceCid',
+        pieceSize: 10,
+      });
+      await Datastore.OutputFileListModel.create({
+        generationId: generationRequest.id,
+        index: 0,
+        generatedFileList: [{
+          path: '/data/file1.mp4',
+          start: 50,
+          end: 60,
+          size: 100,
+          cid: 'file_cid',
+          selector: [],
+          dir: false
+        }, {
+          path: '/data',
+          cid: 'dir_cid',
+          selector: [],
+          dir: true
+        }]
+      })
+      const response = await (supertest(service['app']))
+        .get('/generation-manifest/' + generationRequest.id);
+      expect(response.status).toEqual(200);
+      expect(response.body).toEqual({
+          piece_cid: 'pieceCid',
+          payload_cid: 'dataCid',
+          contents: {
+            '/data/file1.mp4': {
+              CID: 'file_cid',
+              filesize: 100,
+              chunkoffset: 50,
+              chunklength: 10
+            }
+          },
+          groupings: { '/data': 'dir_cid' }
+        }
+      );
+    })
+  })
   describe('GET /generation/:id', () => {
     it('should return error if the id cannot be found', async () => {
       const response = await (supertest(service['app']))

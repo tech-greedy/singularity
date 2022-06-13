@@ -15,6 +15,7 @@ import GetPreparationDetailsResponse from './GetPreparationDetailsResponse';
 import { GetPreparationsResponse } from './GetPreparationsResponse';
 import UpdatePreparationRequest from './UpdatePreparationRequest';
 import { ObjectId } from 'mongodb';
+import GenerationRequest from '../common/model/GenerationRequest';
 
 export default class DealPreparationService extends BaseService {
   private static AllowedDealSizes: number[] = DealPreparationService.initAllowedDealSizes();
@@ -28,6 +29,7 @@ export default class DealPreparationService extends BaseService {
     this.handleListPreparationRequests = this.handleListPreparationRequests.bind(this);
     this.handleGetPreparationRequest = this.handleGetPreparationRequest.bind(this);
     this.handleGetGenerationRequest = this.handleGetGenerationRequest.bind(this);
+    this.handleGetGenerationManifestRequest = this.handleGetGenerationManifestRequest.bind(this);
     this.startCleanupHealthCheck = this.startCleanupHealthCheck.bind(this);
     if (!this.enabled) {
       this.logger.warn('Service is not enabled. Exit now...');
@@ -48,6 +50,8 @@ export default class DealPreparationService extends BaseService {
     this.app.get('/preparation/:id', this.handleGetPreparationRequest);
     this.app.get('/generation/:dataset/:id', this.handleGetGenerationRequest);
     this.app.get('/generation/:id', this.handleGetGenerationRequest);
+    this.app.get('/generation-manifest/:dataset/:id', this.handleGetGenerationManifestRequest);
+    this.app.get('/generation-manifest/:id', this.handleGetGenerationManifestRequest);
   }
 
   public start (): void {
@@ -101,7 +105,7 @@ export default class DealPreparationService extends BaseService {
     setTimeout(this.startCleanupHealthCheck, 5000);
   }
 
-  private async handleGetGenerationRequest (request: Request, response: Response) {
+  private async getGenerationRequest (request: Request, response: Response): Promise<GenerationRequest | undefined> {
     const id = request.params['id'];
     const dataset = request.params['dataset'];
     this.logger.info('Received request to get details of dataset generation.', { id, dataset });
@@ -118,10 +122,61 @@ export default class DealPreparationService extends BaseService {
       found = await Datastore.GenerationRequestModel.findOne({ index: id, datasetName: dataset });
     } else {
       this.sendError(response, ErrorCode.INVALID_OBJECT_ID);
-      return;
+      return undefined;
     }
     if (!found) {
       this.sendError(response, ErrorCode.DATASET_GENERATION_REQUEST_NOT_FOUND);
+      return undefined;
+    }
+
+    return found;
+  }
+
+  private async handleGetGenerationManifestRequest (request: Request, response: Response) {
+    const found = await this.getGenerationRequest(request, response);
+    if (!found) {
+      return;
+    }
+    if (found.status !== 'completed') {
+      this.sendError(response, ErrorCode.GENERATION_NOT_COMPLETED);
+      return;
+    }
+
+    const generatedFileList = (await Datastore.OutputFileListModel.find({
+      generationId: found.id
+    })).map(r => r.generatedFileList).flat();
+
+    const contents: any = {};
+    const groupings: any = {};
+    for (const fileInfo of generatedFileList) {
+      if (fileInfo.dir) {
+        groupings[fileInfo.path] = fileInfo.cid;
+      } else {
+        contents[fileInfo.path] = {
+          CID: fileInfo.cid,
+          filesize: fileInfo.size
+        };
+        if (fileInfo.start) {
+          contents[fileInfo.path].chunkoffset = fileInfo.start;
+          contents[fileInfo.path].chunklength = fileInfo.end! - fileInfo.start;
+        }
+      }
+    }
+
+    const result = {
+      piece_cid: found.pieceCid,
+      payload_cid: found.dataCid,
+      raw_car_file_size: found.carSize,
+      dataset: found.datasetName,
+      contents,
+      groupings
+    };
+    response.end(JSON.stringify(result));
+  }
+
+  private async handleGetGenerationRequest (request: Request, response: Response) {
+    const found = await this.getGenerationRequest(request, response);
+    if (!found) {
       return;
     }
 
