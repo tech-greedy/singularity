@@ -10,7 +10,6 @@ import { create, all } from 'mathjs';
 const mathconfig = {};
 const math = create(all, mathconfig);
 const exec: any = require('await-exec');// no TS support
-const ObjectsToCsv: any = require('objects-to-csv');// no TS support
 
 export default class DealReplicationWorker extends BaseService {
   private readonly workerId: string;
@@ -135,7 +134,6 @@ export default class DealReplicationWorker extends BaseService {
 
       let dealsMadePerSP = 0;
       let retryTimeout = config.get<number>('min_retry_wait_ms'); // 30s, 60s, 120s ...
-      const csvArray = [];
       for (let j = 0; j < cars.length; j++) {
         const carFile = cars[j];
 
@@ -291,23 +289,6 @@ export default class DealReplicationWorker extends BaseService {
           datasetId: model.datasetId,
           errorMessage: errorMsg
         });
-        if (dealCid !== 'unknown') {
-          csvArray.push({
-            provider: miner,
-            deal_cid: dealCid,
-            filename: carFilename,
-            piece_cid: carFile.pieceCid,
-            url: downloadUrl
-          });
-        }
-      }
-      if (csvArray.length > 0) {
-        const csv = new ObjectsToCsv(csvArray);
-        const csvFilename = `/tmp/${miner}_${model.id}.csv`;
-        await csv.toDisk(csvFilename, { append: true });
-        this.logger.info(`CSV written to ${csvFilename}`);
-      } else {
-        this.logger.warn(`No deal made. Skip create CSV.`);
       }
     }
   }
