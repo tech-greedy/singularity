@@ -16,9 +16,10 @@ import { GetPreparationsResponse } from './GetPreparationsResponse';
 import UpdatePreparationRequest from './UpdatePreparationRequest';
 import { ObjectId } from 'mongodb';
 import GenerationRequest from '../common/model/GenerationRequest';
+import { GeneratedFileList } from '../common/model/OutputFileList';
 
 export default class DealPreparationService extends BaseService {
-  private static AllowedDealSizes: number[] = DealPreparationService.initAllowedDealSizes();
+  static AllowedDealSizes: number[] = DealPreparationService.initAllowedDealSizes();
   private app: Express = express();
 
   public constructor () {
@@ -132,6 +133,30 @@ export default class DealPreparationService extends BaseService {
     return found;
   }
 
+  public static getContentsAndGroupings (generatedFileList: GeneratedFileList) {
+    const contents: any = {};
+    const groupings: any = {};
+    for (const fileInfo of generatedFileList) {
+      if (fileInfo.path === '') {
+        continue;
+      }
+      if (fileInfo.dir) {
+        groupings[fileInfo.path] = fileInfo.cid;
+      } else {
+        contents[fileInfo.path] = {
+          CID: fileInfo.cid,
+          filesize: fileInfo.size
+        };
+        if (fileInfo.start) {
+          contents[fileInfo.path].chunkoffset = fileInfo.start;
+          contents[fileInfo.path].chunklength = fileInfo.end! - fileInfo.start;
+        }
+      }
+    }
+
+    return [contents, groupings];
+  }
+
   private async handleGetGenerationManifestRequest (request: Request, response: Response) {
     const found = await this.getGenerationRequest(request, response);
     if (!found) {
@@ -146,22 +171,7 @@ export default class DealPreparationService extends BaseService {
       generationId: found.id
     })).map(r => r.generatedFileList).flat();
 
-    const contents: any = {};
-    const groupings: any = {};
-    for (const fileInfo of generatedFileList) {
-      if (fileInfo.dir) {
-        groupings[fileInfo.path] = fileInfo.cid;
-      } else {
-        contents[fileInfo.path] = {
-          CID: fileInfo.cid,
-          filesize: fileInfo.size
-        };
-        if (fileInfo.start) {
-          contents[fileInfo.path].chunkoffset = fileInfo.start;
-          contents[fileInfo.path].chunklength = fileInfo.end! - fileInfo.start;
-        }
-      }
-    }
+    const [contents, groupings] = DealPreparationService.getContentsAndGroupings(generatedFileList);
 
     const result = {
       piece_cid: found.pieceCid,

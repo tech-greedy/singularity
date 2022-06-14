@@ -19,7 +19,7 @@ interface IpldNode {
   Link: IpldNode[] | null
 }
 
-interface GenerateCarOutput {
+export interface GenerateCarOutput {
   Ipld: IpldNode,
   PieceSize: number,
   PieceCid: string,
@@ -96,7 +96,13 @@ export default class DealPreparationWorker extends BaseService {
   private async generate (request: GenerationRequest, input: string): Promise<[stdout: string, stderr: string, statusCode: number | null]> {
     await fs.mkdir(request.outDir, { recursive: true });
     this.logger.debug(`Spawning generate-car.`, { outPath: request.outDir, parentPath: request.path });
-    const child = spawn('generate-car', ['-o', request.outDir, '-p', request.path], {
+    const [stdout, stderr, exitCode] = await DealPreparationWorker.invokeGenerateCar(input, request.outDir, request.path);
+    this.logger.debug(`Child process finished.`, { stdout, stderr, exitCode });
+    return [stdout, stderr, exitCode];
+  }
+
+  public static async invokeGenerateCar (input: string, outDir: string, p: string): Promise<[stdout: string, stderr: string, statusCode: number | null]> {
+    const child = spawn('generate-car', ['-o', outDir, '-p', p], {
       stdio: ['pipe', 'pipe', 'pipe']
     });
     (async () => {
@@ -111,7 +117,6 @@ export default class DealPreparationWorker extends BaseService {
     try {
       await onExit(child);
     } catch (_) {}
-    this.logger.debug(`Child process finished.`, { stdout, stderr, exitCode: child.exitCode });
     return [stdout, stderr, child.exitCode];
   }
 
@@ -179,7 +184,7 @@ export default class DealPreparationWorker extends BaseService {
         fileMap.set(path.relative(newGenerationWork.path, fileInfo.path), fileInfo);
       }
       const generatedFileList: GeneratedFileList = [];
-      await this.populateGeneratedFileList(fileMap, output.Ipld, [], [], generatedFileList);
+      await DealPreparationWorker.populateGeneratedFileList(fileMap, output.Ipld, [], [], generatedFileList);
       for (let i = 0; i < generatedFileList.length; i += 1000) {
         await Datastore.OutputFileListModel.updateOne({
           generationId: newGenerationWork.id,
@@ -214,7 +219,7 @@ export default class DealPreparationWorker extends BaseService {
     return newGenerationWork != null;
   }
 
-  private async populateGeneratedFileList (
+  public static async populateGeneratedFileList (
     fileMap: Map<string, FileInfo>,
     ipld: IpldNode, segments: string[],
     selector: number[],
@@ -241,7 +246,7 @@ export default class DealPreparationWorker extends BaseService {
       for (let linkId = 0; linkId < ipld.Link.length; ++linkId) {
         selector.push(linkId);
         segments.push(ipld.Link[linkId].Name);
-        await this.populateGeneratedFileList(fileMap, ipld.Link[linkId], segments, selector, list);
+        await DealPreparationWorker.populateGeneratedFileList(fileMap, ipld.Link[linkId], segments, selector, list);
         selector.pop();
         segments.pop();
       }

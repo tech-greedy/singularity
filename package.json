@@ -1,6 +1,6 @@
 {
   "name": "@techgreedy/singularity",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "description": "Large scale client tool with capabilities on onboard PB-scale data to Filecoin network",
   "main": "dist/source/start.js",
   "types": "dist/source/start.d.ts",
@@ -8,6 +8,7 @@
     "build": "tsc && copyfiles \"config/**/*.toml\" dist",
     "build-singularity": "ncc build src/singularity.ts -m -o dist/ncc/singularity --target es2020",
     "build-singularity-retrieve": "ncc build src/singularity-retrieve.ts -m -o dist/ncc/singularity-retrieve --target es2020",
+    "build-singularity-prepare": "ncc build src/singularity-prepare.ts -m -o dist/ncc/singularity-prepare --target es2020",
     "postbuild": "chmod +x dist/src/singularity.js",
     "init": "ts-node src/singularity.ts init",
     "start": "nodemon src/singularity.ts daemon",
@@ -63,6 +64,7 @@
     "typescript": "^4.6.2"
   },
   "dependencies": {
+    "@goodware/task-queue": "^2.1.3",
     "@gzuidhof/go-npm": "^0.1.13",
     "@rauschma/stringio": "^1.4.0",
     "@techgreedy/generate-car": "^1.1.1",
@@ -94,7 +96,8 @@
   ],
   "bin": {
     "singularity": "dist/ncc/singularity/index.js",
-    "singularity-retrieve": "dist/ncc/singularity-retrieve/index.js"
+    "singularity-retrieve": "dist/ncc/singularity-retrieve/index.js",
+    "singularity-prepare": "dist/ncc/singularity-prepare/index.js"
   },
   "nyc": {
     "extends": "@istanbuljs/nyc-config-typescript",
