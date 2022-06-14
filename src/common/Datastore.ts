@@ -5,12 +5,14 @@ import mongoose, { Schema } from 'mongoose';
 import Logger, { Category } from './Logger';
 import DealState from './model/DealState';
 import DealTrackingState from './model/DealTrackingState';
-import GenerationRequest, { FileInfo, GeneratedFileInfo } from './model/GenerationRequest';
+import GenerationRequest from './model/GenerationRequest';
 import HealthCheck from './model/HealthCheck';
 import ProviderMetric from './model/ProviderMetric';
 import ReplicationRequest from './model/ReplicationRequest';
 import ScanningRequest from './model/ScanningRequest';
 import path from 'path';
+import InputFileList, { FileInfo } from './model/InputFileList';
+import OutputFileList, { GeneratedFileInfo } from './model/OutputFileList';
 
 export default class Datastore {
   private static logger = Logger.getLogger(Category.Database);
@@ -30,6 +32,10 @@ export default class Datastore {
   public static ProviderMetricModel: mongoose.Model<ProviderMetric, {}, {}, {}>;
   // eslint-disable-next-line @typescript-eslint/ban-types
   public static DealTrackingStateModel: mongoose.Model<DealTrackingState, {}, {}, {}>;
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  public static InputFileListModel: mongoose.Model<InputFileList, {}, {}, {}>;
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  public static OutputFileListModel: mongoose.Model<OutputFileList, {}, {}, {}>;
 
   private static DB_NAME = 'singularity';
 
@@ -62,10 +68,51 @@ export default class Datastore {
     this.setupDealStateSchema();
     this.setupReplicationRequestSchema();
     this.setupProviderMetricSchema();
-    this.setupDealTrackingState();
+    this.setupDealTrackingStateSchema();
+    this.setupInputFileListSchema();
+    this.setupOutputFileListSchema();
   }
 
-  private static setupDealTrackingState () {
+  private static setupOutputFileListSchema () {
+    const generatedFileInfoSchema = new Schema<GeneratedFileInfo>({
+      path: Schema.Types.String,
+      size: Schema.Types.Number,
+      start: Schema.Types.Number,
+      end: Schema.Types.Number,
+      dir: Schema.Types.Boolean,
+      cid: Schema.Types.String,
+      selector: [Schema.Types.Number]
+    });
+    const schema = new Schema<OutputFileList>({
+      generationId: {
+        type: Schema.Types.String,
+        index: 1
+      },
+      index: Schema.Types.Number,
+      generatedFileList: [generatedFileInfoSchema]
+    });
+    Datastore.OutputFileListModel = mongoose.model<OutputFileList>('OutputFileList', schema);
+  }
+
+  private static setupInputFileListSchema () {
+    const fileInfoSchema = new Schema<FileInfo>({
+      path: Schema.Types.String,
+      size: Schema.Types.Number,
+      start: Schema.Types.Number,
+      end: Schema.Types.Number
+    });
+    const schema = new Schema<InputFileList>({
+      generationId: {
+        type: Schema.Types.String,
+        index: 1
+      },
+      index: Schema.Types.Number,
+      fileList: [fileInfoSchema]
+    });
+    Datastore.InputFileListModel = mongoose.model<InputFileList>('InputFileList', schema);
+  }
+
+  private static setupDealTrackingStateSchema () {
     const dealTrackingStateSchema = new Schema<DealTrackingState>({
       stateType: Schema.Types.String,
       stateKey: Schema.Types.String,
@@ -127,28 +174,12 @@ export default class Datastore {
   }
 
   private static setupGenerationRequestSchema () {
-    const fileInfoSchema = new Schema<FileInfo>({
-      path: Schema.Types.String,
-      size: Schema.Types.Number,
-      start: Schema.Types.Number,
-      end: Schema.Types.Number
-    });
-    const generatedFileInfoSchema = new Schema<GeneratedFileInfo>({
-      path: Schema.Types.String,
-      size: Schema.Types.Number,
-      start: Schema.Types.Number,
-      end: Schema.Types.Number,
-      dir: Schema.Types.Boolean,
-      cid: Schema.Types.String,
-      selector: [Schema.Types.Number]
-    });
     const generationRequestSchema = new Schema<GenerationRequest>({
       datasetId: Schema.Types.String,
       datasetName: Schema.Types.String,
       path: Schema.Types.String,
       index: Schema.Types.Number,
-      fileList: [fileInfoSchema],
-      generatedFileList: [generatedFileInfoSchema],
+      outDir: Schema.Types.String,
       workerId: {
         type: Schema.Types.String,
         index: 1
@@ -174,6 +205,7 @@ export default class Datastore {
       path: Schema.Types.String,
       minSize: Schema.Types.Number,
       maxSize: Schema.Types.Number,
+      outDir: Schema.Types.String,
       workerId: {
         type: Schema.Types.String,
         index: 1

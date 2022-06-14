@@ -4,7 +4,7 @@ import { homedir } from 'os';
 import path from 'path';
 import cluster from 'node:cluster';
 process.env.NODE_CONFIG_DIR = process.env.SINGULARITY_PATH || path.join(homedir(), '.singularity');
-import { Argument, Command } from 'commander';
+import { Argument, Command, Option } from 'commander';
 import packageJson from '../package.json';
 import Datastore from './common/Datastore';
 import DealPreparationService from './deal-preparation/DealPreparationService';
@@ -18,7 +18,6 @@ import DealTrackingService from './deal-tracking/DealTrackingService';
 import GetPreparationDetailsResponse from './deal-preparation/GetPreparationDetailsResponse';
 import fs from 'fs-extra';
 import Logger, { Category } from './common/Logger';
-import GenerationRequest from './common/model/GenerationRequest';
 import { Worker } from 'cluster';
 import * as IpfsCore from 'ipfs-core';
 import DealReplicationService from './replication/DealReplicationService';
@@ -67,19 +66,6 @@ program.command('daemon')
         await Datastore.connect();
         if (config.get('ipfs.enabled')) {
           await IpfsCore.create();
-        }
-        if (config.get('deal_preparation_worker.enable_cleanup')) {
-          const outDir = path.resolve(process.env.NODE_CONFIG_DIR!, config.get('deal_preparation_worker.out_dir'));
-          if (await fs.pathExists(outDir)) {
-            for (const file of await fs.readdir(outDir)) {
-              const regex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.car$/;
-              if (regex.test(file)) {
-                const fullPath = path.join(outDir, file);
-                logger.info(`Removing temporary file ${fullPath}`);
-                await fs.remove(fullPath);
-              }
-            }
-          }
         }
         const workers: [Worker, string][] = [];
         let readied = 0;
@@ -177,8 +163,11 @@ const preparation = program.command('preparation')
 preparation.command('create').description('Start deal preparation for a local dataset')
   .argument('<datasetName>', 'A unique name of the dataset')
   .argument('<datasetPath>', 'Directory path to the dataset')
+  .argument('<outDir>', 'The output Directory to save CAR files')
   .option('-s, --deal-size <deal_size>', 'Target deal size, i.e. 32GiB', '32 GiB')
-  .action(async (name, p, options) => {
+  .addOption(new Option('-m, --min-ratio <min_ratio>', 'Min ratio of deal to sector size, i.e. 0.55').argParser(parseFloat))
+  .addOption(new Option('-M, --max-ratio <max_ratio>', 'Max ratio of deal to sector size, i.e. 0.95').argParser(parseFloat))
+  .action(async (name, p, outDir, options) => {
     if (!await fs.pathExists(p)) {
       logger.error(`Dataset path "${p}" does not exist.`);
       process.exit(1);
@@ -190,7 +179,10 @@ preparation.command('create').description('Start deal preparation for a local da
       response = await axios.post(`${url}/preparation`, {
         name: name,
         path: path.resolve(p),
-        dealSize: dealSize
+        dealSize: dealSize,
+        outDir: path.resolve(outDir),
+        minRatio: options.minRatio,
+        maxRatio: options.maxRatio
       });
     } catch (error) {
       CliUtil.renderErrorAndExit(error);
@@ -237,6 +229,31 @@ preparation.command('list').description('List all deal preparation requests')
     CliUtil.renderResponse(response.data, options.json);
   });
 
+preparation.command('generation-manifest').description('Get the Slingshot v3.x manifest data for a single deal generation request')
+  .option('--dataset <dataset>', 'The dataset id or name, required if looking for generation request using index')
+  .option('--pretty', 'Whether to add indents to output JSON')
+  .requiredOption('-l, --url-prefix <urlPrefix>', 'The prefix of the download link, which will be followed by datacid.car, i.e. http://download.mysite.org/')
+  .argument('<generationId>', 'A unique id or index of the generation request')
+  .action(async (id, options) => {
+    const url: string = config.get('connection.deal_preparation_service');
+    let response! : AxiosResponse;
+    try {
+      response = options.dataset ? await axios.get(`${url}/generation-manifest/${options.dataset}/${id}`) : await axios.get(`${url}/generation-manifest/${id}`);
+    } catch (error) {
+      CliUtil.renderErrorAndExit(error);
+    }
+    const data = response.data;
+    if (!options.urlPrefix.endsWith('/')) {
+      options.urlPrefix = options.urlPrefix + '/';
+    }
+    data.car_file_link = options.urlPrefix + data.payload_cid + '.car';
+    if (options.pretty) {
+      console.log(JSON.stringify(data, null, 2));
+    } else {
+      console.log(JSON.stringify(data));
+    }
+  });
+
 preparation.command('generation-status').description('Check the status of a single deal generation request')
   .option('--json', 'Output with JSON format')
   .option('--dataset <dataset>', 'The dataset id or name, required if looking for generation request using index')
@@ -249,15 +266,15 @@ preparation.command('generation-status').description('Check the status of a sing
     } catch (error) {
       CliUtil.renderErrorAndExit(error);
     }
-    const data = <GenerationRequest>response.data;
+    const data = response.data;
     if (options.json) {
       console.log(JSON.stringify(data, null, 2));
     } else {
-      const { fileList, ...summary } = data;
+      const { fileList, generatedFileList, ...summary } = data;
       console.log('Generation Request Summary');
       console.table([summary]);
       console.log('File Lists');
-      console.table(fileList);
+      console.table(fileList.length > 0 ? fileList : generatedFileList);
     }
   });
 

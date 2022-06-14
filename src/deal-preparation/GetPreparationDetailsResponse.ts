@@ -1,7 +1,7 @@
 export interface GenerationRequestSummary {
   id: string,
   index: number,
-  status: 'active' | 'paused' | 'completed' | 'error',
+  status: 'active' | 'paused' | 'completed' | 'error' | 'created',
   errorMessage?: string,
   dataCid?: string,
   pieceCid?: string,
@@ -15,6 +15,7 @@ export default interface GetPreparationDetailsResponse {
   path: string,
   minSize: number,
   maxSize: number,
+  outDir: string,
   scanningStatus: 'active' | 'error' | 'completed' | 'paused',
   errorMessage?: string,
   generationTotal: number,

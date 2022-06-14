@@ -29,6 +29,7 @@ export default class DealPreparationService extends BaseService {
     this.handleListPreparationRequests = this.handleListPreparationRequests.bind(this);
     this.handleGetPreparationRequest = this.handleGetPreparationRequest.bind(this);
     this.handleGetGenerationRequest = this.handleGetGenerationRequest.bind(this);
+    this.handleGetGenerationManifestRequest = this.handleGetGenerationManifestRequest.bind(this);
     this.startCleanupHealthCheck = this.startCleanupHealthCheck.bind(this);
     if (!this.enabled) {
       this.logger.warn('Service is not enabled. Exit now...');
@@ -49,15 +50,40 @@ export default class DealPreparationService extends BaseService {
     this.app.get('/preparation/:id', this.handleGetPreparationRequest);
     this.app.get('/generation/:dataset/:id', this.handleGetGenerationRequest);
     this.app.get('/generation/:id', this.handleGetGenerationRequest);
+    this.app.get('/generation-manifest/:dataset/:id', this.handleGetGenerationManifestRequest);
+    this.app.get('/generation-manifest/:id', this.handleGetGenerationManifestRequest);
   }
 
   public start (): void {
     const bind = config.get<string>('deal_preparation_service.bind');
     const port = config.get<number>('deal_preparation_service.port');
     this.startCleanupHealthCheck();
+    if (config.get('deal_preparation_service.enable_cleanup')) {
+      this.cleanupIncompleteFiles();
+    }
     this.app!.listen(port, bind, () => {
       this.logger.info(`Service started listening at http://${bind}:${port}`);
     });
+  }
+
+  private async cleanupIncompleteFiles () : Promise<void> {
+    let dirs = (await Datastore.ScanningRequestModel.find()).map(r => r.outDir);
+    dirs = [...new Set(dirs)];
+    for (const dir of dirs) {
+      try {
+        await fs.access(dir, constants.F_OK);
+        for (const file of await fs.readdir(dir)) {
+          const regex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.car$/;
+          if (regex.test(file)) {
+            const fullPath = path.join(dir, file);
+            this.logger.info(`Removing temporary file ${fullPath}`);
+            await fs.rm(fullPath);
+          }
+        }
+      } catch (e) {
+        this.logger.warn(`${dir} cannot be read during cleanup.`);
+      }
+    }
   }
 
   private async cleanupHealthCheck (): Promise<void> {
@@ -79,7 +105,7 @@ export default class DealPreparationService extends BaseService {
     setTimeout(this.startCleanupHealthCheck, 5000);
   }
 
-  private async handleGetGenerationRequest (request: Request, response: Response) {
+  private async getGenerationRequest (request: Request, response: Response): Promise<GenerationRequest | undefined> {
     const id = request.params['id'];
     const dataset = request.params['dataset'];
     this.logger.info('Received request to get details of dataset generation.', { id, dataset });
@@ -96,34 +122,84 @@ export default class DealPreparationService extends BaseService {
       found = await Datastore.GenerationRequestModel.findOne({ index: id, datasetName: dataset });
     } else {
       this.sendError(response, ErrorCode.INVALID_OBJECT_ID);
-      return;
+      return undefined;
     }
     if (!found) {
       this.sendError(response, ErrorCode.DATASET_GENERATION_REQUEST_NOT_FOUND);
+      return undefined;
+    }
+
+    return found;
+  }
+
+  private async handleGetGenerationManifestRequest (request: Request, response: Response) {
+    const found = await this.getGenerationRequest(request, response);
+    if (!found) {
+      return;
+    }
+    if (found.status !== 'completed') {
+      this.sendError(response, ErrorCode.GENERATION_NOT_COMPLETED);
       return;
     }
 
-    const result : GenerationRequest = {
+    const generatedFileList = (await Datastore.OutputFileListModel.find({
+      generationId: found.id
+    })).map(r => r.generatedFileList).flat();
+
+    const contents: any = {};
+    const groupings: any = {};
+    for (const fileInfo of generatedFileList) {
+      if (fileInfo.dir) {
+        groupings[fileInfo.path] = fileInfo.cid;
+      } else {
+        contents[fileInfo.path] = {
+          CID: fileInfo.cid,
+          filesize: fileInfo.size
+        };
+        if (fileInfo.start) {
+          contents[fileInfo.path].chunkoffset = fileInfo.start;
+          contents[fileInfo.path].chunklength = fileInfo.end! - fileInfo.start;
+        }
+      }
+    }
+
+    const result = {
+      piece_cid: found.pieceCid,
+      payload_cid: found.dataCid,
+      raw_car_file_size: found.carSize,
+      dataset: found.datasetName,
+      contents,
+      groupings
+    };
+    response.end(JSON.stringify(result));
+  }
+
+  private async handleGetGenerationRequest (request: Request, response: Response) {
+    const found = await this.getGenerationRequest(request, response);
+    if (!found) {
+      return;
+    }
+
+    const fileList = (await Datastore.InputFileListModel.find({
+      generationId: found.id
+    })).map(r => r.fileList).flat().map(r => ({
+      path: r.path, size: r.size, start: r.start, end: r.end
+    }));
+    const generatedFileList = (await Datastore.OutputFileListModel.find({
+      generationId: found.id
+    })).map(r => r.generatedFileList).flat().map(r => ({
+      path: r.path, size: r.size, start: r.start, end: r.end, dir: r.dir, selector: r.selector, cid: r.cid
+    }));
+
+    const result = {
       id: found.id,
       datasetId: found.datasetId,
       datasetName: found.datasetName,
       path: found.path,
       index: found.index,
-      fileList: found.fileList.map((f) => ({
-        path: f.path,
-        size: f.size,
-        start: f.start,
-        end: f.end
-      })),
-      generatedFileList: found.generatedFileList.map((f) => ({
-        path: f.path,
-        size: f.size,
-        start: f.start,
-        end: f.end,
-        dir: f.dir,
-        selector: f.selector,
-        cid: f.cid
-      })),
+      outDir: found.outDir,
+      fileList,
+      generatedFileList,
       workerId: found.workerId,
       status: found.status,
       errorMessage: found.errorMessage,
@@ -150,6 +226,7 @@ export default class DealPreparationService extends BaseService {
       path: found.path,
       minSize: found.minSize,
       maxSize: found.maxSize,
+      outDir: found.outDir,
       scanningStatus: found.status,
       errorMessage: found.errorMessage,
       generationTotal: await Datastore.GenerationRequestModel.count({ datasetId: found.id }),
@@ -185,6 +262,7 @@ export default class DealPreparationService extends BaseService {
         path: r.path,
         minSize: r.minSize,
         maxSize: r.maxSize,
+        outDir: r.outDir,
         scanningStatus: r.status,
         errorMessage: r.errorMessage,
         generationTotal: await Datastore.GenerationRequestModel.count({ datasetId: r.id }),
@@ -208,17 +286,16 @@ export default class DealPreparationService extends BaseService {
       return;
     }
 
-    await found.remove();
-
     if (purge) {
-      const outPath = path.resolve(process.env.NODE_CONFIG_DIR!, config.get('deal_preparation_worker.out_dir'));
       for await (const { dataCid } of Datastore.GenerationRequestModel.find({ datasetId: found.id }, { dataCid: 1 })) {
-        const filename = path.join(outPath, dataCid + '.car');
+        const filename = path.join(found.outDir, dataCid + '.car');
         this.logger.info(`Removing file.`, { filename });
         await fs.rm(filename, { force: true });
       }
     }
-    await Datastore.GenerationRequestModel.remove({ datasetId: found.id });
+
+    await found.remove();
+    await Datastore.GenerationRequestModel.deleteMany({ datasetId: found.id });
 
     response.end();
   }
@@ -244,7 +321,7 @@ export default class DealPreparationService extends BaseService {
     };
 
     const changed = (await Datastore.ScanningRequestModel.findOneAndUpdate({
-      id: found.id,
+      _id: found.id,
       ...actionMap[action][0]
     }, actionMap[action][1])) != null
       ? 1
@@ -254,21 +331,21 @@ export default class DealPreparationService extends BaseService {
     let changedGeneration;
     if (!generation) {
       changedGenerations = (await Datastore.GenerationRequestModel.updateMany({
-        id: found.id,
+        datasetId: found.id,
         ...actionMap[action][0]
       }, actionMap[action][1])).modifiedCount;
     } else {
       const generationIsInt = !isNaN(parseInt(generation));
       if (ObjectId.isValid(generation)) {
         changedGeneration = (await Datastore.GenerationRequestModel.findOneAndUpdate(
-          { id: generation, ...actionMap[action][0] },
+          { _id: generation, ...actionMap[action][0] },
           actionMap[action][1],
           { projection: { _id: 1 } }))
           ? 1
           : 0;
       } else if (generationIsInt) {
         changedGeneration = (await Datastore.GenerationRequestModel.findOneAndUpdate(
-          { index: generation, ...actionMap[action][0] },
+          { datasetId: found.id, index: generation, ...actionMap[action][0] },
           actionMap[action][1],
           { projection: { _id: 1 } }))
           ? 1
@@ -295,7 +372,10 @@ export default class DealPreparationService extends BaseService {
     const {
       name,
       path,
-      dealSize
+      dealSize,
+      outDir,
+      minRatio,
+      maxRatio
     } = <CreatePreparationRequest>request.body;
     this.logger.info(`Received request to start preparing dataset.`, { name, path, dealSize });
     const dealSizeNumber = xbytes.parseSize(dealSize);
@@ -304,11 +384,32 @@ export default class DealPreparationService extends BaseService {
       this.sendError(response, ErrorCode.DEAL_SIZE_NOT_ALLOWED);
       return;
     }
+    if (minRatio && (minRatio < 0.5 || minRatio > 0.95)) {
+      this.sendError(response, ErrorCode.MIN_RATIO_INVALID);
+      return;
+    }
+    if (maxRatio && (maxRatio < 0.5 || maxRatio > 0.95)) {
+      this.sendError(response, ErrorCode.MAX_RATIO_INVALID);
+      return;
+    }
+    if (minRatio && maxRatio && minRatio >= maxRatio) {
+      this.sendError(response, ErrorCode.MAX_RATIO_INVALID);
+      return;
+    }
 
-    const minSize = Math.floor(dealSizeNumber * config.get<number>('deal_preparation_service.minDealSizeRatio'));
-    const maxSize = Math.floor(dealSizeNumber * config.get<number>('deal_preparation_service.maxDealSizeRatio'));
+    let minSize = Math.floor(dealSizeNumber * config.get<number>('deal_preparation_service.minDealSizeRatio'));
+    if (minRatio) {
+      minSize = minRatio * dealSizeNumber;
+    }
+    minSize = Math.round(minSize);
+    let maxSize = Math.floor(dealSizeNumber * config.get<number>('deal_preparation_service.maxDealSizeRatio'));
+    if (maxRatio) {
+      maxSize = maxRatio * dealSizeNumber;
+    }
+    maxSize = Math.round(maxSize);
     try {
       await fs.access(path, constants.F_OK);
+      await fs.access(outDir, constants.F_OK);
     } catch (_) {
       this.sendError(response, ErrorCode.PATH_NOT_ACCESSIBLE);
       return;
@@ -320,6 +421,7 @@ export default class DealPreparationService extends BaseService {
     scanningRequest.maxSize = maxSize;
     scanningRequest.path = path;
     scanningRequest.status = 'active';
+    scanningRequest.outDir = outDir;
     try {
       await scanningRequest.save();
     } catch (e: any) {
@@ -335,6 +437,7 @@ export default class DealPreparationService extends BaseService {
       minSize,
       maxSize,
       path,
+      outDir,
       status: scanningRequest.status
     }));
   }
