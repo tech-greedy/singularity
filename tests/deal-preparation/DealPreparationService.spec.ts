@@ -133,6 +133,10 @@ describe('DealPreparationService', () => {
           cid: 'dir_cid',
           selector: [],
           dir: true
+        },{
+          path: '',
+          cid: 'root_cid',
+          dir: true
         }]
       })
       const response = await (supertest(service['app']))
