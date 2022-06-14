@@ -10,6 +10,9 @@ import Scanner from './deal-preparation/Scanner';
 import DealPreparationWorker, { GenerateCarOutput } from './deal-preparation/DealPreparationWorker';
 import { FileInfo } from './common/model/InputFileList';
 import { GeneratedFileList } from './common/model/OutputFileList';
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+import TaskQueue from '@goodware/task-queue';
 
 const version = packageJson.version;
 const program = new Command();
@@ -21,8 +24,9 @@ program.name('singularity-prepare')
   .argument('<outDir>', 'The output Directory to save CAR files and manifest files')
   .requiredOption('-l, --url-prefix <urlPrefix>', 'The prefix of the download link, which will be followed by datacid.car, i.e. http://download.mysite.org/')
   .option('-s, --deal-size <deal_size>', 'Target deal size, i.e. 32GiB', '32 GiB')
-  .addOption(new Option('-m, --min-ratio <min_ratio>', 'Min ratio of deal to sector size, i.e. 0.55').default(0.55).argParser(parseFloat))
-  .addOption(new Option('-M, --max-ratio <max_ratio>', 'Max ratio of deal to sector size, i.e. 0.95').default(0.95).argParser(parseFloat))
+  .addOption(new Option('-m, --min-ratio <min_ratio>', 'Min ratio of deal to sector size, i.e. 0.55').default('0.55').argParser(parseFloat))
+  .addOption(new Option('-M, --max-ratio <max_ratio>', 'Max ratio of deal to sector size, i.e. 0.95').default('0.95').argParser(parseFloat))
+  .addOption(new Option('-j, --parallel <parallel>', 'How many generation jobs to run at the same time').default('1'))
   .action(async (name, p, outDir, options) => {
     await fs.mkdir(outDir, { recursive: true });
     if (!await fs.pathExists(p)) {
@@ -60,44 +64,51 @@ program.name('singularity-prepare')
       options.urlPrefix = options.urlPrefix + '/';
     }
 
+    const queue = new TaskQueue({ workers: parseInt(options.parallel) });
+    let task;
     for await (const fileList of Scanner.scan(p, minSize, maxSize)) {
-      console.log('Preparing a new CAR');
-      const input = JSON.stringify(fileList.map(file => ({
-        Path: file.path,
-        Size: file.size,
-        Start: file.start,
-        End: file.end
-      })));
+      console.log('Pushed a new generation request');
+      task = await queue.push(async () => {
+        const input = JSON.stringify(fileList.map(file => ({
+          Path: file.path,
+          Size: file.size,
+          Start: file.start,
+          End: file.end
+        })));
 
-      const [stdout, stderr, exitCode] = await DealPreparationWorker.invokeGenerateCar(input, outDir, p);
-      if (exitCode !== 0) {
-        console.error(stderr);
-      }
+        const [stdout, stderr, exitCode] = await DealPreparationWorker.invokeGenerateCar(input, outDir, p);
+        if (exitCode !== 0) {
+          console.error(stderr);
+        }
 
-      const output :GenerateCarOutput = JSON.parse(stdout);
-      const carFile = path.join(outDir, output.DataCid + '.car');
-      console.log(`Generated a new car ${carFile}`);
-      const carFileStat = await fs.stat(carFile);
-      const fileMap = new Map<string, FileInfo>();
-      for (const fileInfo of fileList) {
-        fileMap.set(path.relative(p, fileInfo.path), fileInfo);
-      }
-      const generatedFileList: GeneratedFileList = [];
-      await DealPreparationWorker.populateGeneratedFileList(fileMap, output.Ipld, [], [], generatedFileList);
+        const output :GenerateCarOutput = JSON.parse(stdout);
+        const carFile = path.join(outDir, output.DataCid + '.car');
+        console.log(`Generated a new car ${carFile}`);
+        const carFileStat = await fs.stat(carFile);
+        const fileMap = new Map<string, FileInfo>();
+        for (const fileInfo of fileList) {
+          fileMap.set(path.relative(p, fileInfo.path), fileInfo);
+        }
+        const generatedFileList: GeneratedFileList = [];
+        await DealPreparationWorker.populateGeneratedFileList(fileMap, output.Ipld, [], [], generatedFileList);
 
-      const [contents, groupings] = DealPreparationService.getContentsAndGroupings(generatedFileList);
+        const [contents, groupings] = DealPreparationService.getContentsAndGroupings(generatedFileList);
 
-      const result = {
-        piece_cid: output.PieceCid,
-        payload_cid: output.DataCid,
-        raw_car_file_size: carFileStat.size,
-        car_file_link: options.urlPrefix + output.DataCid + '.car',
-        dataset: name,
-        contents,
-        groupings
-      };
+        const result = {
+          piece_cid: output.PieceCid,
+          payload_cid: output.DataCid,
+          raw_car_file_size: carFileStat.size,
+          car_file_link: options.urlPrefix + output.DataCid + '.car',
+          dataset: name,
+          contents,
+          groupings
+        };
 
-      await fs.writeJSON(path.join(outDir, `${output.DataCid}.manifest`), result);
+        await fs.writeJSON(path.join(outDir, `${output.DataCid}.manifest`), result);
+      });
+    }
+    if (task) {
+      await task.promise;
     }
   });
 program.parse();
