@@ -152,24 +152,38 @@ export default class Datastore {
 
   private static setupDealStateSchema () {
     const dealStateSchema = new Schema<DealState>({
-      client: Schema.Types.String,
-      provider: Schema.Types.String,
+      client: {
+        type: Schema.Types.String,
+        index: true
+      },
+      provider: {
+        type: Schema.Types.String,
+        index: true
+      },
       dealCid: Schema.Types.String,
       dataCid: Schema.Types.String,
-      pieceCid: Schema.Types.String,
+      pieceCid: {
+        type: Schema.Types.String,
+        index: true
+      },
       expiration: Schema.Types.Number,
       duration: Schema.Types.Number,
       price: Schema.Types.Number,
       verified: Schema.Types.Boolean,
-      state: Schema.Types.String,
+      state: {
+        type: Schema.Types.String,
+        index: true
+      },
       replicationRequestId: Schema.Types.String,
       datasetId: Schema.Types.String,
-      dealId: Schema.Types.Number,
+      dealId: {
+        type: Schema.Types.Number,
+        index: true
+      },
       errorMessage: Schema.Types.String
     }, {
       timestamps: true
     });
-    // TODO create index if needed
     Datastore.DealStateModel = mongoose.model<DealState>('DealState', dealStateSchema);
   }
 

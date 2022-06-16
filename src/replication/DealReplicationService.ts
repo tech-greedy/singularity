@@ -61,9 +61,15 @@ export default class DealReplicationService extends BaseService {
       const result: GetReplicationDetailsResponse = {
         id: found.id,
         datasetId: found.datasetId,
-        maxReplicas: found.maxReplicas,
+        replica: found.maxReplicas,
         criteria: found.criteria,
         client: found.client,
+        urlPrefix: found.urlPrefix,
+        maxPrice: found.maxPrice,
+        maxNumberOfDeals: found.maxNumberOfDeals,
+        isVerfied: String(found.isVerfied),
+        duration: found.duration,
+        isOffline: String(found.isOffline),
         status: found.status
       };
       response.end(JSON.stringify(result));
@@ -77,9 +83,10 @@ export default class DealReplicationService extends BaseService {
         result.push({
           id: r.id,
           datasetId: r.datasetId,
-          maxReplicas: r.maxReplicas,
+          replica: r.maxReplicas,
           criteria: r.criteria,
           client: r.client,
+          maxNumberOfDeals: r.maxNumberOfDeals,
           status: r.status,
           errorMessage: r.errorMessage,
           replicationTotal: await Datastore.ReplicationRequestModel.count({ datasetId: r.id }),
@@ -99,7 +106,7 @@ export default class DealReplicationService extends BaseService {
         return;
       }
       const { status } = <UpdateReplicationRequest>request.body;
-      this.logger.info(`Received request to change status of dataset "${id}" to "${status}".`);
+      this.logger.info(`Received request to change status of replication request "${id}" to "${status}".`);
       if (!['active', 'paused'].includes(status)) {
         this.sendError(response, ErrorCode.CHANGE_STATE_INVALID);
         return;
@@ -110,7 +117,8 @@ export default class DealReplicationService extends BaseService {
         return;
       }
 
-      await Datastore.ReplicationRequestModel.updateMany({
+      await Datastore.ReplicationRequestModel.updateOne({
+        id: id,
         status: {
           $nin: [
             'completed', 'error'
@@ -175,6 +183,19 @@ export default class DealReplicationService extends BaseService {
       replicationRequest.status = 'active';
       try {
         await replicationRequest.save();
+        // Create a deal tracking request if not exist
+        await Datastore.DealTrackingStateModel.updateOne({
+          stateType: 'client',
+          stateKey: client
+        }, {
+          $setOnInsert: {
+            stateType: 'client',
+            stateKey: client,
+            stateValue: 'track'
+          }
+        }, {
+          upsert: true
+        });
       } catch (e: any) {
         this.logger.error(`MongoSave error`, e);
         this.sendError(response, ErrorCode.INTERNAL_ERROR);

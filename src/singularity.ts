@@ -346,7 +346,7 @@ replication.command('start')
   .option('-p, --price <maxprice>', 'Maximum price per epoch per GiB in Fil.', '0.000000002')
   .option('-r, --verified <verified>', 'Whether to propose deal as verified. true|false.', 'true')
   .option('-d, --duration <duration>', 'Duration in days for deal length.', '500')
-  .option('-o, --offline <offline>', 'Propose as offline deal.', 'false')
+  .option('-o, --offline <offline>', 'Propose as offline deal.', 'true')
   .option('-m, --max-deals <maxdeals>', 'Max number of deals in this replication request per SP.', '0')
   .action(async (datasetid, replica, criteria, client, options) => {
     let response!: AxiosResponse;

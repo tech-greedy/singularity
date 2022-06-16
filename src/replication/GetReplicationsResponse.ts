@@ -1,9 +1,10 @@
 export interface GetReplicationsResponseItem {
     id: string,
     datasetId: string,
-    maxReplicas: number,
+    replica: number,
     criteria: string,
     client: string,
+    maxNumberOfDeals: number,
     status: 'active' | 'paused' | 'completed' | 'error',
     errorMessage?: string,
     replicationCompleted: number,

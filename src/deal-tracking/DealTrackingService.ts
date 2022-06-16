@@ -80,6 +80,12 @@ export default class DealTrackingService extends BaseService {
             this.logger.info('Reached to the last page or last checked deal.');
             break;
           }
+          const publishedDeal = await Datastore.DealStateModel.findOne({
+            dealId: deal['dealid']
+          });
+          if (publishedDeal) {
+            continue;
+          }
           const proposedDeal = await Datastore.DealStateModel.findOne({
             pieceCid: deal['piece_cid'],
             provider: deal['provider'],

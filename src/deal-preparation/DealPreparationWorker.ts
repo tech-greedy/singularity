@@ -161,7 +161,7 @@ export default class DealPreparationWorker extends BaseService {
         Size: file.size,
         Start: file.start,
         End: file.end
-      })));      
+      })));
       let timeSpentInMs = performance.now();
       const result = await this.generate(newGenerationWork, input);
       timeSpentInMs = performance.now() - timeSpentInMs;
