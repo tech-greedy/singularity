@@ -193,6 +193,32 @@ Worker to scan the dataset, make plan and generate Car file and CIDs
 #### enabled, num_workers
 Whether to enable the worker and how many worker instances. As a rule of thumb, use `min(cpu_cores / 2.5, io_MBps / 50)`
 
+# Build from source
+## This project
+You can transpile this project with npm
+```shell
+# Make sure you have npm v16 installed, i.e. via nvm (https://github.com/nvm-sh/nvm)
+git clone https://github.com/tech-greedy/singularity.git
+cd singularity
+npm ci
+npm run build-singularity
+npm run build-singularity-retrieve
+npm run build-singularity-prepare
+npm link
+singularity -h
+```
+The dependency of this project can be built from source
+## go-generate-car
+```shell
+# Make sure you have go v1.17+ installed
+git clone https://github.com/tech-greedy/go-generate-car.git
+cd go-generate-car
+make
+```
+Then copy the generated binary to override the existing one from the PATH for your node environment, i.e. 
+* singularity installed globally `/home/user/.nvm/versions/node/v16.15.0/bin`
+* singularity cloned locally `./node_modules/.bin`
+
 # FAQ
 ### Does it work in Windows
 Only Deal Preparation works and Indexing works in Windows.
