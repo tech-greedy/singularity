@@ -58,7 +58,7 @@ export SINGULARITY_PATH=/the/path/to/the/repo
 set SINGULARITY_PATH=/the/path/to/the/repo
 ```
 
-# Deployment
+# Configuration Choices
 Since the tool is modularized, it can be deployed in different ways and have different components enabled or disabled.
 
 Below are configurations for common scenarios.
@@ -69,7 +69,9 @@ In [default.toml](./config/default.toml) from your repo
 1. change `index_service.enabled` to false
 2. change `ipfs.enabled` to false
 3. change `http_hosting_service.enabled` to false
-4. change `hdeal_tracking_service.enabled` to false
+4. change `deal_tracking_service.enabled` to false
+4. change `deal_replication_service.enabled` to false
+4. change `deal_replication_worker.enabled` to false
 
 ## Use External MongoDb database
 This is useful if you know MongoDB, and you're hitting some bottlenecks or issues from the built-in MongoDb.
@@ -77,6 +79,9 @@ This is useful if you know MongoDB, and you're hitting some bottlenecks or issue
 2. In [default.toml](./config/default.toml) from your repo
    1. change `database.start_local` to false
    2. change `connection.database` to the connection string of your own MongoDb database
+
+## Running modules on different nodes
+TODO
 
 
 # Usage
@@ -99,7 +104,11 @@ Commands:
   preparation|prep  Manage deal preparation
   help [command]    display help for command
 ```
-
+## Start the Daemon
+```shell
+$ export SINGULARITY_PATH=/the/path/to/the/repo
+$ singularity daemon
+```
 ## Deal Preparation
 Deal preparation contains two parts
 * Scanning Request - an initial effort to scan the directory and make plans of how to assign different files and folders to different chunks
