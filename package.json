@@ -79,7 +79,7 @@
     "fs-extra": "^10.1.0",
     "ipfs-client": "^0.7.8",
     "ipfs-core": "^0.14.2",
-    "mathjs": "^10.5.0",
+    "mathjs": "^10.6.1",
     "minimist": "^1.2.6",
     "mongodb": "^4.3.1",
     "mongodb-memory-server": "^8.4.1",
