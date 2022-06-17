@@ -17,7 +17,7 @@ export default class DealReplicationWorker extends BaseService {
   private readonly lotusCMD: string;
   private readonly boostCMD: string;
 
-  public constructor() {
+  public constructor () {
     super(Category.DealReplicationWorker);
     this.workerId = randomUUID();
     this.startHealthCheck = this.startHealthCheck.bind(this);
@@ -26,7 +26,7 @@ export default class DealReplicationWorker extends BaseService {
     this.boostCMD = config.get('deal_replication_worker.boost_cli_cmd');
   }
 
-  public start(): void {
+  public start (): void {
     if (!this.enabled) {
       this.logger.warn('Deal Replication Worker is not enabled. Exit now...');
     }
@@ -39,7 +39,7 @@ export default class DealReplicationWorker extends BaseService {
 
   private readonly ImmediatePollInterval = 1;
 
-  private async startPollWork(): Promise<void> {
+  private async startPollWork (): Promise<void> {
     let hasDoneWork = false;
     try {
       hasDoneWork = await this.pollWork();
@@ -53,13 +53,13 @@ export default class DealReplicationWorker extends BaseService {
     }
   }
 
-  private async pollWork(): Promise<boolean> {
+  private async pollWork (): Promise<boolean> {
     this.logger.debug(`${this.workerId} - Polling for work`);
     const hasDoneWork = await this.pollReplicationWork();
     return hasDoneWork;
   }
 
-  private async pollReplicationWork(): Promise<boolean> {
+  private async pollReplicationWork (): Promise<boolean> {
     const newReplicationWork = await Datastore.ReplicationRequestModel.findOneAndUpdate({
       workerId: null,
       status: 'active'
@@ -87,41 +87,37 @@ export default class DealReplicationWorker extends BaseService {
   /**
    * Create miners list by criteria. Currently it is just a list of miners separated by comma.
    * TODO marking this function as async pending future Pando integration
-   * 
-   * @param criteria 
-   * @returns 
+   *
+   * @param criteria
+   * @returns
    */
-  private async generateMinersList(criteria: string): Promise<Array<string>> {
+  private static async generateMinersList (criteria: string): Promise<Array<string>> {
     return criteria.split(',');
   }
 
   /**
    * Check if given miner is using lotus or boost
-   * 
-   * @param miner 
+   *
+   * @param miner
    * @returns true is lotus, false is boost
    */
-  private async isUsingLotus(miner: string): Promise<boolean> {
+  private async isUsingLotus (miner: string): Promise<boolean> {
     let useLotus = true;
     // use boost libp2p command to check whether miner supports boost
     const versionQueryCmd = `${this.boostCMD} provider libp2p-info ${miner}`;
-    try {
-      const cmdOut = await exec(versionQueryCmd);
-      if (cmdOut.stdout.includes('/fil/storage/mk/1.2.0')) {
-        useLotus = false;
-        this.logger.debug(`SP ${miner} supports boost.`);
-      } else if (cmdOut.stdout.includes('/fil/storage/mk/1.1.0')) {
-        this.logger.debug(`SP ${miner} supports lotus.`);
-      } else {
-        throw new Error(JSON.stringify(cmdOut));
-      }
-      return useLotus;
-    } catch (error) {
-      throw error;
+    const cmdOut = await exec(versionQueryCmd);
+    if (cmdOut.stdout.includes('/fil/storage/mk/1.2.0')) {
+      useLotus = false;
+      this.logger.debug(`SP ${miner} supports boost.`);
+    } else if (cmdOut.stdout.includes('/fil/storage/mk/1.1.0')) {
+      this.logger.debug(`SP ${miner} supports lotus.`);
+    } else {
+      throw new Error(JSON.stringify(cmdOut));
     }
+    return useLotus;
   }
 
-  private calculatePriceWithSize(price: number, pieceSize: number): Unit {
+  private static calculatePriceWithSize (price: number, pieceSize: number): Unit {
     if (price > 0) {
       return math.unit(price * (pieceSize || 0) / 1073741824, 'm');
     } else {
@@ -131,11 +127,11 @@ export default class DealReplicationWorker extends BaseService {
 
   /**
    * TODO: assemble URL with builtin hosting service
-   * @param model 
-   * @param carFile 
-   * @returns 
+   * @param model
+   * @param carFile
+   * @returns
    */
-  private assembleDownloadUrl(model: ReplicationRequest, carFile: GenerationRequest) {
+  private static assembleDownloadUrl (model: ReplicationRequest, carFile: GenerationRequest) {
     let downloadUrl = model.urlPrefix;
     if (!downloadUrl.endsWith('/')) {
       downloadUrl += '/';
@@ -151,7 +147,7 @@ export default class DealReplicationWorker extends BaseService {
     return downloadUrl;
   }
 
-  private async checkUrlReachability(url: string): Promise<boolean> {
+  private async checkUrlReachability (url: string): Promise<boolean> {
     try {
       await axios.head(url);
       return true;
@@ -161,7 +157,7 @@ export default class DealReplicationWorker extends BaseService {
     }
   }
 
-  private async createDealCmd(useLotus: boolean, miner: string, priceInFil: Unit, model: ReplicationRequest, carFile: GenerationRequest): Promise<string> {
+  private async createDealCmd (useLotus: boolean, miner: string, priceInFil: Unit, model: ReplicationRequest, carFile: GenerationRequest): Promise<string> {
     if (useLotus) {
       if (model.isOffline) {
         const unpaddedSize = carFile.pieceSize! * 127 / 128;
@@ -172,8 +168,8 @@ export default class DealReplicationWorker extends BaseService {
         throw new Error(`Deal making failed. SP ${miner} only supports lotus and for lotus we only support offline deals.`);
       }
     } else {
-      // determine car download link 
-      const downloadUrl = this.assembleDownloadUrl(model, carFile);
+      // determine car download link
+      const downloadUrl = DealReplicationWorker.assembleDownloadUrl(model, carFile);
       // check if download URL is reachable if necessary
       if (!model.isOffline && !(await this.checkUrlReachability(downloadUrl))) {
         throw new Error(`${downloadUrl} is not reachable`);
@@ -193,8 +189,8 @@ export default class DealReplicationWorker extends BaseService {
    * Main function of deal making
    * @param replicationRequest
    */
-  private async replicate(replicationRequest: ReplicationRequest): Promise<void> {
-    const miners = await this.generateMinersList(replicationRequest.criteria);
+  private async replicate (replicationRequest: ReplicationRequest): Promise<void> {
+    const miners = await DealReplicationWorker.generateMinersList(replicationRequest.criteria);
     const boostResultUUIDMatcher = /deal uuid: (\S+)/;
     let breakOuter = false;
     for (let i = 0; i < miners.length; i++) {
@@ -242,8 +238,8 @@ export default class DealReplicationWorker extends BaseService {
 
         // check if the car has already dealt or have enough replica
         const existingDeals = await Datastore.DealStateModel.find({
-          state: { $nin: ['slashed', 'error'] },
-          pieceCid: carFile.pieceCid
+          pieceCid: carFile.pieceCid,
+          state: { $nin: ['slashed', 'error'] }
         });
         let alreadyDealt = false;
         for (let k = 0; k < existingDeals.length; k++) {
@@ -263,7 +259,7 @@ export default class DealReplicationWorker extends BaseService {
           continue;
         }
         // determine price in Fil (for lotus) and AttoFil (for boost)
-        const priceInFil = this.calculatePriceWithSize(replicationRequest.maxPrice, carFile.pieceSize!);
+        const priceInFil = DealReplicationWorker.calculatePriceWithSize(replicationRequest.maxPrice, carFile.pieceSize!);
 
         let dealCmd = '';
         try {
@@ -335,12 +331,12 @@ export default class DealReplicationWorker extends BaseService {
     }
   }
 
-  private async startHealthCheck(): Promise<void> {
+  private async startHealthCheck (): Promise<void> {
     await this.healthCheck();
     setTimeout(this.startHealthCheck, 5000);
   }
 
-  private async healthCheck(): Promise<void> {
+  private async healthCheck (): Promise<void> {
     this.logger.debug(`${this.workerId} - Sending HealthCheck`);
     await Datastore.HealthCheckModel.findOneAndUpdate(
       {

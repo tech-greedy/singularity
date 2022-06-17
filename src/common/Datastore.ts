@@ -152,20 +152,11 @@ export default class Datastore {
 
   private static setupDealStateSchema () {
     const dealStateSchema = new Schema<DealState>({
-      client: {
-        type: Schema.Types.String,
-        index: true
-      },
-      provider: {
-        type: Schema.Types.String,
-        index: true
-      },
+      client: Schema.Types.String,
+      provider: Schema.Types.String,
       dealCid: Schema.Types.String,
       dataCid: Schema.Types.String,
-      pieceCid: {
-        type: Schema.Types.String,
-        index: true
-      },
+      pieceCid: Schema.Types.String,
       expiration: Schema.Types.Number,
       duration: Schema.Types.Number,
       price: Schema.Types.Number,
@@ -184,6 +175,9 @@ export default class Datastore {
     }, {
       timestamps: true
     });
+    dealStateSchema.index({ pieceCid: 1, provider: 1, client: 1, state: 1 });
+    dealStateSchema.index({ client: 1, state: 1 });
+    dealStateSchema.index({ pieceCid: 1, state: 1 });
     Datastore.DealStateModel = mongoose.model<DealState>('DealState', dealStateSchema);
   }
 

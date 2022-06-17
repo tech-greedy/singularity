@@ -104,23 +104,17 @@ export default class DealTrackingService extends BaseService {
             });
             this.logger.debug(`Deal ${deal['dealid']} was proposed through singularity. Filling in deal ID.`);
           } else {
-            await Datastore.DealStateModel.updateOne({
-              dealId: deal['dealid']
-            }, {
-              $setOnInsert: {
-                client,
-                provider: deal['provider'],
-                dealId: deal['dealid'],
-                dealCid: deal['cid'],
-                pieceCid: deal['piece_cid'],
-                expiration: deal['end_epoch'],
-                duration: deal['end_epoch'] - deal['start_epoch'],
-                state: 'published'
-              }
-            }, {
-              upsert: true
+            await Datastore.DealStateModel.create({
+              client,
+              provider: deal['provider'],
+              dealId: deal['dealid'],
+              dealCid: deal['cid'],
+              pieceCid: deal['piece_cid'],
+              expiration: deal['end_epoch'],
+              duration: deal['end_epoch'] - deal['start_epoch'],
+              state: 'published'
             });
-            this.logger.debug(`Deal ${deal['dealid']} updates to published.`);
+            this.logger.debug(`Deal ${deal['dealid']} inserted as published.`);
           }
         }
         if (breakOuter) {
