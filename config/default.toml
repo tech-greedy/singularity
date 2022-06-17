@@ -10,6 +10,7 @@ database = "mongodb://127.0.0.1:37000"
 
 # Connection string to deal preparation service, used by Singularity CLI
 deal_preparation_service = 'http://127.0.0.1:7001'
+deal_replication_service = 'http://127.0.0.1:7004'
 
 # Connection string to index service, used by Singularity CLI
 index_service = 'http://127.0.0.1:7003'
@@ -36,7 +37,7 @@ local_port = 37000
 [deal_preparation_worker]
 enabled = true
 # Number of workers to start, one worker consumes 2 - 2.5 CPUs
-num_workers = 2
+num_workers = 4
 
 [index_service]
 enabled = true
@@ -60,3 +61,15 @@ static_path = "./cars"
 enabled = true
 lotus_api = "https://api.node.glif.io/rpc/v0"
 lotus_token = ""
+
+[deal_replication_service]
+enabled = true
+bind = "0.0.0.0"
+port = 7004
+
+[deal_replication_worker]
+enabled = true
+min_retry_wait_ms = 30000
+max_retry_count = 3
+boost_cli_cmd = "boost" #if not in PATH, specify full location here
+lotus_cli_cmd = "lotus" #if not in PATH, specify full location here

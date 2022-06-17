@@ -20,6 +20,8 @@ import fs from 'fs-extra';
 import Logger, { Category } from './common/Logger';
 import { Worker } from 'cluster';
 import * as IpfsCore from 'ipfs-core';
+import DealReplicationService from './replication/DealReplicationService';
+import DealReplicationWorker from './replication/DealReplicationWorker';
 
 const logger = Logger.getLogger(Category.Cli);
 const version = packageJson.version;
@@ -93,6 +95,12 @@ program.command('daemon')
         if (config.get('deal_tracking_service.enabled')) {
           workers.push([cluster.fork(), 'deal_tracking_service']);
         }
+        if (config.get('deal_replication_service.enabled')) {
+          workers.push([cluster.fork(), 'deal_replication_service']);
+        }
+        if (config.get('deal_replication_worker.enabled')) {
+          workers.push([cluster.fork(), 'deal_replication_worker']);
+        }
       } else if (cluster.isWorker) {
         await Datastore.connect();
         process.on('message', async (msg) => {
@@ -112,6 +120,12 @@ program.command('daemon')
             case 'deal_tracking_service':
               new DealTrackingService().start();
               break;
+            case 'deal_replication_service':
+              new DealReplicationService().start();
+              break;
+            case 'deal_replication_worker':
+              new DealReplicationWorker().start();
+              break;
           }
         });
         process.send!('ready');
@@ -124,7 +138,7 @@ index.command('create')
   .argument('<id_or_name>', 'The dataset id or name')
   .action(async (id) => {
     const url: string = config.get('connection.index_service');
-    let response! : AxiosResponse;
+    let response!: AxiosResponse;
     try {
       response = await axios.get(`${url}/create/${id}`);
     } catch (error) {
@@ -160,7 +174,7 @@ preparation.command('create').description('Start deal preparation for a local da
     }
     const dealSize: string = options.dealSize;
     const url: string = config.get('connection.deal_preparation_service');
-    let response! : AxiosResponse;
+    let response!: AxiosResponse;
     try {
       response = await axios.post(`${url}/preparation`, {
         name: name,
@@ -182,14 +196,14 @@ preparation.command('status').description('Check the status of a deal preparatio
   .argument('<dataset>', 'The dataset id or name')
   .action(async (id, options) => {
     const url: string = config.get('connection.deal_preparation_service');
-    let response! : AxiosResponse;
+    let response!: AxiosResponse;
     try {
       response = await axios.get(`${url}/preparation/${id}`);
     } catch (error) {
       CliUtil.renderErrorAndExit(error);
     }
 
-    const data : GetPreparationDetailsResponse = response.data;
+    const data: GetPreparationDetailsResponse = response.data;
     if (options.json) {
       console.log(JSON.stringify(data, null, 2));
     } else {
@@ -205,7 +219,7 @@ preparation.command('list').description('List all deal preparation requests')
   .option('--json', 'Output with JSON format')
   .action(async (options) => {
     const url: string = config.get('connection.deal_preparation_service');
-    let response! : AxiosResponse;
+    let response!: AxiosResponse;
     try {
       response = await axios.get(`${url}/preparations`);
     } catch (error) {
@@ -246,7 +260,7 @@ preparation.command('generation-status').description('Check the status of a sing
   .argument('<generationId>', 'A unique id or index of the generation request')
   .action(async (id, options) => {
     const url: string = config.get('connection.deal_preparation_service');
-    let response! : AxiosResponse;
+    let response!: AxiosResponse;
     try {
       response = options.dataset ? await axios.get(`${url}/generation/${options.dataset}/${id}`) : await axios.get(`${url}/generation/${id}`);
     } catch (error) {
@@ -264,9 +278,9 @@ preparation.command('generation-status').description('Check the status of a sing
     }
   });
 
-async function UpdateState (id : string, generation: string, action: string) : Promise<AxiosResponse> {
+async function UpdateState (id: string, generation: string, action: string): Promise<AxiosResponse> {
   const url: string = config.get('connection.deal_preparation_service');
-  let response! : AxiosResponse;
+  let response!: AxiosResponse;
   try {
     if (generation) {
       response = await axios.post(`${url}/preparation/${id}/${generation}`, { action });
@@ -316,6 +330,75 @@ preparation.command('remove').description('Remove all records from database for 
     } catch (error) {
       CliUtil.renderErrorAndExit(error);
     }
+  });
+
+const replication = program.command('replication')
+  .alias('repl')
+  .description('Start replication for a local dataset');
+
+replication.command('start')
+  .description('Start deal replication for a prepared local dataset')
+  .argument('<datasetid>', 'Existing ID of dataset prepared.')
+  .argument('<# of replica>', 'Number of targeting replica of the dataset')
+  .argument('<criteria>', 'Comma separated miner list')
+  .argument('<client>', 'Client address where deals are proposed from')
+  .option('-u, --url-prefix <urlprefix>', 'URL prefix for car downloading. Must be reachable by provider\'s boostd node.', 'http://127.0.0.1/')
+  .option('-p, --price <maxprice>', 'Maximum price per epoch per GiB in Fil.', '0.000000002')
+  .option('-r, --verified <verified>', 'Whether to propose deal as verified. true|false.', 'true')
+  .option('-d, --duration <duration>', 'Duration in days for deal length.', '500')
+  .option('-o, --offline <offline>', 'Propose as offline deal.', 'true')
+  .option('-m, --max-deals <maxdeals>', 'Max number of deals in this replication request per SP.', '0')
+  .action(async (datasetid, replica, criteria, client, options) => {
+    let response!: AxiosResponse;
+    try {
+      console.log(options);
+      const url: string = config.get('connection.deal_replication_service');
+      response = await axios.post(`${url}/replication`, {
+        datasetId: datasetid,
+        replica: replica,
+        criteria: criteria,
+        client: client,
+        urlPrefix: options.urlPrefix,
+        maxPrice: options.price,
+        isVerfied: options.verified,
+        duration: options.duration * 2880, // convert to epoch
+        isOffline: options.offline,
+        maxNumberOfDeals: options.maxDeals
+      });
+    } catch (error) {
+      CliUtil.renderErrorAndExit(error);
+    }
+
+    CliUtil.renderResponse(response.data, options.json);
+  });
+
+replication.command('status')
+  .description('Check the status of a deal replication request')
+  .argument('<id>', 'A unique id of the dataset')
+  .action(async (id, options) => {
+    let response!: AxiosResponse;
+    try {
+      const url: string = config.get('connection.deal_replication_service');
+      response = await axios.get(`${url}/replication/${id}`);
+    } catch (error) {
+      CliUtil.renderErrorAndExit(error);
+    }
+
+    CliUtil.renderResponse(response.data, options.json);
+  });
+
+replication.command('list')
+  .description('List all deal replication requests')
+  .action(async (options) => {
+    let response!: AxiosResponse;
+    try {
+      const url: string = config.get('connection.deal_replication_service');
+      response = await axios.get(`${url}/replications`);
+    } catch (error) {
+      CliUtil.renderErrorAndExit(error);
+    }
+
+    CliUtil.renderResponse(response.data, options.json);
   });
 
 program.showSuggestionAfterError();

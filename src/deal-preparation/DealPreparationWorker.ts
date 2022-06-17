@@ -9,6 +9,7 @@ import ScanningRequest from '../common/model/ScanningRequest';
 import Scanner from './Scanner';
 import fs from 'fs-extra';
 import path from 'path';
+import { performance } from 'perf_hooks';
 import { GeneratedFileList } from '../common/model/OutputFileList';
 import { FileInfo } from '../common/model/InputFileList';
 
@@ -166,7 +167,9 @@ export default class DealPreparationWorker extends BaseService {
         Start: file.start,
         End: file.end
       })));
+      let timeSpentInMs = performance.now();
       const result = await this.generate(newGenerationWork, input);
+      timeSpentInMs = performance.now() - timeSpentInMs;
 
       // Parse the output and update the database
       const [stdout, stderr, statusCode] = result!;
@@ -213,7 +216,7 @@ export default class DealPreparationWorker extends BaseService {
         generationId: newGenerationWork.id
       });
       this.logger.info(`${this.workerId} - Finished Generation of dataset.`,
-        { id: newGenerationWork.id, datasetName: newGenerationWork.datasetName, index: newGenerationWork.index });
+        { id: newGenerationWork.id, datasetName: newGenerationWork.datasetName, index: newGenerationWork.index, timeSpentInMs: timeSpentInMs });
     }
 
     return newGenerationWork != null;

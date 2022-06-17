@@ -133,10 +133,19 @@ export default class Datastore {
   private static setupReplicationRequestSchema () {
     const replicationRequestSchema = new Schema<ReplicationRequest>({
       datasetId: Schema.Types.String,
-      minReplicas: Schema.Types.Number,
-      client: Schema.Types.String,
+      maxReplicas: Schema.Types.Number,
       criteria: Schema.Types.String,
-      status: Schema.Types.String
+      client: Schema.Types.String,
+      urlPrefix: Schema.Types.String,
+      maxPrice: Schema.Types.Number,
+      maxNumberOfDeals: Schema.Types.Number,
+      isVerfied: Schema.Types.Boolean,
+      duration: Schema.Types.Number,
+      isOffline: Schema.Types.Boolean,
+      status: Schema.Types.String,
+      errorMessage: Schema.Types.String
+    }, {
+      timestamps: true
     });
     Datastore.ReplicationRequestModel = mongoose.model<ReplicationRequest>('ReplicationRequest', replicationRequestSchema);
   }
@@ -145,12 +154,30 @@ export default class Datastore {
     const dealStateSchema = new Schema<DealState>({
       client: Schema.Types.String,
       provider: Schema.Types.String,
+      dealCid: Schema.Types.String,
+      dataCid: Schema.Types.String,
       pieceCid: Schema.Types.String,
-      dealId: Schema.Types.Number,
       expiration: Schema.Types.Number,
-      state: Schema.Types.String
+      duration: Schema.Types.Number,
+      price: Schema.Types.Number,
+      verified: Schema.Types.Boolean,
+      state: {
+        type: Schema.Types.String,
+        index: true
+      },
+      replicationRequestId: Schema.Types.String,
+      datasetId: Schema.Types.String,
+      dealId: {
+        type: Schema.Types.Number,
+        index: true
+      },
+      errorMessage: Schema.Types.String
+    }, {
+      timestamps: true
     });
-    // TODO create index if needed
+    dealStateSchema.index({ pieceCid: 1, provider: 1, client: 1, state: 1 });
+    dealStateSchema.index({ client: 1, state: 1 });
+    dealStateSchema.index({ pieceCid: 1, state: 1 });
     Datastore.DealStateModel = mongoose.model<DealState>('DealState', dealStateSchema);
   }
 
@@ -171,6 +198,8 @@ export default class Datastore {
       carSize: Schema.Types.Number,
       pieceCid: Schema.Types.String,
       pieceSize: Schema.Types.Number
+    }, {
+      timestamps: true
     });
     Datastore.GenerationRequestModel = mongoose.model<GenerationRequest>('GenerationRequest', generationRequestSchema);
   }
@@ -191,6 +220,8 @@ export default class Datastore {
       },
       status: Schema.Types.String,
       errorMessage: Schema.Types.String
+    }, {
+      timestamps: true
     });
     Datastore.ScanningRequestModel = mongoose.model<ScanningRequest>('ScanningRequest', scanningRequestSchema);
   }
