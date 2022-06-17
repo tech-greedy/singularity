@@ -103,7 +103,8 @@ export default class DealPreparationWorker extends BaseService {
   }
 
   public static async invokeGenerateCar (input: string, outDir: string, p: string): Promise<[stdout: string, stderr: string, statusCode: number | null]> {
-    const child = spawn('generate-car', ['-o', outDir, '-p', p], {
+    const cmd = await fs.pathExists(path.join(__dirname, 'generate-car')) ? path.join(__dirname, 'generate-car') : 'generate-car';
+    const child = spawn(cmd, ['-o', outDir, '-p', p], {
       stdio: ['pipe', 'pipe', 'pipe']
     });
     (async () => {

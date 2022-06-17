@@ -5,14 +5,44 @@ New node software for large-scale clients with PB-scale data onboarding to Filec
 [![npm version](https://badge.fury.io/js/@techgreedy%2Fsingularity.svg)](https://badge.fury.io/js/@techgreedy%2Fsingularity)
 
 # Quick Start
-```shell
-# Only works with node v16
-npm i -g @techgreedy/singularity
-singularity init
-singularity daemon
-singularity prep create -h
-```
 Looking for standalone Deal Preparation? Try [singularity-prepare](./singularity-prepare.md)
+## Prerequisite
+```shell
+# Install nvm (https://github.com/nvm-sh/nvm#install--update-script)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash
+source ~/.bashrc
+# Install node v16
+nvm install 16
+```
+# Install globally from npm
+```shell
+npm i -g @techgreedy/singularity
+singularity-prepare -h
+```
+# Build and run from source
+## 1. Transpile this project
+```shell
+git clone https://github.com/tech-greedy/singularity.git
+cd singularity
+npm ci
+npm run build-singularity
+npm run build-singularity-retrieve
+npm run build-singularity-prepare
+npm link
+npx singularity-prepare
+```
+## 2. Build Dependency
+By default, npm will pull the pre-built binaries for dependencies. You can choose to build it from source and override the one pulled by npm.
+```shell
+# Make sure you have go v1.17+ installed
+git clone https://github.com/tech-greedy/go-generate-car.git
+cd go-generate-car
+make
+```
+Then copy the generated binary to override the existing one from the PATH for your node environment, i.e.
+* singularity installed globally `/home/user/.nvm/versions/node/v16.15.0/bin`
+* singularity cloned locally `./node_modules/.bin`
+
 
 # Initialization
 To use the tool as a daemon, it needs to initialize the config and the database. To do so, run
@@ -32,20 +62,21 @@ set SINGULARITY_PATH=/the/path/to/the/repo
 Since the tool is modularized, it can be deployed in different ways and have different components enabled or disabled.
 
 Below are configurations for common scenarios.
-## Use Standalone MongoDb database
-This is useful if you know MongoDB, and you're hitting some bottlenecks or issues from the built-in MongoDb.
-1. Setup your own MongoDb instance
-2. In [default.toml](./config/default.toml) from your repo
-   1. change `database.start_local` to false
-   2. change `connection.database` to the connection string of your own MongoDb database
 ## Deal Preparation Only
-This is useful if you only need deal preparation but not deal making. 
+This is useful if you only need deal preparation but not deal making.
 You can still have deal making enabled, but disabling it will use slightly less system resources.  
 In [default.toml](./config/default.toml) from your repo
 1. change `index_service.enabled` to false
 2. change `ipfs.enabled` to false
 3. change `http_hosting_service.enabled` to false
 4. change `hdeal_tracking_service.enabled` to false
+
+## Use External MongoDb database
+This is useful if you know MongoDB, and you're hitting some bottlenecks or issues from the built-in MongoDb.
+1. Setup your own MongoDb instance
+2. In [default.toml](./config/default.toml) from your repo
+   1. change `database.start_local` to false
+   2. change `connection.database` to the connection string of your own MongoDb database
 
 
 # Usage

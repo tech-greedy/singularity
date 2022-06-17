@@ -1,13 +1,43 @@
 # singularity-prepare
 A tool to prepare the dataset for onboarding to Filecoin network
 
+Looking for the daemon version? Try [singularity](./README.md)
+
 # Quick Start
+## Prerequisite
 ```shell
-# Only works with node v16
+# Install nvm (https://github.com/nvm-sh/nvm#install--update-script)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash
+source ~/.bashrc
+# Install node v16
+nvm install 16
+```
+# Install globally from npm
+```shell
 npm i -g @techgreedy/singularity
 singularity-prepare -h
 ```
-Looking for the daemon version? Try [singularity](./README.md)
+# Build from source
+## 1. Transpile this project
+```shell
+git clone https://github.com/tech-greedy/singularity.git
+cd singularity
+npm ci
+npm run build-singularity-prepare
+npx singularity-prepare
+```
+## 2. Build Dependency
+By default, npm will pull the pre-built binaries for dependencies. You can choose to build it from source and override the one pulled by npm.
+```shell
+# Make sure you have go v1.17+ installed
+git clone https://github.com/tech-greedy/go-generate-car.git
+cd go-generate-car
+make
+```
+Then copy the generated binary to override the existing one from the PATH for your node environment, i.e.
+* singularity installed globally `/home/user/.nvm/versions/node/v16.15.0/bin`
+* singularity cloned locally `./node_modules/.bin`
+
 
 # Usage
 To parallel the CAR file generation, specify `--parallel`
