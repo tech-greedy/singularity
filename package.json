@@ -99,7 +99,10 @@
   "bin": {
     "singularity": "dist/ncc/singularity/index.js",
     "singularity-retrieve": "dist/ncc/singularity-retrieve/index.js",
-    "singularity-prepare": "dist/ncc/singularity-prepare/index.js"
+    "singularity-prepare": "dist/ncc/singularity-prepare/index.js",
+    "singularity-generic": "dist/src/singularity.js",
+    "singularity-retrieve-generic": "dist/src/singularity-retrieve.js",
+    "singularity-prepare-generic": "dist/src/singularity-prepare.js"
   },
   "nyc": {
     "extends": "@istanbuljs/nyc-config-typescript",
