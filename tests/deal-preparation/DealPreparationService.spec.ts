@@ -637,6 +637,20 @@ describe('DealPreparationService', () => {
         error: ErrorCode.PATH_NOT_ACCESSIBLE
       });
     });
+    it('should return error if tmpDir is not accessible', async () => {
+      const response = await supertest(service['app'])
+        .post('/preparation').send({
+          name: 'name',
+          tmpDir: '/probably/does/not/exist',
+          path: '.',
+          outDir: '.',
+          dealSize: '32GiB'
+        }).set('Accept', 'application/json');
+      expect(response.status).toEqual(400);
+      expect(response.body).toEqual({
+        error: ErrorCode.PATH_NOT_ACCESSIBLE
+      });
+    });
     it('should return error if the dataset name is already taken', async () => {
       let response = await supertest(service['app'])
         .post('/preparation').send({
@@ -664,6 +678,7 @@ describe('DealPreparationService', () => {
           name: 'name',
           path: '.',
           outDir: '.',
+          tmpDir: '.',
           dealSize: '32GiB'
         }).set('Accept', 'application/json');
       expect(response.status).toEqual(200);
@@ -672,6 +687,7 @@ describe('DealPreparationService', () => {
       expect(found).toEqual(jasmine.objectContaining({
         name: 'name',
         path: '.',
+        tmpDir: '.',
         minSize: 18897856102,
         maxSize: 32641751449,
       }));

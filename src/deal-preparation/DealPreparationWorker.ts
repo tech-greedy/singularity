@@ -63,6 +63,7 @@ export default class DealPreparationWorker extends BaseService {
         datasetName: request.name,
         path: request.path,
         outDir: request.outDir,
+        tmpDir: request.tmpDir,
         index,
         status: 'created'
       });
@@ -96,15 +97,27 @@ export default class DealPreparationWorker extends BaseService {
 
   private async generate (request: GenerationRequest, input: string): Promise<[stdout: string, stderr: string, statusCode: number | null]> {
     await fs.mkdir(request.outDir, { recursive: true });
-    this.logger.debug(`Spawning generate-car.`, { outPath: request.outDir, parentPath: request.path });
-    const [stdout, stderr, exitCode] = await DealPreparationWorker.invokeGenerateCar(input, request.outDir, request.path);
+    this.logger.debug(`Spawning generate-car.`, { outPath: request.outDir, parentPath: request.path, tmpDir: request.tmpDir });
+    let tmpDir: string | undefined;
+    if (request.tmpDir) {
+      tmpDir = path.join(request.tmpDir, randomUUID());
+    }
+    const [stdout, stderr, exitCode] = await DealPreparationWorker.invokeGenerateCar(input, request.outDir, request.path, tmpDir);
+    if (tmpDir) {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    }
     this.logger.debug(`Child process finished.`, { stdout, stderr, exitCode });
     return [stdout, stderr, exitCode];
   }
 
-  public static async invokeGenerateCar (input: string, outDir: string, p: string): Promise<[stdout: string, stderr: string, statusCode: number | null]> {
+  public static async invokeGenerateCar (input: string, outDir: string, p: string, tmpDir?: string)
+    : Promise<[stdout: string, stderr: string, statusCode: number | null]> {
     const cmd = await fs.pathExists(path.join(__dirname, 'generate-car')) ? path.join(__dirname, 'generate-car') : 'generate-car';
-    const child = spawn(cmd, ['-o', outDir, '-p', p], {
+    const args = ['-o', outDir, '-p', p];
+    if (tmpDir) {
+      args.push('-t', tmpDir);
+    }
+    const child = spawn(cmd, args, {
       stdio: ['pipe', 'pipe', 'pipe']
     });
     (async () => {

@@ -13,6 +13,7 @@ import { GeneratedFileList } from './common/model/OutputFileList';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import TaskQueue from '@goodware/task-queue';
+import { randomUUID } from 'crypto';
 
 const version = packageJson.version;
 const program = new Command();
@@ -24,6 +25,7 @@ program.name('singularity-prepare')
   .argument('<outDir>', 'The output Directory to save CAR files and manifest files')
   .requiredOption('-l, --url-prefix <urlPrefix>', 'The prefix of the download link, which will be followed by datacid.car, i.e. http://download.mysite.org/')
   .option('-s, --deal-size <deal_size>', 'Target deal size, i.e. 32GiB', '32 GiB')
+  .option('-t, --tmp-dir <tmp_dir>', 'Temporary directory, may be useful when dataset source is slow, such as on S3 mount or NFS')
   .addOption(new Option('-m, --min-ratio <min_ratio>', 'Min ratio of deal to sector size, i.e. 0.55').default('0.55').argParser(parseFloat))
   .addOption(new Option('-M, --max-ratio <max_ratio>', 'Max ratio of deal to sector size, i.e. 0.95').default('0.95').argParser(parseFloat))
   .addOption(new Option('-j, --parallel <parallel>', 'How many generation jobs to run at the same time').default('1'))
@@ -76,7 +78,16 @@ program.name('singularity-prepare')
           End: file.end
         })));
 
-        const [stdout, stderr, exitCode] = await DealPreparationWorker.invokeGenerateCar(input, outDir, p);
+        let tmpDir: string | undefined;
+        if (options.tmpDir) {
+          tmpDir = path.join(options.tmpDir, randomUUID());
+        }
+        const [stdout, stderr, exitCode] = await DealPreparationWorker.invokeGenerateCar(input, outDir, p, tmpDir);
+
+        if (tmpDir) {
+          await fs.rm(tmpDir, { recursive: true, force: true });
+        }
+
         if (exitCode !== 0) {
           console.error(stderr);
         }

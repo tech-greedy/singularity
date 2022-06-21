@@ -197,7 +197,9 @@ export default class Datastore {
       dataCid: Schema.Types.String,
       carSize: Schema.Types.Number,
       pieceCid: Schema.Types.String,
-      pieceSize: Schema.Types.Number
+      pieceSize: Schema.Types.Number,
+      filenameOverride: Schema.Types.String,
+      tmpDir: Schema.Types.String
     }, {
       timestamps: true
     });
@@ -219,7 +221,8 @@ export default class Datastore {
         index: 1
       },
       status: Schema.Types.String,
-      errorMessage: Schema.Types.String
+      errorMessage: Schema.Types.String,
+      tmpDir: Schema.Types.String
     }, {
       timestamps: true
     });
