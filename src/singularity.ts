@@ -184,7 +184,7 @@ preparation.command('create').description('Start deal preparation for a local da
         outDir: path.resolve(outDir),
         minRatio: options.minRatio,
         maxRatio: options.maxRatio,
-        tmpDir: options.tmpDir
+        tmpDir: options.tmpDir ? path.resolve(options.tmpDir) : undefined
       });
     } catch (error) {
       CliUtil.renderErrorAndExit(error);

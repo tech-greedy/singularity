@@ -80,7 +80,7 @@ program.name('singularity-prepare')
 
         let tmpDir: string | undefined;
         if (options.tmpDir) {
-          tmpDir = path.join(options.tmpDir, randomUUID());
+          tmpDir = path.join(path.resolve(options.tmpDir), randomUUID());
         }
         const [stdout, stderr, exitCode] = await DealPreparationWorker.invokeGenerateCar(input, outDir, p, tmpDir);
 
