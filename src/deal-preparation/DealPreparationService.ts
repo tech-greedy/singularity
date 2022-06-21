@@ -85,6 +85,18 @@ export default class DealPreparationService extends BaseService {
         this.logger.warn(`${dir} cannot be read during cleanup.`);
       }
     }
+    let tmpDirs = (await Datastore.ScanningRequestModel.find()).map(r => r.tmpDir);
+    tmpDirs = [...new Set(tmpDirs)];
+    for (const dir of tmpDirs) {
+      if (dir) {
+        try {
+          await fs.rm(dir, { recursive: true, force: true });
+          this.logger.info(`Removing temporary folder ${dir}`);
+        } catch (e) {
+          this.logger.warn(`${dir} cannot be read during cleanup.`);
+        }
+      }
+    }
   }
 
   private async cleanupHealthCheck (): Promise<void> {
@@ -385,7 +397,8 @@ export default class DealPreparationService extends BaseService {
       dealSize,
       outDir,
       minRatio,
-      maxRatio
+      maxRatio,
+      tmpDir
     } = <CreatePreparationRequest>request.body;
     this.logger.info(`Received request to start preparing dataset.`, { name, path, dealSize });
     const dealSizeNumber = xbytes.parseSize(dealSize);
@@ -420,6 +433,9 @@ export default class DealPreparationService extends BaseService {
     try {
       await fs.access(path, constants.F_OK);
       await fs.access(outDir, constants.F_OK);
+      if (tmpDir) {
+        await fs.access(tmpDir, constants.F_OK);
+      }
     } catch (_) {
       this.sendError(response, ErrorCode.PATH_NOT_ACCESSIBLE);
       return;
@@ -432,6 +448,7 @@ export default class DealPreparationService extends BaseService {
     scanningRequest.path = path;
     scanningRequest.status = 'active';
     scanningRequest.outDir = outDir;
+    scanningRequest.tmpDir = tmpDir;
     try {
       await scanningRequest.save();
     } catch (e: any) {
@@ -448,6 +465,7 @@ export default class DealPreparationService extends BaseService {
       maxSize,
       path,
       outDir,
+      tmpDir,
       status: scanningRequest.status
     }));
   }

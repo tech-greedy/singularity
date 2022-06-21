@@ -100,6 +100,7 @@ describe('DealPreparationWorker', () => {
         index: 0,
         status: 'active',
         outDir: '.',
+        tmpDir: './tmpdir'
       });
       await Datastore.InputFileListModel.create({
         generationId: created.id,
@@ -236,7 +237,8 @@ describe('DealPreparationWorker', () => {
         minSize: 12,
         maxSize: 16,
         status: 'active',
-        outDir: '.'
+        outDir: '.',
+        tmpDir: './tmpdir'
       });
       const requests = await Datastore.GenerationRequestModel.find({}, null, { sort: { index: 1 } });
       /**
@@ -256,6 +258,8 @@ describe('DealPreparationWorker', () => {
         path: path.join('tests', 'test_folder'),
         index: 0,
         status: 'active',
+        outDir: '.',
+        tmpDir: './tmpdir'
       }));
       expect(await Datastore.InputFileListModel.findOne({generationId: requests[0].id})).toEqual(jasmine.objectContaining({
         fileList: [jasmine.objectContaining({
@@ -274,6 +278,8 @@ describe('DealPreparationWorker', () => {
         path: path.join('tests', 'test_folder'),
         index: 1,
         status: 'active',
+        outDir: '.',
+        tmpDir: './tmpdir'
       }));
       expect(await Datastore.InputFileListModel.findOne({generationId: requests[1].id})).toEqual(jasmine.objectContaining({
         fileList: [jasmine.objectContaining({
@@ -289,6 +295,8 @@ describe('DealPreparationWorker', () => {
         path: path.join('tests', 'test_folder'),
         index: 2,
         status: 'active',
+        outDir: '.',
+        tmpDir: './tmpdir'
       }));
       expect(await Datastore.InputFileListModel.findOne({generationId: requests[2].id})).toEqual(jasmine.objectContaining({
         fileList: [jasmine.objectContaining({
@@ -309,6 +317,8 @@ describe('DealPreparationWorker', () => {
         path: path.join('tests', 'test_folder'),
         index: 3,
         status: 'active',
+        outDir: '.',
+        tmpDir: './tmpdir'
       }));
       expect(await Datastore.InputFileListModel.findOne({generationId: requests[3].id})).toEqual(jasmine.objectContaining({
         fileList: [jasmine.objectContaining({
