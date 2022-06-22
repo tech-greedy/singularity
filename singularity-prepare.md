@@ -23,7 +23,7 @@ singularity-prepare -h
 git clone https://github.com/tech-greedy/singularity.git
 cd singularity
 npm ci
-npm run build-singularity-prepare
+npm run build
 npx singularity-prepare
 ```
 ## 2. Build Dependency
