@@ -11,4 +11,6 @@ export default interface GetReplicationDetailsResponse {
     duration: number,
     isOffline: string,
     status: 'active' | 'paused' | 'completed' | 'error',
+    cronSchedule?: string,
+    cronMaxDeals?: number
   }

@@ -143,6 +143,8 @@ export default class Datastore {
       duration: Schema.Types.Number,
       isOffline: Schema.Types.Boolean,
       status: Schema.Types.String,
+      cronSchedule: Schema.Types.String,
+      cronMaxDeals: Schema.Types.Number,
       errorMessage: Schema.Types.String
     }, {
       timestamps: true

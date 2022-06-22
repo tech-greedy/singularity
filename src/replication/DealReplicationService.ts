@@ -148,7 +148,9 @@ export default class DealReplicationService extends BaseService {
         isVerfied,
         duration,
         isOffline,
-        maxNumberOfDeals
+        maxNumberOfDeals,
+        cronSchedule,
+        cronMaxDeals
       } = <CreateReplicationRequest>request.body;
       this.logger.info(`Received request to replicate dataset "${datasetId}" from client "${client}.`);
       let realDatasetId = datasetId;
@@ -181,6 +183,8 @@ export default class DealReplicationService extends BaseService {
       replicationRequest.isOffline = isOffline === 'true';
       replicationRequest.maxNumberOfDeals = maxNumberOfDeals;
       replicationRequest.status = 'active';
+      replicationRequest.cronSchedule = cronSchedule;
+      replicationRequest.cronMaxDeals = cronMaxDeals;
       try {
         await replicationRequest.save();
         // Create a deal tracking request if not exist

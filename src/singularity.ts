@@ -19,6 +19,7 @@ import GetPreparationDetailsResponse from './deal-preparation/GetPreparationDeta
 import fs from 'fs-extra';
 import Logger, { Category } from './common/Logger';
 import { Worker } from 'cluster';
+const cron: any = require('node-cron');// no TS support
 import * as IpfsCore from 'ipfs-core';
 import DealReplicationService from './replication/DealReplicationService';
 import DealReplicationWorker from './replication/DealReplicationWorker';
@@ -349,11 +350,18 @@ replication.command('start')
   .option('-r, --verified <verified>', 'Whether to propose deal as verified. true|false.', 'true')
   .option('-d, --duration <duration>', 'Duration in days for deal length.', '500')
   .option('-o, --offline <offline>', 'Propose as offline deal.', 'true')
-  .option('-m, --max-deals <maxdeals>', 'Max number of deals in this replication request per SP.', '0')
+  .option('-m, --max-deals <maxdeals>', 'Max number of deals in this replication request per SP, per cron triggered.', '0')
+  .option('-c, --cron-schedule <cronschedule>', 'Optional cron to send deals at interval. Use double quote to wrap the format containing spaces.')
+  .option('-m, --cron-max <cronmax>', 'When cron schedule specified, limit the total number of deals across entire cron.')
   .action(async (datasetid, replica, criteria, client, options) => {
     let response!: AxiosResponse;
     try {
       console.log(options);
+      if(options.cronSchedule) {
+        if(!cron.validate(options.cronSchedule)) {
+          CliUtil.renderErrorAndExit(`Invalid cron schedule format ${options.cronSchedule}. Try https://crontab.guru/ for a sample.`);
+        }
+      }
       const url: string = config.get('connection.deal_replication_service');
       response = await axios.post(`${url}/replication`, {
         datasetId: datasetid,
@@ -365,7 +373,9 @@ replication.command('start')
         isVerfied: options.verified,
         duration: options.duration * 2880, // convert to epoch
         isOffline: options.offline,
-        maxNumberOfDeals: options.maxDeals
+        maxNumberOfDeals: options.maxDeals,
+        cronSchedule: options.cronSchedule ? options.cronSchedule : undefined,
+        cronMaxDeals: options.cronMax ? options.cronMax : undefined
       });
     } catch (error) {
       CliUtil.renderErrorAndExit(error);

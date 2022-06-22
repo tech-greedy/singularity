@@ -6,6 +6,8 @@ export interface GetReplicationsResponseItem {
     client: string,
     maxNumberOfDeals: number,
     status: 'active' | 'paused' | 'completed' | 'error',
+    cronSchedule?: string,
+    cronMaxDeals?: number,
     errorMessage?: string,
     replicationCompleted: number,
     replicationActive: number,
