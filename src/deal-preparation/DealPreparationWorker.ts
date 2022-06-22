@@ -12,6 +12,7 @@ import path from 'path';
 import { performance } from 'perf_hooks';
 import { GeneratedFileList } from '../common/model/OutputFileList';
 import { FileInfo } from '../common/model/InputFileList';
+import GenerateCar from '../common/GenerateCar';
 
 interface IpldNode {
   Name: string,
@@ -112,7 +113,7 @@ export default class DealPreparationWorker extends BaseService {
 
   public static async invokeGenerateCar (input: string, outDir: string, p: string, tmpDir?: string)
     : Promise<[stdout: string, stderr: string, statusCode: number | null]> {
-    const cmd = await fs.pathExists(path.join(__dirname, 'generate-car')) ? path.join(__dirname, 'generate-car') : 'generate-car';
+    const cmd = GenerateCar.path ?? 'generate-car';
     const args = ['-o', outDir, '-p', p];
     if (tmpDir) {
       args.push('-t', tmpDir);
