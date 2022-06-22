@@ -14,6 +14,7 @@ import { GeneratedFileList } from './common/model/OutputFileList';
 // @ts-ignore
 import TaskQueue from '@goodware/task-queue';
 import { randomUUID } from 'crypto';
+import GenerateCar from './common/GenerateCar';
 
 const version = packageJson.version;
 const program = new Command();
@@ -30,6 +31,7 @@ program.name('singularity-prepare')
   .addOption(new Option('-M, --max-ratio <max_ratio>', 'Max ratio of deal to sector size, i.e. 0.95').default('0.95').argParser(parseFloat))
   .addOption(new Option('-j, --parallel <parallel>', 'How many generation jobs to run at the same time').default('1'))
   .action(async (name, p, outDir, options) => {
+    GenerateCar.initialize();
     await fs.mkdir(outDir, { recursive: true });
     if (!await fs.pathExists(p)) {
       console.error(`Dataset path "${p}" does not exist.`);

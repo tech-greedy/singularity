@@ -1,6 +1,6 @@
 {
   "name": "@techgreedy/singularity",
-  "version": "0.0.18",
+  "version": "0.0.19",
   "description": "Large scale client tool with capabilities on onboard PB-scale data to Filecoin network",
   "main": "dist/source/start.js",
   "types": "dist/source/start.d.ts",
@@ -95,8 +95,7 @@
   "bin": {
     "singularity": "dist/src/singularity.js",
     "singularity-retrieve": "dist/src/singularity-retrieve.js",
-    "singularity-prepare": "dist/src/singularity-prepare.js",
-    "generate-car": "node_modules/.bin/generate-car"
+    "singularity-prepare": "dist/src/singularity-prepare.js"
   },
   "nyc": {
     "extends": "@istanbuljs/nyc-config-typescript",
