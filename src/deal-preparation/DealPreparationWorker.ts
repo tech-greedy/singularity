@@ -113,7 +113,7 @@ export default class DealPreparationWorker extends BaseService {
 
   public static async invokeGenerateCar (input: string, outDir: string, p: string, tmpDir?: string)
     : Promise<[stdout: string, stderr: string, statusCode: number | null]> {
-    const cmd = GenerateCar.path!;
+    const cmd = GenerateCar.path ?? 'generate-car';
     const args = ['-o', outDir, '-p', p];
     if (tmpDir) {
       args.push('-t', tmpDir);
