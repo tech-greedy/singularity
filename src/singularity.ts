@@ -24,6 +24,7 @@ const cron: any = require('node-cron');// no TS support
 import * as IpfsCore from 'ipfs-core';
 import DealReplicationService from './replication/DealReplicationService';
 import DealReplicationWorker from './replication/DealReplicationWorker';
+import GenerateCar from './common/GenerateCar';
 
 const logger = Logger.getLogger(Category.Cli);
 const version = packageJson.version;
@@ -50,6 +51,7 @@ program.command('daemon')
   .description('Start a daemon process for deal preparation and deal making')
   .action((_options) => {
     (async function () {
+      GenerateCar.initialize();
       if (cluster.isMaster) {
         let indexService: IndexService;
         process.on('SIGUSR2', async () => {

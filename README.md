@@ -38,7 +38,7 @@ cd go-generate-car
 make
 ```
 Then copy the generated binary to override the existing one from the PATH for your node environment, i.e.
-* singularity installed globally `/home/user/.nvm/versions/node/v16.15.0/bin`
+* singularity installed globally `/home/user/.nvm/versions/node/v16.xx.x/lib/node_modules/.bin`
 * singularity cloned locally `./node_modules/.bin`
 
 
