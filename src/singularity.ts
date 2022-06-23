@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 /* eslint-disable import/first */
+/* eslint @typescript-eslint/no-var-requires: "off" */
 import { homedir } from 'os';
 import path from 'path';
 import cluster from 'node:cluster';
@@ -357,8 +358,8 @@ replication.command('start')
     let response!: AxiosResponse;
     try {
       console.log(options);
-      if(options.cronSchedule) {
-        if(!cron.validate(options.cronSchedule)) {
+      if (options.cronSchedule) {
+        if (!cron.validate(options.cronSchedule)) {
           CliUtil.renderErrorAndExit(`Invalid cron schedule format ${options.cronSchedule}. Try https://crontab.guru/ for a sample.`);
         }
       }

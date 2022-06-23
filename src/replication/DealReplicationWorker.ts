@@ -160,11 +160,11 @@ export default class DealReplicationWorker extends BaseService {
   private async createDealCmd (useLotus: boolean, provider: string, replicationRequest: ReplicationRequest, carFile: GenerationRequest): Promise<string> {
     if (useLotus) {
       if (replicationRequest.isOffline) {
-        const priceInFilWithSize = DealReplicationWorker.calculatePriceWithSize(replicationRequest.maxPrice, carFile.pieceSize!);
+        const priceInFilWithSize = math.format(DealReplicationWorker.calculatePriceWithSize(replicationRequest.maxPrice, carFile.pieceSize!).toNumber(), { notation: 'fixed' });
         const unpaddedSize = carFile.pieceSize! * 127 / 128;
         return `${this.lotusCMD} client deal --manual-piece-cid=${carFile.pieceCid} --manual-piece-size=${unpaddedSize} ` +
           `--manual-stateless-deal --from=${replicationRequest.client} --verified-deal=${replicationRequest.isVerfied} ` +
-          `${carFile.dataCid} ${provider} ${priceInFilWithSize.toNumber()} ${replicationRequest.duration}`;
+          `${carFile.dataCid} ${provider} ${priceInFilWithSize} ${replicationRequest.duration}`;
       } else {
         throw new Error(`Deal making failed. SP ${provider} only supports lotus and for lotus we only support offline deals.`);
       }
@@ -175,7 +175,7 @@ export default class DealReplicationWorker extends BaseService {
       if (!replicationRequest.isOffline && !(await this.checkUrlReachability(downloadUrl))) {
         throw new Error(`${downloadUrl} is not reachable`);
       }
-      const priceInAttoWithoutSize = math.unit(replicationRequest.maxPrice, 'm').toNumber('am');
+      const priceInAttoWithoutSize = math.format(math.unit(replicationRequest.maxPrice, 'm').toNumber('am'), { notation: 'fixed' });
       let propose = `deal --http-url=${downloadUrl}`;
       if (replicationRequest.isOffline) {
         propose = `offline-deal`;
