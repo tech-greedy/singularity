@@ -58,7 +58,7 @@ program.command('daemon')
             await Datastore['mongoMemoryServer'].stop();
           }
           // unlock ipfs repo
-          if (config.get('index_service.enabled') && config.get('index_service.start_ipfs') && indexService && indexService['ipfsClient']) {
+          if (config.get('index_service.enabled') && config.get('ipfs.enabled') && indexService && indexService['ipfsClient']) {
             await indexService['ipfsClient'].stop();
           }
 
@@ -86,7 +86,7 @@ program.command('daemon')
           }
         }
         if (config.get('index_service.enabled')) {
-          const indexService = new IndexService();
+          indexService = new IndexService();
           if (config.get('ipfs.enabled')) {
             indexService['ipfsClient'] = await IpfsCore.create();
           }
