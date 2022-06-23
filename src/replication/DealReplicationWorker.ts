@@ -162,8 +162,9 @@ export default class DealReplicationWorker extends BaseService {
       if (replicationRequest.isOffline) {
         const priceInFilWithSize = math.format(DealReplicationWorker.calculatePriceWithSize(replicationRequest.maxPrice, carFile.pieceSize!).toNumber(), { notation: 'fixed' });
         const unpaddedSize = carFile.pieceSize! * 127 / 128;
+        const manualStateless = replicationRequest.maxPrice > 0 ? '' : '--manual-stateless-deal';// only zero priced deal support manual stateless deal
         return `${this.lotusCMD} client deal --manual-piece-cid=${carFile.pieceCid} --manual-piece-size=${unpaddedSize} ` +
-          `--manual-stateless-deal --from=${replicationRequest.client} --verified-deal=${replicationRequest.isVerfied} ` +
+          `${manualStateless} --from=${replicationRequest.client} --verified-deal=${replicationRequest.isVerfied} ` +
           `${carFile.dataCid} ${provider} ${priceInFilWithSize} ${replicationRequest.duration}`;
       } else {
         throw new Error(`Deal making failed. SP ${provider} only supports lotus and for lotus we only support offline deals.`);
@@ -193,18 +194,13 @@ export default class DealReplicationWorker extends BaseService {
   private async replicate (replicationRequest: ReplicationRequest): Promise<void> {
     const providers = await DealReplicationWorker.generateProvidersList(replicationRequest.criteria);
     const boostResultUUIDMatcher = /deal uuid: (\S+)/;
-    let breakOuter = false;
-    for (let i = 0; i < providers.length; i++) {
-      if (breakOuter) {
-        break;
-      }
-      const provider = providers[i];
+    const makeDealAll = providers.map(async (provider) => {
       let useLotus = true;
       try {
         useLotus = await this.isUsingLotus(provider);
       } catch (error) {
         this.logger.error(`SP ${provider} unknown output from libp2p. Give up on this SP.`, error);
-        continue;
+        return;
       }
 
       // Find cars that are finished generation
@@ -222,19 +218,17 @@ export default class DealReplicationWorker extends BaseService {
         const existingRec = await Datastore.ReplicationRequestModel.findById(replicationRequest.id);
         if (!existingRec) {
           this.logger.error(`This replication request ${replicationRequest.id} no longer exist.`);
-          breakOuter = true;
-          break;
+          return;
         }
         if (existingRec.status !== 'active') {
           this.logger.warn(`This replication request ${existingRec.id} has become non-active: ${existingRec.status}.`);
-          breakOuter = true;
-          break;
+          return;
         }
 
         // check if reached max deals needed to be sent
         if (existingRec.maxNumberOfDeals > 0 && dealsMadePerSP >= existingRec.maxNumberOfDeals) {
           this.logger.warn(`This SP ${provider} has made max deals planned (${existingRec.maxNumberOfDeals}) by the request ${existingRec.id}.`);
-          break;
+          return;
         }
 
         // check if the car has already dealt or have enough replica
@@ -252,12 +246,12 @@ export default class DealReplicationWorker extends BaseService {
           }
         }
         if (alreadyDealt) {
-          continue;
+          continue; // go to next file
         }
         if (existingDeals.length >= existingRec.maxReplicas) {
           this.logger.warn(`This pieceCID ${carFile.pieceCid} has reached enough ` +
             `replica (${existingRec.maxReplicas}) planned by the request ${existingRec.id}.`);
-          continue;
+          continue; // go to next file
         }
 
         let dealCmd = '';
@@ -265,7 +259,7 @@ export default class DealReplicationWorker extends BaseService {
           dealCmd = await this.createDealCmd(useLotus, provider, replicationRequest, carFile);
         } catch (error) {
           this.logger.error(`Deal CMD generation failed`, error);
-          continue;
+          return;
         }
 
         this.logger.debug(dealCmd);
@@ -327,7 +321,8 @@ export default class DealReplicationWorker extends BaseService {
           errorMessage: errorMsg
         });
       }
-    }
+    });
+    await Promise.all(makeDealAll);
   }
 
   private async startHealthCheck (): Promise<void> {
