@@ -58,7 +58,7 @@ program.command('daemon')
             await Datastore['mongoMemoryServer'].stop();
           }
           // unlock ipfs repo
-          if (config.get('index_service.enabled') && config.get('index_service.start_ipfs') && indexService && indexService['ipfsClient']) {
+          if (config.get('index_service.enabled') && config.get('ipfs.enabled') && indexService && indexService['ipfsClient']) {
             await indexService['ipfsClient'].stop();
           }
 
@@ -66,9 +66,6 @@ program.command('daemon')
         });
         await Datastore.init(false);
         await Datastore.connect();
-        if (config.get('ipfs.enabled')) {
-          await IpfsCore.create();
-        }
         const workers: [Worker, string][] = [];
         let readied = 0;
         cluster.on('message', _ => {
@@ -89,7 +86,11 @@ program.command('daemon')
           }
         }
         if (config.get('index_service.enabled')) {
-          workers.push([cluster.fork(), 'index_service']);
+          indexService = new IndexService();
+          if (config.get('ipfs.enabled')) {
+            indexService['ipfsClient'] = await IpfsCore.create();
+          }
+          indexService.start();
         }
         if (config.get('http_hosting_service.enabled')) {
           workers.push([cluster.fork(), 'http_hosting_service']);
@@ -112,9 +113,6 @@ program.command('daemon')
               break;
             case 'deal_preparation_worker':
               new DealPreparationWorker().start();
-              break;
-            case 'index_service':
-              new IndexService().start();
               break;
             case 'http_hosting_service':
               new HttpHostingService().start();
