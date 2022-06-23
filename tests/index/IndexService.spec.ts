@@ -103,6 +103,11 @@ describe('IndexService', () => {
         generationId: generation2.id,
         generatedFileList: [
           {
+            path: path.join('a'),
+            selector: [0],
+            dir: true
+          },
+          {
             path: path.join('a', 'c.mp4'),
             selector: [0, 0],
             size: 100,
@@ -112,9 +117,7 @@ describe('IndexService', () => {
           {
             path: path.join('d', 'e.mp4'),
             selector: [1, 0],
-            size: 100,
-            start: 0,
-            end: 100
+            size: 100
           },
         ]
       });
