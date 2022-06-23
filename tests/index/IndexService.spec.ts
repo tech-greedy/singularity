@@ -7,7 +7,7 @@ import ErrorCode from '../../src/index/ErrorCode';
 import { CID } from 'ipfs-core';
 import * as IPFS from 'ipfs-core';
 
-fdescribe('IndexService', () => {
+describe('IndexService', () => {
   let service: IndexService;
   beforeAll(async () => {
     await Utils.initDatabase();
