@@ -355,7 +355,7 @@ replication.command('start')
   .option('-o, --offline <offline>', 'Propose as offline deal.', 'true')
   .option('-m, --max-deals <maxdeals>', 'Max number of deals in this replication request per SP, per cron triggered.', '0')
   .option('-c, --cron-schedule <cronschedule>', 'Optional cron to send deals at interval. Use double quote to wrap the format containing spaces.')
-  .option('-m, --cron-max <cronmax>', 'When cron schedule specified, limit the total number of deals across entire cron.')
+  .option('-x, --cron-max <cronmax>', 'When cron schedule specified, limit the total number of deals across entire cron.')
   .action(async (datasetid, replica, criteria, client, options) => {
     let response!: AxiosResponse;
     try {
