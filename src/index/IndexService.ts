@@ -76,6 +76,9 @@ export default class IndexService extends BaseService {
       const generatedFileList = (await Datastore.OutputFileListModel.find({ generationId: generation.id }, null, { sort: { index: 1 } }))
         .map(r => r.generatedFileList).flat();
       for (const file of generatedFileList) {
+        if (file.dir) {
+          continue;
+        }
         let node = root;
         const segments = file.path.split(path.sep);
         // Enter directories
@@ -118,7 +121,7 @@ export default class IndexService extends BaseService {
           });
         }
         const fileSource = {
-          dataCid, pieceCid, selector: file.selector, from: file.start, to: file.end
+          dataCid, pieceCid, selector: file.selector, from: file.start ?? 0, to: file.end ?? file.size
         };
         const sourceMap = (<FileNode>node.entries.get(segment)).sourcesMap!;
         if (!sourceMap.has(dataCid)) {
