@@ -70,7 +70,9 @@ export default class DealReplicationService extends BaseService {
         isVerfied: String(found.isVerfied),
         duration: found.duration,
         isOffline: String(found.isOffline),
-        status: found.status
+        status: found.status,
+        cronSchedule: found.cronSchedule,
+        cronMaxDeals: found.cronMaxDeals
       };
       response.end(JSON.stringify(result));
     }
@@ -105,7 +107,7 @@ export default class DealReplicationService extends BaseService {
         this.sendError(response, ErrorCode.INVALID_OBJECT_ID);
         return;
       }
-      const { status } = <UpdateReplicationRequest>request.body;
+      const { status, cronSchedule, cronMaxDeals } = <UpdateReplicationRequest>request.body;
       this.logger.info(`Received request to change status of replication request "${id}" to "${status}".`);
       if (!['active', 'paused'].includes(status)) {
         this.sendError(response, ErrorCode.CHANGE_STATE_INVALID);
@@ -125,7 +127,9 @@ export default class DealReplicationService extends BaseService {
           ]
         }
       }, {
-        status
+        status,
+        cronSchedule,
+        cronMaxDeals
       });
       this.logger.info(`Updated status of incomplete replication request to "${status}".`);
       response.end();

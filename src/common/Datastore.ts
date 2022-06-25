@@ -179,6 +179,7 @@ export default class Datastore {
     });
     dealStateSchema.index({ pieceCid: 1, provider: 1, client: 1, state: 1 });
     dealStateSchema.index({ client: 1, state: 1 });
+    dealStateSchema.index({ replicationRequestId: 1, state: 1 });
     dealStateSchema.index({ pieceCid: 1, state: 1 });
     Datastore.DealStateModel = mongoose.model<DealState>('DealState', dealStateSchema);
   }

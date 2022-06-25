@@ -11,11 +11,13 @@ import GenerationRequest from '../common/model/GenerationRequest';
 const mathconfig = {};
 const math = create(all, mathconfig);
 const exec: any = require('await-exec');// no TS support
+const cron: any = require('node-cron');// no TS support
 
 export default class DealReplicationWorker extends BaseService {
   private readonly workerId: string;
   private readonly lotusCMD: string;
   private readonly boostCMD: string;
+  private cronRefArray: Array<any> = []; // holds reference to all started crons to be updated
 
   public constructor () {
     super(Category.DealReplicationWorker);
@@ -69,7 +71,18 @@ export default class DealReplicationWorker extends BaseService {
     if (newReplicationWork) {
       this.logger.info(`${this.workerId} - Received a new request - dataset: ${newReplicationWork.datasetId}`);
       try {
-        await this.replicate(newReplicationWork);
+        if (newReplicationWork.cronSchedule) {
+          // schedule and start immediately
+          this.cronRefArray[newReplicationWork.id] = [
+            newReplicationWork.cronSchedule,
+            cron.schedule(newReplicationWork.cronSchedule, async () => {
+              await this.replicate(newReplicationWork);
+            })
+          ];
+        } else {
+          // no cron, execute immediately
+          await this.replicate(newReplicationWork);
+        }
       } catch (err) {
         if (err instanceof Error) {
           this.logger.error(`${this.workerId} - Encountered an error - ${err.message}`);
@@ -78,7 +91,6 @@ export default class DealReplicationWorker extends BaseService {
         }
         throw err;
       }
-      await Datastore.ReplicationRequestModel.findByIdAndUpdate(newReplicationWork.id, { status: 'completed' });
     }
 
     return newReplicationWork != null;
@@ -187,6 +199,27 @@ export default class DealReplicationWorker extends BaseService {
     }
   }
 
+  private async checkAndMarkCompletion (replicationRequest: ReplicationRequest): Promise<boolean> {
+    const maxNumberOfDeals = replicationRequest.cronSchedule ? replicationRequest.cronMaxDeals : replicationRequest.maxNumberOfDeals;
+    const actualDealsCount = await Datastore.DealStateModel.count({
+      replicationRequestId: replicationRequest.id,
+      state: {
+        $nin: [
+          'slashed', 'error'
+        ]
+      }
+    });
+    if (actualDealsCount >= maxNumberOfDeals!) {
+      await Datastore.ReplicationRequestModel.findOneAndUpdate({
+        id: replicationRequest.id
+      }, {
+        status: 'completed'
+      });
+      return true;
+    }
+    return false;
+  }
+
   /**
    * Main function of deal making
    * @param replicationRequest
@@ -194,7 +227,11 @@ export default class DealReplicationWorker extends BaseService {
   private async replicate (replicationRequest: ReplicationRequest): Promise<void> {
     const providers = await DealReplicationWorker.generateProvidersList(replicationRequest.criteria);
     const boostResultUUIDMatcher = /deal uuid: (\S+)/;
+    let breakOuter = false; // set this to true will terminate all concurrent deal making thread
     const makeDealAll = providers.map(async (provider) => {
+      if (breakOuter) {
+        return;
+      }
       let useLotus = true;
       try {
         useLotus = await this.isUsingLotus(provider);
@@ -218,16 +255,49 @@ export default class DealReplicationWorker extends BaseService {
         const existingRec = await Datastore.ReplicationRequestModel.findById(replicationRequest.id);
         if (!existingRec) {
           this.logger.error(`This replication request ${replicationRequest.id} no longer exist.`);
+          breakOuter = true;
           return;
         }
         if (existingRec.status !== 'active') {
           this.logger.warn(`This replication request ${existingRec.id} has become non-active: ${existingRec.status}.`);
+          breakOuter = true;
           return;
+        }
+        // check if cron schedule has changed
+        if (existingRec.cronSchedule) {
+          let needRestartCron = false;
+          if (this.cronRefArray[existingRec.id]) {
+            if (this.cronRefArray[existingRec.id][0] !== existingRec.cronSchedule) {
+              // cron schedule changed from update request
+              this.cronRefArray[existingRec.id][1].stop();
+              delete this.cronRefArray[existingRec.id];
+              needRestartCron = true;
+            }
+          } else {
+            // this could happen when previous it was set to
+            // immediately send but later on changed to cron send
+            // restart and let next pollWork pick up
+            needRestartCron = true;
+          }
+          if (needRestartCron) {
+            await Datastore.ReplicationRequestModel.findOneAndUpdate({
+              id: existingRec.id
+            }, {
+              workerId: null
+            }); // will be picked up again by next pollWork
+            breakOuter = true;
+            this.logger.info(`Cron changed, restarting schedule. (${replicationRequest.id})`);
+            return;
+          }
         }
 
         // check if reached max deals needed to be sent
         if (existingRec.maxNumberOfDeals > 0 && dealsMadePerSP >= existingRec.maxNumberOfDeals) {
           this.logger.warn(`This SP ${provider} has made max deals planned (${existingRec.maxNumberOfDeals}) by the request ${existingRec.id}.`);
+          const shouldStopAll = await this.checkAndMarkCompletion(existingRec);
+          if (shouldStopAll) {
+            breakOuter = true;
+          }
           return;
         }
 
@@ -240,7 +310,7 @@ export default class DealReplicationWorker extends BaseService {
         for (let k = 0; k < existingDeals.length; k++) {
           const deal = existingDeals[k];
           if (deal.provider === provider) {
-            this.logger.warn(`This pieceCID ${carFile.pieceCid} has already been dealt with ${provider}. ` +
+            this.logger.debug(`This pieceCID ${carFile.pieceCid} has already been dealt with ${provider}. ` +
               `Deal CID ${deal.dealCid}.`);
             alreadyDealt = true;
           }
