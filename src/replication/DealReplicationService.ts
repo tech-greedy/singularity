@@ -21,6 +21,7 @@ export default class DealReplicationService extends BaseService {
       this.handleUpdateReplicationRequest = this.handleUpdateReplicationRequest.bind(this);
       this.handleListReplicationRequests = this.handleListReplicationRequests.bind(this);
       this.handleGetReplicationRequest = this.handleGetReplicationRequest.bind(this);
+      this.startCleanupHealthCheck = this.startCleanupHealthCheck.bind(this);
       if (!this.enabled) {
         this.logger.warn('Deal Replication Service is not enabled. Exit now...');
         return;
@@ -39,6 +40,7 @@ export default class DealReplicationService extends BaseService {
     }
 
     public start (): void {
+      this.startCleanupHealthCheck();
       const bind = config.get<string>('deal_replication_service.bind');
       const port = config.get<number>('deal_replication_service.port');
         this.app!.listen(port, bind, () => {
@@ -108,31 +110,56 @@ export default class DealReplicationService extends BaseService {
         return;
       }
       const { status, cronSchedule, cronMaxDeals } = <UpdateReplicationRequest>request.body;
-      this.logger.info(`Received request to change status of replication request "${id}" to "${status}".`);
-      if (!['active', 'paused'].includes(status)) {
-        this.sendError(response, ErrorCode.CHANGE_STATE_INVALID);
-        return;
-      }
+      this.logger.info(`Received request to update replication request "${id}" with ` +
+      `status: "${status}", cron schedule: ${cronSchedule} and cronMaxDeal: ${cronMaxDeals}.`);
       const found = await Datastore.ReplicationRequestModel.findById(id);
       if (!found) {
         this.sendError(response, ErrorCode.DATASET_NOT_FOUND);
         return;
       }
-
-      await Datastore.ReplicationRequestModel.updateOne({
-        id: id,
-        status: {
-          $nin: [
-            'completed', 'error'
-          ]
+      if (!['active', 'paused'].includes(found.status)) {
+        this.sendError(response, ErrorCode.CHANGE_STATE_INVALID);
+        return;
+      }
+      let responseObj;
+      if (cronSchedule) {
+        if (!found.cronSchedule) {
+          this.sendError(response, ErrorCode.NOT_CRON_JOB);
+          return;
         }
-      }, {
-        status,
-        cronSchedule,
-        cronMaxDeals
-      });
-      this.logger.info(`Updated status of incomplete replication request to "${status}".`);
-      response.end();
+        responseObj = await Datastore.ReplicationRequestModel.findOneAndUpdate({
+          _id: id,
+          status: {
+            $nin: [
+              'completed', 'error'
+            ]
+          }
+        }, {
+          cronSchedule,
+          cronMaxDeals
+        }, {
+          new: true
+        });
+      } else if (status) {
+        if (!['active', 'paused'].includes(status)) {
+          this.sendError(response, ErrorCode.CHANGE_STATE_INVALID);
+          return;
+        }
+
+        responseObj = await Datastore.ReplicationRequestModel.findOneAndUpdate({
+          _id: id,
+          status: {
+            $nin: [
+              'completed', 'error'
+            ]
+          }
+        }, {
+          status
+        }, {
+          new: true
+        });
+      }
+      response.end(JSON.stringify(responseObj));
     }
 
     private sendError (response: Response, error: ErrorCode) {
@@ -210,5 +237,20 @@ export default class DealReplicationService extends BaseService {
       }
 
       response.end(JSON.stringify({ id: replicationRequest.id }));
+    }
+
+    private async cleanupHealthCheck (): Promise<void> {
+      this.logger.debug(`Cleaning up health check table`);
+      // Find all active workerId
+      const workerIds = (await Datastore.HealthCheckModel.find()).map(worker => worker.workerId);
+      const modified = (await Datastore.ReplicationRequestModel.updateMany({ workerId: { $nin: workerIds } }, { workerId: null })).modifiedCount;
+      if (modified > 0) {
+        this.logger.debug(`Reset ${modified} tasks from ReplicationRequestModel table`);
+      }
+    }
+
+    private async startCleanupHealthCheck (): Promise<void> {
+      await this.cleanupHealthCheck();
+      setTimeout(this.startCleanupHealthCheck, 5000);
     }
 }

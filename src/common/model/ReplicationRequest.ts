@@ -3,6 +3,7 @@
  */
 export default interface ReplicationRequest {
   id: string,
+  workerId?: string,
   datasetId: string,
   maxReplicas: number, // targeted replica per piece
   criteria: string, // comma separated SP

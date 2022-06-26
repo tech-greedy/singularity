@@ -17,7 +17,7 @@ export default class DealReplicationWorker extends BaseService {
   private readonly workerId: string;
   private readonly lotusCMD: string;
   private readonly boostCMD: string;
-  private cronRefArray: Array<any> = []; // holds reference to all started crons to be updated
+  private cronRefArray: Map<string, any[]> = new Map<string, any[]>();; // holds reference to all started crons to be updated
 
   public constructor () {
     super(Category.DealReplicationWorker);
@@ -57,8 +57,32 @@ export default class DealReplicationWorker extends BaseService {
 
   private async pollWork (): Promise<boolean> {
     this.logger.debug(`${this.workerId} - Polling for work`);
+    await this.checkCronChange();
     const hasDoneWork = await this.pollReplicationWork();
     return hasDoneWork;
+  }
+
+  private async checkCronChange (): Promise<void> {
+    const activeCronWorks = await Datastore.ReplicationRequestModel.find({
+      cronSchedule: { $ne: null },
+      workerId: { $ne: null },
+      status: 'active'
+    });
+
+    for (let i = 0; i < activeCronWorks.length; i++) {
+      const request2Check = activeCronWorks[i];
+      if (this.cronRefArray.has(request2Check.id) && this.cronRefArray.get(request2Check.id)![0] !== request2Check.cronSchedule) {
+        // cron schedule changed from update request
+        this.cronRefArray.get(request2Check.id)![1].stop();
+        this.cronRefArray.delete(request2Check.id);
+        await Datastore.ReplicationRequestModel.findOneAndUpdate({
+          _id: request2Check.id
+        }, {
+          workerId: null
+        }); // will be picked up again by the immediate pollReplicationWork
+        this.logger.info(`Cron changed, restarting schedule. (${request2Check.id})`);
+      }
+    }
   }
 
   private async pollReplicationWork (): Promise<boolean> {
@@ -69,18 +93,18 @@ export default class DealReplicationWorker extends BaseService {
       workerId: this.workerId
     });
     if (newReplicationWork) {
-      this.logger.info(`${this.workerId} - Received a new request - dataset: ${newReplicationWork.datasetId}`);
+      this.logger.info(`${this.workerId} - Received a new request - id ${newReplicationWork.id} dataset: ${newReplicationWork.datasetId}`);
       try {
         if (newReplicationWork.cronSchedule) {
-          // schedule and start immediately
-          this.cronRefArray[newReplicationWork.id] = [
+          this.logger.debug(`Schedule and start cron (${newReplicationWork.cronSchedule})`);
+          this.cronRefArray.set(newReplicationWork.id, [
             newReplicationWork.cronSchedule,
             cron.schedule(newReplicationWork.cronSchedule, async () => {
+              this.logger.debug(`Cron triggered (${newReplicationWork.cronSchedule}) - id ${newReplicationWork.id}`);
               await this.replicate(newReplicationWork);
-            })
-          ];
+            })]);
         } else {
-          // no cron, execute immediately
+          this.logger.debug(`No cron, execute immediately`);
           await this.replicate(newReplicationWork);
         }
       } catch (err) {
@@ -199,25 +223,42 @@ export default class DealReplicationWorker extends BaseService {
     }
   }
 
-  private async checkAndMarkCompletion (replicationRequest: ReplicationRequest): Promise<boolean> {
-    const maxNumberOfDeals = replicationRequest.cronSchedule ? replicationRequest.cronMaxDeals : replicationRequest.maxNumberOfDeals;
+  private async checkAndMarkCompletion (request2Check: ReplicationRequest, carCount: number): Promise<boolean> {
+    const maxNumberOfDeals = request2Check.cronSchedule ? request2Check.cronMaxDeals : request2Check.maxNumberOfDeals;
+    const numberOfSPs = (await DealReplicationWorker.generateProvidersList(request2Check.criteria)).length;
     const actualDealsCount = await Datastore.DealStateModel.count({
-      replicationRequestId: replicationRequest.id,
+      replicationRequestId: request2Check.id,
       state: {
         $nin: [
           'slashed', 'error'
         ]
       }
     });
-    if (actualDealsCount >= maxNumberOfDeals!) {
+    this.logger.debug(`checkAndMarkCompletion ${request2Check.id} max: ${maxNumberOfDeals} actual: ${actualDealsCount}`);
+    let isComplete = false;
+    if (maxNumberOfDeals != null && maxNumberOfDeals > 0 && actualDealsCount >= (maxNumberOfDeals! * numberOfSPs)) {
+      this.logger.debug(`Actual deals over limit`);
+      isComplete = true;
+    } else if (actualDealsCount >= (carCount * Math.min(numberOfSPs, request2Check.maxReplicas))) {
+      this.logger.debug(`Actual deals under limit but no more cars available`);
+      isComplete = true;
+    }
+    if (isComplete) {
+      this.logger.debug(`Mark as complete`);
       await Datastore.ReplicationRequestModel.findOneAndUpdate({
-        id: replicationRequest.id
+        _id: request2Check.id
       }, {
         status: 'completed'
       });
+      if (request2Check.cronSchedule && this.cronRefArray.has(request2Check.id)) {
+        this.cronRefArray.get(request2Check.id)![1].stop();
+        this.cronRefArray.delete(request2Check.id);
+      }
       return true;
+    } else {
+      this.logger.debug(`Not yet complete`);
+      return false;
     }
-    return false;
   }
 
   /**
@@ -225,6 +266,7 @@ export default class DealReplicationWorker extends BaseService {
    * @param replicationRequest
    */
   private async replicate (replicationRequest: ReplicationRequest): Promise<void> {
+    this.logger.debug(`Start replication ${replicationRequest.id}`);
     const providers = await DealReplicationWorker.generateProvidersList(replicationRequest.criteria);
     const boostResultUUIDMatcher = /deal uuid: (\S+)/;
     let breakOuter = false; // set this to true will terminate all concurrent deal making thread
@@ -263,38 +305,11 @@ export default class DealReplicationWorker extends BaseService {
           breakOuter = true;
           return;
         }
-        // check if cron schedule has changed
-        if (existingRec.cronSchedule) {
-          let needRestartCron = false;
-          if (this.cronRefArray[existingRec.id]) {
-            if (this.cronRefArray[existingRec.id][0] !== existingRec.cronSchedule) {
-              // cron schedule changed from update request
-              this.cronRefArray[existingRec.id][1].stop();
-              delete this.cronRefArray[existingRec.id];
-              needRestartCron = true;
-            }
-          } else {
-            // this could happen when previous it was set to
-            // immediately send but later on changed to cron send
-            // restart and let next pollWork pick up
-            needRestartCron = true;
-          }
-          if (needRestartCron) {
-            await Datastore.ReplicationRequestModel.findOneAndUpdate({
-              id: existingRec.id
-            }, {
-              workerId: null
-            }); // will be picked up again by next pollWork
-            breakOuter = true;
-            this.logger.info(`Cron changed, restarting schedule. (${replicationRequest.id})`);
-            return;
-          }
-        }
 
         // check if reached max deals needed to be sent
         if (existingRec.maxNumberOfDeals > 0 && dealsMadePerSP >= existingRec.maxNumberOfDeals) {
           this.logger.warn(`This SP ${provider} has made max deals planned (${existingRec.maxNumberOfDeals}) by the request ${existingRec.id}.`);
-          const shouldStopAll = await this.checkAndMarkCompletion(existingRec);
+          const shouldStopAll = await this.checkAndMarkCompletion(existingRec, cars.length);
           if (shouldStopAll) {
             breakOuter = true;
           }
@@ -311,7 +326,7 @@ export default class DealReplicationWorker extends BaseService {
           const deal = existingDeals[k];
           if (deal.provider === provider) {
             this.logger.debug(`This pieceCID ${carFile.pieceCid} has already been dealt with ${provider}. ` +
-              `Deal CID ${deal.dealCid}.`);
+              `Deal CID ${deal.dealCid}. Moving on to next file.`);
             alreadyDealt = true;
           }
         }
@@ -391,6 +406,10 @@ export default class DealReplicationWorker extends BaseService {
           errorMessage: errorMsg
         });
       }
+      // cron schedule could change from outside
+      this.logger.debug(`Finished all files in the dataset. Checking completion.`);
+      const reRead = await Datastore.ReplicationRequestModel.findById(replicationRequest.id);
+      await this.checkAndMarkCompletion(reRead!, cars.length);
     });
     await Promise.all(makeDealAll);
   }
