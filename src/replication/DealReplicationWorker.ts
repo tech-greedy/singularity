@@ -8,16 +8,17 @@ import config from 'config';
 import axios from 'axios';
 import { create, all, Unit } from 'mathjs';
 import GenerationRequest from '../common/model/GenerationRequest';
+import cron, { ScheduledTask } from 'node-cron';
 const mathconfig = {};
 const math = create(all, mathconfig);
 const exec: any = require('await-exec');// no TS support
-const cron: any = require('node-cron');// no TS support
 
 export default class DealReplicationWorker extends BaseService {
   private readonly workerId: string;
   private readonly lotusCMD: string;
   private readonly boostCMD: string;
-  private cronRefArray: Map<string, any[]> = new Map<string, any[]>();; // holds reference to all started crons to be updated
+  // holds reference to all started crons to be updated
+  private cronRefArray: Map<string, [string, ScheduledTask]> = new Map<string, [string, ScheduledTask]>();
 
   public constructor () {
     super(Category.DealReplicationWorker);

@@ -64,6 +64,7 @@
     "@gzuidhof/go-npm": "^0.1.13",
     "@rauschma/stringio": "^1.4.0",
     "@techgreedy/generate-car": "1.2.0",
+    "@types/node-cron": "^3.0.1",
     "async-retry": "^1.3.3",
     "await-exec": "^0.1.2",
     "axios": "^0.26.1",

@@ -20,7 +20,7 @@ import GetPreparationDetailsResponse from './deal-preparation/GetPreparationDeta
 import fs from 'fs-extra';
 import Logger, { Category } from './common/Logger';
 import { Worker } from 'cluster';
-const cron: any = require('node-cron');// no TS support
+import cron from 'node-cron';
 import * as IpfsCore from 'ipfs-core';
 import DealReplicationService from './replication/DealReplicationService';
 import DealReplicationWorker from './replication/DealReplicationWorker';
