@@ -18,7 +18,7 @@ export default class DealReplicationWorker extends BaseService {
   private readonly lotusCMD: string;
   private readonly boostCMD: string;
   // holds reference to all started crons to be updated
-  private cronRefArray: Map<string, [string, ScheduledTask]> = new Map<string, [string, ScheduledTask]>();
+  private cronRefArray: Map<string, [schedule: string, taskRef: ScheduledTask]> = new Map<string, [string, ScheduledTask]>();
 
   public constructor () {
     super(Category.DealReplicationWorker);
@@ -72,16 +72,19 @@ export default class DealReplicationWorker extends BaseService {
 
     for (let i = 0; i < activeCronWorks.length; i++) {
       const request2Check = activeCronWorks[i];
-      if (this.cronRefArray.has(request2Check.id) && this.cronRefArray.get(request2Check.id)![0] !== request2Check.cronSchedule) {
-        // cron schedule changed from update request
-        this.cronRefArray.get(request2Check.id)![1].stop();
-        this.cronRefArray.delete(request2Check.id);
-        await Datastore.ReplicationRequestModel.findOneAndUpdate({
-          _id: request2Check.id
-        }, {
-          workerId: null
-        }); // will be picked up again by the immediate pollReplicationWork
-        this.logger.info(`Cron changed, restarting schedule. (${request2Check.id})`);
+      if (this.cronRefArray.has(request2Check.id)) {
+        const [schedule, taskRef] = this.cronRefArray.get(request2Check.id)!;
+        if (schedule !== request2Check.cronSchedule) {
+          // cron schedule changed from update request
+          taskRef.stop();
+          this.cronRefArray.delete(request2Check.id);
+          await Datastore.ReplicationRequestModel.findOneAndUpdate({
+            _id: request2Check.id
+          }, {
+            workerId: null
+          }); // will be picked up again by the immediate pollReplicationWork
+          this.logger.info(`Cron changed, restarting schedule. (${request2Check.id})`);
+        }
       }
     }
   }
@@ -252,8 +255,10 @@ export default class DealReplicationWorker extends BaseService {
         status: 'completed'
       });
       if (request2Check.cronSchedule && this.cronRefArray.has(request2Check.id)) {
-        this.cronRefArray.get(request2Check.id)![1].stop();
+        const [schedule, taskRef] = this.cronRefArray.get(request2Check.id)!;
+        taskRef.stop();
         this.cronRefArray.delete(request2Check.id);
+        this.logger.debug(`Stopped cron (${schedule}) of ${request2Check.id}`);
       }
       return true;
     } else {
