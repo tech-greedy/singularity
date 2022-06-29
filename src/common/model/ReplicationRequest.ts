@@ -3,6 +3,7 @@
  */
 export default interface ReplicationRequest {
   id: string,
+  workerId?: string,
   datasetId: string,
   maxReplicas: number, // targeted replica per piece
   criteria: string, // comma separated SP
@@ -14,5 +15,7 @@ export default interface ReplicationRequest {
   duration: number, // in epoch
   isOffline: boolean,
   status: 'active' | 'paused' | 'completed' | 'error',
+  cronSchedule?: string, // if specified, each cron will trigger sending the next maxNumberOfDeals
+  cronMaxDeals?: number, // per SP total with cron considered
   errorMessage?: string
 }

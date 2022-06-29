@@ -133,6 +133,10 @@ export default class Datastore {
   private static setupReplicationRequestSchema () {
     const replicationRequestSchema = new Schema<ReplicationRequest>({
       datasetId: Schema.Types.String,
+      workerId: {
+        type: Schema.Types.String,
+        index: 1
+      },
       maxReplicas: Schema.Types.Number,
       criteria: Schema.Types.String,
       client: Schema.Types.String,
@@ -143,6 +147,8 @@ export default class Datastore {
       duration: Schema.Types.Number,
       isOffline: Schema.Types.Boolean,
       status: Schema.Types.String,
+      cronSchedule: Schema.Types.String,
+      cronMaxDeals: Schema.Types.Number,
       errorMessage: Schema.Types.String
     }, {
       timestamps: true
@@ -177,6 +183,7 @@ export default class Datastore {
     });
     dealStateSchema.index({ pieceCid: 1, provider: 1, client: 1, state: 1 });
     dealStateSchema.index({ client: 1, state: 1 });
+    dealStateSchema.index({ replicationRequestId: 1, state: 1 });
     dealStateSchema.index({ pieceCid: 1, state: 1 });
     Datastore.DealStateModel = mongoose.model<DealState>('DealState', dealStateSchema);
   }

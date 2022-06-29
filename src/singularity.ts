@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 /* eslint-disable import/first */
+/* eslint @typescript-eslint/no-var-requires: "off" */
 import { homedir } from 'os';
 import path from 'path';
 import cluster from 'node:cluster';
@@ -19,6 +20,7 @@ import GetPreparationDetailsResponse from './deal-preparation/GetPreparationDeta
 import fs from 'fs-extra';
 import Logger, { Category } from './common/Logger';
 import { Worker } from 'cluster';
+import cron from 'node-cron';
 import * as IpfsCore from 'ipfs-core';
 import DealReplicationService from './replication/DealReplicationService';
 import DealReplicationWorker from './replication/DealReplicationWorker';
@@ -349,11 +351,18 @@ replication.command('start')
   .option('-r, --verified <verified>', 'Whether to propose deal as verified. true|false.', 'true')
   .option('-d, --duration <duration>', 'Duration in days for deal length.', '500')
   .option('-o, --offline <offline>', 'Propose as offline deal.', 'true')
-  .option('-m, --max-deals <maxdeals>', 'Max number of deals in this replication request per SP.', '0')
+  .option('-m, --max-deals <maxdeals>', 'Max number of deals in this replication request per SP, per cron triggered.', '0')
+  .option('-c, --cron-schedule <cronschedule>', 'Optional cron to send deals at interval. Use double quote to wrap the format containing spaces.')
+  .option('-x, --cron-max <cronmax>', 'When cron schedule specified, limit the total number of deals across entire cron, per SP.')
   .action(async (datasetid, replica, criteria, client, options) => {
     let response!: AxiosResponse;
     try {
       console.log(options);
+      if (options.cronSchedule) {
+        if (!cron.validate(options.cronSchedule)) {
+          CliUtil.renderErrorAndExit(`Invalid cron schedule format ${options.cronSchedule}. Try https://crontab.guru/ for a sample.`);
+        }
+      }
       const url: string = config.get('connection.deal_replication_service');
       response = await axios.post(`${url}/replication`, {
         datasetId: datasetid,
@@ -365,7 +374,9 @@ replication.command('start')
         isVerfied: options.verified,
         duration: options.duration * 2880, // convert to epoch
         isOffline: options.offline,
-        maxNumberOfDeals: options.maxDeals
+        maxNumberOfDeals: options.maxDeals,
+        cronSchedule: options.cronSchedule ? options.cronSchedule : undefined,
+        cronMaxDeals: options.cronMax ? options.cronMax : undefined
       });
     } catch (error) {
       CliUtil.renderErrorAndExit(error);
@@ -403,6 +414,60 @@ replication.command('list')
     CliUtil.renderResponse(response.data, options.json);
   });
 
+replication.command('schedule')
+  .description('Change an existing deal replication request\'s cron schedule.')
+  .argument('<id>', 'Existing ID of deal replication request.')
+  .argument('<schedule>', 'Updated cron schedule.')
+  .argument('<maxDeals>', 'Updated max number of deals across entire cron schedule, per SP. Specify 0 for unlimited.')
+  .action(async (id, schedule, maxDeals, options) => {
+    if (!cron.validate(schedule)) {
+      CliUtil.renderErrorAndExit(`Invalid cron schedule format ${schedule}. Try https://crontab.guru/ for a sample.`);
+    }
+
+    let response!: AxiosResponse;
+    try {
+      const url: string = config.get('connection.deal_replication_service');
+      response = await axios.post(`${url}/replication/${id}`, {
+        cronSchedule: schedule,
+        cronMaxDeals: maxDeals
+      });
+    } catch (error) {
+      CliUtil.renderErrorAndExit(error);
+    }
+    CliUtil.renderResponse(response.data, options.json);
+  });
+
+replication.command('pause').description('Pause an active deal replication request.')
+  .option('--json', 'Output with JSON format')
+  .argument('<id>', 'Existing ID of deal replication request.')
+  .action(async (id, options) => {
+    let response!: AxiosResponse;
+    try {
+      const url: string = config.get('connection.deal_replication_service');
+      response = await axios.post(`${url}/replication/${id}`, {
+        status: 'paused'
+      });
+    } catch (error) {
+      CliUtil.renderErrorAndExit(error);
+    }
+    CliUtil.renderResponse(response.data, options.json);
+  });
+
+replication.command('resume').description('Resume a paused deal replication request.')
+  .option('--json', 'Output with JSON format')
+  .argument('<id>', 'Existing ID of deal replication request.')
+  .action(async (id, options) => {
+    let response!: AxiosResponse;
+    try {
+      const url: string = config.get('connection.deal_replication_service');
+      response = await axios.post(`${url}/replication/${id}`, {
+        status: 'active'
+      });
+    } catch (error) {
+      CliUtil.renderErrorAndExit(error);
+    }
+    CliUtil.renderResponse(response.data, options.json);
+  });
 program.showSuggestionAfterError();
 program.showHelpAfterError('(add --help for additional information)');
 program.parse();

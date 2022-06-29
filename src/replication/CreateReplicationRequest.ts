@@ -9,4 +9,6 @@ export default interface CreateReplicationRequest {
     isVerfied: string,
     duration: number,
     isOffline: string,
+    cronSchedule?: string,
+    cronMaxDeals?: number
   }
