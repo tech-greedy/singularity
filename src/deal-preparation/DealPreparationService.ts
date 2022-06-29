@@ -102,7 +102,7 @@ export default class DealPreparationService extends BaseService {
   private async cleanupHealthCheck (): Promise<void> {
     this.logger.debug(`Cleaning up health check table`);
     // Find all active workerId
-    const workerIds = (await Datastore.HealthCheckModel.find()).map(worker => worker.workerId);
+    const workerIds = [...(await Datastore.HealthCheckModel.find()).map(worker => worker.workerId), null];
     let modified = (await Datastore.ScanningRequestModel.updateMany({ workerId: { $nin: workerIds } }, { workerId: null })).modifiedCount;
     if (modified > 0) {
       this.logger.debug(`Reset ${modified} tasks from Scanning Request table`);
@@ -337,9 +337,9 @@ export default class DealPreparationService extends BaseService {
       return;
     }
     const actionMap = {
-      resume: [{ status: 'paused' }, { status: 'active' }],
-      pause: [{ status: 'active' }, { status: 'paused' }],
-      retry: [{ status: 'error' }, { status: 'active', errorMessage: undefined }]
+      resume: [{ status: 'paused' }, { status: 'active', workerId: null }],
+      pause: [{ status: 'active', workerId: null }, { status: 'paused' }],
+      retry: [{ status: 'error' }, { status: 'active', errorMessage: undefined, workerId: null }]
     };
 
     const changed = (await Datastore.ScanningRequestModel.findOneAndUpdate({

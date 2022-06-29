@@ -93,7 +93,7 @@ export default class DealPreparationWorker extends BaseService {
       }
     }
     this.logger.debug(`Finished scanning. Inserted ${index} tasks.`);
-    await Datastore.ScanningRequestModel.findByIdAndUpdate(request.id, { status: 'completed' });
+    await Datastore.ScanningRequestModel.findByIdAndUpdate(request.id, { status: 'completed', workerId: null });
   }
 
   private async generate (request: GenerationRequest, input: string): Promise<[stdout: string, stderr: string, statusCode: number | null]> {
@@ -150,7 +150,7 @@ export default class DealPreparationWorker extends BaseService {
       } catch (err) {
         if (err instanceof Error) {
           this.logger.error(`${this.workerId} - Encountered an error.`, { error: err.message });
-          await Datastore.ScanningRequestModel.findByIdAndUpdate(newScanningWork.id, { status: 'error', errorMessage: err.message });
+          await Datastore.ScanningRequestModel.findByIdAndUpdate(newScanningWork.id, { status: 'error', errorMessage: err.message, workerId: null });
           return true;
         }
         throw err;
@@ -190,7 +190,7 @@ export default class DealPreparationWorker extends BaseService {
       const [stdout, stderr, statusCode] = result!;
       if (statusCode !== 0) {
         this.logger.error(`${this.workerId} - Encountered an error.`, { stderr });
-        await Datastore.GenerationRequestModel.findByIdAndUpdate(newGenerationWork.id, { status: 'error', errorMessage: stderr }, { projection: { _id: 1 } });
+        await Datastore.GenerationRequestModel.findByIdAndUpdate(newGenerationWork.id, { status: 'error', errorMessage: stderr, workerId: null }, { projection: { _id: 1 } });
         return true;
       }
 
@@ -223,7 +223,8 @@ export default class DealPreparationWorker extends BaseService {
         dataCid: output.DataCid,
         pieceSize: output.PieceSize,
         pieceCid: output.PieceCid,
-        carSize: carFileStat.size
+        carSize: carFileStat.size,
+        workerId: null
       }, {
         projection: { _id: 1 }
       });
