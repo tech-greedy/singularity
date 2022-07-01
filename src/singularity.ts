@@ -349,6 +349,7 @@ replication.command('start')
   .option('-u, --url-prefix <urlprefix>', 'URL prefix for car downloading. Must be reachable by provider\'s boostd node.', 'http://127.0.0.1/')
   .option('-p, --price <maxprice>', 'Maximum price per epoch per GiB in Fil.', '0.000000002')
   .option('-r, --verified <verified>', 'Whether to propose deal as verified. true|false.', 'true')
+  .option('-s, --start-delay <startdelay>', 'Deal start delay in days. (StartEpoch)', '7')
   .option('-d, --duration <duration>', 'Duration in days for deal length.', '500')
   .option('-o, --offline <offline>', 'Propose as offline deal.', 'true')
   .option('-m, --max-deals <maxdeals>', 'Max number of deals in this replication request per SP, per cron triggered.', '0')
@@ -363,6 +364,9 @@ replication.command('start')
           CliUtil.renderErrorAndExit(`Invalid cron schedule format ${options.cronSchedule}. Try https://crontab.guru/ for a sample.`);
         }
       }
+      if ((options.startDelay + options.duration) > 540) {
+        CliUtil.renderErrorAndExit(`Start Delay + Duration cannot exceed 540 days.`);
+      }
       const url: string = config.get('connection.deal_replication_service');
       response = await axios.post(`${url}/replication`, {
         datasetId: datasetid,
@@ -372,6 +376,7 @@ replication.command('start')
         urlPrefix: options.urlPrefix,
         maxPrice: options.price,
         isVerfied: options.verified,
+        startDelay: options.startDelay * 2880, // convert to epoch
         duration: options.duration * 2880, // convert to epoch
         isOffline: options.offline,
         maxNumberOfDeals: options.maxDeals,

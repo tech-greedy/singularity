@@ -144,6 +144,7 @@ export default class Datastore {
       maxPrice: Schema.Types.Number,
       maxNumberOfDeals: Schema.Types.Number,
       isVerfied: Schema.Types.Boolean,
+      startDelay: Schema.Types.Number,
       duration: Schema.Types.Number,
       isOffline: Schema.Types.Boolean,
       status: Schema.Types.String,

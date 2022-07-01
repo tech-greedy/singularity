@@ -70,6 +70,7 @@ export default class DealReplicationService extends BaseService {
         maxPrice: found.maxPrice,
         maxNumberOfDeals: found.maxNumberOfDeals,
         isVerfied: String(found.isVerfied),
+        startDelay: found.startDelay,
         duration: found.duration,
         isOffline: String(found.isOffline),
         status: found.status,
@@ -154,7 +155,8 @@ export default class DealReplicationService extends BaseService {
             ]
           }
         }, {
-          status
+          status,
+          workerId: null
         }, {
           new: true
         });
@@ -177,6 +179,7 @@ export default class DealReplicationService extends BaseService {
         urlPrefix,
         maxPrice,
         isVerfied,
+        startDelay,
         duration,
         isOffline,
         maxNumberOfDeals,
@@ -210,6 +213,7 @@ export default class DealReplicationService extends BaseService {
       replicationRequest.urlPrefix = urlPrefix;
       replicationRequest.maxPrice = maxPrice;
       replicationRequest.isVerfied = isVerfied === 'true';
+      replicationRequest.startDelay = startDelay;
       replicationRequest.duration = duration;
       replicationRequest.isOffline = isOffline === 'true';
       replicationRequest.maxNumberOfDeals = maxNumberOfDeals;
@@ -242,7 +246,7 @@ export default class DealReplicationService extends BaseService {
     private async cleanupHealthCheck (): Promise<void> {
       this.logger.debug(`Cleaning up health check table`);
       // Find all active workerId
-      const workerIds = (await Datastore.HealthCheckModel.find()).map(worker => worker.workerId);
+      const workerIds = [...(await Datastore.HealthCheckModel.find()).map(worker => worker.workerId), null];
       const modified = (await Datastore.ReplicationRequestModel.updateMany({ workerId: { $nin: workerIds } }, { workerId: null })).modifiedCount;
       if (modified > 0) {
         this.logger.debug(`Reset ${modified} tasks from ReplicationRequestModel table`);

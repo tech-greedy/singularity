@@ -7,6 +7,7 @@ export default interface CreateReplicationRequest {
     maxPrice: number,
     maxNumberOfDeals: number,
     isVerfied: string,
+    startDelay: number,
     duration: number,
     isOffline: string,
     cronSchedule?: string,

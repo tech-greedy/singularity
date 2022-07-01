@@ -12,6 +12,7 @@ export default interface ReplicationRequest {
   maxPrice: number, // unit in Fil
   maxNumberOfDeals: number, // per SP, unlimited if 0
   isVerfied: boolean,
+  startDelay: number, // in epoch
   duration: number, // in epoch
   isOffline: boolean,
   status: 'active' | 'paused' | 'completed' | 'error',

@@ -3,6 +3,7 @@ import { Category } from '../common/Logger';
 import config from 'config';
 import Datastore from '../common/Datastore';
 import axios, { AxiosRequestHeaders } from 'axios';
+import DealReplicationWorker from '../replication/DealReplicationWorker';
 
 export default class DealTrackingService extends BaseService {
   public constructor () {
@@ -36,6 +37,10 @@ export default class DealTrackingService extends BaseService {
       }
       try {
         await this.updateDealFromLotus(client);
+        // only clean up expired deals when updateDealFromLotus update success
+        if (config.get('deal_replication_worker.enabled')) {
+          await this.markExpired(client);
+        }
       } catch (error) {
         this.logger.error('Encountered an error when updating deals from lotus', error);
       }
@@ -183,6 +188,24 @@ export default class DealTrackingService extends BaseService {
     } while (response.data['deals'].length > 0);
   }
   */
+  private async markExpired (client: string): Promise<void> {
+    const chainHeight = await DealReplicationWorker.getCurrentChainHeight(config.get('deal_replication_worker.lotus_cli_cmd'));
+    const modified = (await Datastore.DealStateModel.updateMany({
+      client,
+      state: {
+        $in: ['published', 'proposed']
+      },
+      expiration: {
+        $gt: 0,
+        $lt: chainHeight
+      }
+    }, {
+      $set: {
+        state: 'expired'
+      }
+    })).modifiedCount;
+    this.logger.info(`Marked ${modified} deals as expired from ${client}`);
+  }
 
   private async updateDealFromLotus (client: string): Promise<void> {
     this.logger.debug('Start update deal state from lotus.', { client });

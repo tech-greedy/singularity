@@ -8,6 +8,7 @@ export default interface GetReplicationDetailsResponse {
     maxPrice: number,
     maxNumberOfDeals: number,
     isVerfied: string,
+    startDelay: number,
     duration: number,
     isOffline: string,
     status: 'active' | 'paused' | 'completed' | 'error',
