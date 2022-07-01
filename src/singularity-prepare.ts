@@ -24,7 +24,6 @@ program.name('singularity-prepare')
   .argument('<datasetName>', 'Name of the dataset')
   .argument('<datasetPath>', 'Directory path to the dataset')
   .argument('<outDir>', 'The output Directory to save CAR files and manifest files')
-  .requiredOption('-l, --url-prefix <urlPrefix>', 'The prefix of the download link, which will be followed by datacid.car, i.e. http://download.mysite.org/')
   .option('-s, --deal-size <deal_size>', 'Target deal size, i.e. 32GiB', '32 GiB')
   .option('-t, --tmp-dir <tmp_dir>', 'Temporary directory, may be useful when dataset source is slow, such as on S3 mount or NFS')
   .addOption(new Option('-m, --min-ratio <min_ratio>', 'Min ratio of deal to sector size, i.e. 0.55').default('0.55').argParser(parseFloat))
@@ -111,7 +110,6 @@ program.name('singularity-prepare')
           piece_cid: output.PieceCid,
           payload_cid: output.DataCid,
           raw_car_file_size: carFileStat.size,
-          car_file_link: options.urlPrefix + output.DataCid + '.car',
           dataset: name,
           contents,
           groupings
