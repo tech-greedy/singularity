@@ -24,7 +24,7 @@ describe('DealPreparationWorker', () => {
         await fs.rm(file);
       }
     }
-    await fs.rm('tests/subfolder1', { recursive: true });
+    await fs.rm('tests/subfolder1', { recursive: true, force: true });
   })
   describe('startPollWork', () => {
     it('should immediately start next job if Scan work finishes', async () => {
