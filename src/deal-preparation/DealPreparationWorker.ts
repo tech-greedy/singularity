@@ -204,7 +204,7 @@ export default class DealPreparationWorker extends BaseService {
       const carFileStat = await fs.stat(carFile);
       const fileMap = new Map<string, FileInfo>();
       for (const fileInfo of fileList) {
-        fileMap.set(path.relative(newGenerationWork.path, fileInfo.path), fileInfo);
+        fileMap.set(path.relative(newGenerationWork.path, fileInfo.path).split(path.sep).join('/'), fileInfo);
       }
       const generatedFileList = DealPreparationWorker.handleGeneratedFileList(fileMap, output.CidMap);
       for (let i = 0; i < generatedFileList.length; i += 1000) {

@@ -94,7 +94,7 @@ program.name('singularity-prepare')
         const carFileStat = await fs.stat(carFile);
         const fileMap = new Map<string, FileInfo>();
         for (const fileInfo of fileList) {
-          fileMap.set(path.relative(p, fileInfo.path), fileInfo);
+          fileMap.set(path.relative(p, fileInfo.path).split(path.sep).join('/'), fileInfo);
         }
         const generatedFileList = DealPreparationWorker.handleGeneratedFileList(fileMap, output.CidMap);
 
