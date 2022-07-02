@@ -105,7 +105,7 @@ export default class IndexService extends BaseService {
         // Handle file node
         const segment = segments[segments.length - 1];
         const source = {
-          dataCid, pieceCid, selector: file.selector.slice(0, file.selector.length - 1)
+          dataCid, pieceCid, selector: file.selector!.slice(0, file.selector!.length - 1)
         };
         if (!node.sourcesMap!.has(dataCid)) {
           node.sourcesMap!.set(dataCid, source);

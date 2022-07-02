@@ -9,7 +9,6 @@ import DealPreparationService from './deal-preparation/DealPreparationService';
 import Scanner from './deal-preparation/Scanner';
 import DealPreparationWorker, { GenerateCarOutput } from './deal-preparation/DealPreparationWorker';
 import { FileInfo } from './common/model/InputFileList';
-import { GeneratedFileList } from './common/model/OutputFileList';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import TaskQueue from '@goodware/task-queue';
@@ -94,15 +93,14 @@ program.name('singularity-prepare')
         }
 
         const output :GenerateCarOutput = JSON.parse(stdout);
-        const carFile = path.join(outDir, output.DataCid + '.car');
+        const carFile = path.join(outDir, output.PieceCid + '.car');
         console.log(`Generated a new car ${carFile}`);
         const carFileStat = await fs.stat(carFile);
         const fileMap = new Map<string, FileInfo>();
         for (const fileInfo of fileList) {
           fileMap.set(path.relative(p, fileInfo.path), fileInfo);
         }
-        const generatedFileList: GeneratedFileList = [];
-        await DealPreparationWorker.populateGeneratedFileList(fileMap, output.Ipld, [], [], generatedFileList);
+        const generatedFileList = DealPreparationWorker.handleGeneratedFileList(fileMap, output.CidMap);
 
         const [contents, groupings] = DealPreparationService.getContentsAndGroupings(generatedFileList);
 
@@ -115,7 +113,7 @@ program.name('singularity-prepare')
           groupings
         };
 
-        await fs.writeJSON(path.join(outDir, `${output.DataCid}.manifest`), result);
+        await fs.writeJSON(path.join(outDir, `${output.PieceCid}.json`), result);
       });
     }
     if (task) {

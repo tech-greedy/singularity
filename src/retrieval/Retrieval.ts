@@ -118,7 +118,7 @@ export default class Retrieval {
         console.log(`${provider} has the piece ${source.dataCid}. Start retrieving...`);
         fs.rmSync(tempDir, { recursive: true, force: true });
         fs.mkdirSync(tempDir, { recursive: true });
-        const selector = source.selector.map((n) => `Links/${n}/Hash`).join('/');
+        const selector = source.selector!.map((n) => `Links/${n}/Hash`).join('/');
         const retrieveResult = spawnSync('lotus', ['client', 'retrieve', '--maxPrice', '0', '--miner', provider, '--data-selector', selector, source.dataCid, tempPath], { stdio: 'inherit' });
         if (retrieveResult.signal || retrieveResult.status !== 0) {
           console.error(retrieveResult.stderr.toString());

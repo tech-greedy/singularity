@@ -3,7 +3,7 @@ import { CID } from 'ipfs-core';
 export interface Source {
   dataCid: string,
   pieceCid: string,
-  selector: number[],
+  selector?: number[],
   from?: number,
   to?: number,
 }
