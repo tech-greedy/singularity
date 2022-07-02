@@ -1,6 +1,6 @@
 {
   "name": "@techgreedy/singularity",
-  "version": "0.0.21",
+  "version": "0.1.0",
   "description": "Large scale client tool with capabilities on onboard PB-scale data to Filecoin network",
   "main": "dist/source/start.js",
   "types": "dist/source/start.d.ts",
@@ -62,7 +62,7 @@
     "@goodware/task-queue": "^2.1.3",
     "@gzuidhof/go-npm": "^0.1.13",
     "@rauschma/stringio": "^1.4.0",
-    "@techgreedy/generate-car": "1.2.0",
+    "@techgreedy/generate-car": "2.0.0",
     "@types/node-cron": "^3.0.1",
     "async-retry": "^1.3.3",
     "await-exec": "^0.1.2",

@@ -24,6 +24,7 @@ describe('DealPreparationWorker', () => {
         await fs.rm(file);
       }
     }
+    await fs.rm('tests/subfolder1', { recursive: true, force: true });
   })
   describe('startPollWork', () => {
     it('should immediately start next job if Scan work finishes', async () => {
@@ -92,6 +93,35 @@ describe('DealPreparationWorker', () => {
         errorMessage: jasmine.stringMatching(/no such file or directory|cannot find the file/)
       }));
     })
+
+    // Unfortunately, this requires root to increase number of open files
+    xit('should generate commp, car files for dataset with > 10000 subfiles', async () => {
+      await fs.mkdir('tests/subfolder1/subfolder2', { recursive: true });
+      const fileList: FileList = []
+      for (let i = 10000; i < 20000; ++i) {
+        const p = path.join('tests/subfolder1/subfolder2', `${i}.txt`);
+        await fs.writeFile(p, i.toString())
+        fileList.push({
+          path: p,
+          size: (await fs.stat(p)).size
+        })
+      }
+      const created = await Datastore.GenerationRequestModel.create({
+        datasetId: 'id',
+        datasetName: 'name',
+        path: 'tests/subfolder1',
+        index: 0,
+        status: 'active',
+        outDir: '.',
+        tmpDir: './tmpdir'
+      });
+      await Datastore.InputFileListModel.create({
+        generationId: created.id,
+        index: 0,
+        fileList
+      })
+      await worker['pollWork']();
+    })
     it('should generate commp, car files', async () => {
       const created = await Datastore.GenerationRequestModel.create({
         datasetId: 'id',
@@ -136,26 +166,22 @@ describe('DealPreparationWorker', () => {
             path: '',
             dir: true,
             cid: 'bafybeih2nwd66s7rstnbj4grzjw7re4lyhmx3auvphibbz7nalo4ygfypq',
-            selector: []
           }),
           jasmine.objectContaining({
             path: 'a',
             dir: true,
             cid: 'bafybeifd34zco7545dzqflv7djpi3q2l2egi4l4coohgftgjssn4zoeu2y',
-            selector: [0]
           }),
           jasmine.objectContaining({
             path: path.join('a', '1.txt'),
             size: 3,
             dir: false,
             cid: 'bafkreiey5jxe6ilpf62lnh77tm5ejbbmhbugzjuf6p2v3remlu73ced34q',
-            selector: [0, 0],
           }),
           jasmine.objectContaining({
             path: 'b',
             dir: true,
             cid: 'bafybeif7zaqg45xk5zvwybbfgeiotkzvjmd4bpjasb4aevne57dpt67com',
-            selector: [1]
           }),
           jasmine.objectContaining({
             path: path.join('b', '2.txt'),
@@ -164,7 +190,6 @@ describe('DealPreparationWorker', () => {
             end: 9,
             dir: false,
             cid: 'bafkreiblmv6wzk3grdk7u5a7u5zqh5vez3zatwuk3ptparw45unujqxysi',
-            selector: [1, 0]
           }),
         ]
       }))
