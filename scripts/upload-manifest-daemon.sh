@@ -15,13 +15,13 @@ if [ -z "${WEB3_STORAGE_TOKEN}" ]; then
   echo "Environment variable WEB3_STORAGE_TOKEN not set"
   exit 1
 fi
-if [ "$#" -ne 2 ]; then
-  echo "Argument not supplied. Example: ./upload-manifest-daemon.sh <data_preparation_service_endpoint> <datasetName>"
-  echo "By default, data_preparation_service_endpoint is set to http://127.0.0.1:7001 - check default.toml file in singularity repo"
+if [ "$#" -lt 1 ]; then
+  echo "Argument not supplied. Example: ./upload-manifest-daemon.sh <datasetName> [data_preparation_service_endpoint]"
+  echo "By default, data_preparation_service_endpoint is set to http://127.0.0.1:7001 if you haven't modified default.toml in singularity repo"
   exit 1
 fi
-endpoint=$1
-name=$2
+endpoint=${2:-http://127.0.0.1:7001}
+name=$1
 for row in $(curl ${endpoint}/preparation/${name} 2>/dev/null | jq -c .generationRequests[])
 do
   id=$(jq '.id' <<< "$row" | tr -d '"')
