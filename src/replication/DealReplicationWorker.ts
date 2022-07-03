@@ -245,7 +245,7 @@ export default class DealReplicationWorker extends BaseService {
       replicationRequestId: request2Check.id,
       state: {
         $nin: [
-          'slashed', 'error', 'expired'
+          'slashed', 'error', 'expired', 'proposal_expired'
         ]
       }
     });
@@ -337,7 +337,7 @@ export default class DealReplicationWorker extends BaseService {
         // check if the car has already dealt or have enough replica
         const existingDeals = await Datastore.DealStateModel.find({
           pieceCid: carFile.pieceCid,
-          state: { $nin: ['slashed', 'error', 'expired'] }
+          state: { $nin: ['slashed', 'error', 'expired', 'proposal_expired'] }
         });
         let alreadyDealt = false;
         for (let k = 0; k < existingDeals.length; k++) {
@@ -418,7 +418,8 @@ export default class DealReplicationWorker extends BaseService {
           dealCid: dealCid,
           dataCid: carFile.dataCid,
           pieceCid: carFile.pieceCid,
-          expiration: startEpoch, // aka start epoch
+          startEpoch: startEpoch,
+          expiration: startEpoch + replicationRequest.duration,
           duration: replicationRequest.duration,
           price: replicationRequest.maxPrice, // unit is Fil per epoch per GB
           verified: replicationRequest.isVerfied,

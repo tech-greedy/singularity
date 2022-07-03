@@ -164,6 +164,7 @@ export default class Datastore {
       dealCid: Schema.Types.String,
       dataCid: Schema.Types.String,
       pieceCid: Schema.Types.String,
+      startEpoch: Schema.Types.Number,
       expiration: Schema.Types.Number,
       duration: Schema.Types.Number,
       price: Schema.Types.Number,
