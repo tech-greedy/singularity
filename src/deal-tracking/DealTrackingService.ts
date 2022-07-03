@@ -214,7 +214,7 @@ export default class DealTrackingService extends BaseService {
       },
       expiration: {
         $gt: 0,
-        $lt: chainHeight,
+        $lt: chainHeight
       }
     }, {
       $set: {
