@@ -236,3 +236,5 @@ Whether to enable the worker and how many worker instances. As a rule of thumb, 
 Only Deal Preparation works and Indexing works in Windows.
 Deal Replication and Retrieval only works in Linux/Mac due to dependency restrictions. 
 
+### Error - too many open files
+In case that one CAR contains more files than allowed by OS, you will need to increase the open file limit with `ulimit`, or `LimitNOFILE` if using systemd.
