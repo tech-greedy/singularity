@@ -180,7 +180,7 @@ export default class DealReplicationWorker extends BaseService {
     if (!downloadUrl.endsWith('/')) {
       downloadUrl += '/';
     }
-    let carFilename = carFile.dataCid + '.car';
+    let carFilename = carFile.pieceCid + '.car';
     if (carFile.filenameOverride) {
       carFilename = carFile.filenameOverride;
       if (!carFile.filenameOverride.endsWith('.car')) {

@@ -5,7 +5,7 @@ export interface GeneratedFileInfo {
   size?: number,
   start?: number,
   end?: number,
-  selector: number[],
+  selector?: number[],
   cid: string
 }
 

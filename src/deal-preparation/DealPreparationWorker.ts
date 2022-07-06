@@ -21,11 +21,16 @@ interface IpldNode {
   Link: IpldNode[] | null
 }
 
+interface CidMapType {[key: string] : {
+  IsDir: boolean, Cid: string
+}}
+
 export interface GenerateCarOutput {
   Ipld: IpldNode,
   PieceSize: number,
   PieceCid: string,
-  DataCid: string
+  DataCid: string,
+  CidMap: CidMapType
 }
 
 export default class DealPreparationWorker extends BaseService {
@@ -195,14 +200,13 @@ export default class DealPreparationWorker extends BaseService {
       }
 
       const output :GenerateCarOutput = JSON.parse(stdout);
-      const carFile = path.join(newGenerationWork.outDir, output.DataCid + '.car');
+      const carFile = path.join(newGenerationWork.outDir, output.PieceCid + '.car');
       const carFileStat = await fs.stat(carFile);
       const fileMap = new Map<string, FileInfo>();
       for (const fileInfo of fileList) {
-        fileMap.set(path.relative(newGenerationWork.path, fileInfo.path), fileInfo);
+        fileMap.set(path.relative(newGenerationWork.path, fileInfo.path).split(path.sep).join('/'), fileInfo);
       }
-      const generatedFileList: GeneratedFileList = [];
-      await DealPreparationWorker.populateGeneratedFileList(fileMap, output.Ipld, [], [], generatedFileList);
+      const generatedFileList = DealPreparationWorker.handleGeneratedFileList(fileMap, output.CidMap);
       for (let i = 0; i < generatedFileList.length; i += 1000) {
         await Datastore.OutputFileListModel.updateOne({
           generationId: newGenerationWork.id,
@@ -238,38 +242,30 @@ export default class DealPreparationWorker extends BaseService {
     return newGenerationWork != null;
   }
 
-  public static async populateGeneratedFileList (
+  public static handleGeneratedFileList (
     fileMap: Map<string, FileInfo>,
-    ipld: IpldNode, segments: string[],
-    selector: number[],
-    list: GeneratedFileList) : Promise<void> {
-    const relPath = segments.length > 0 ? path.join(...segments) : '';
-    if (ipld.Link == null) {
-      const fileInfo = fileMap.get(relPath)!;
+    cidMap: CidMapType) : GeneratedFileList {
+    const list: GeneratedFileList = [];
+    for (const path in cidMap) {
+      if (cidMap[path].IsDir) {
+        list.push({
+          path,
+          dir: cidMap[path].IsDir,
+          cid: cidMap[path].Cid
+        });
+        continue;
+      }
+      const fileInfo = fileMap.get(path)!;
       list.push({
-        path: relPath,
-        dir: false,
+        path,
+        dir: cidMap[path].IsDir,
+        cid: cidMap[path].Cid,
         size: fileInfo.size,
         start: fileInfo.start,
-        end: fileInfo.end,
-        cid: ipld.Hash,
-        selector: [...selector]
+        end: fileInfo.end
       });
-    } else {
-      list.push({
-        path: relPath,
-        dir: true,
-        cid: ipld.Hash,
-        selector: [...selector]
-      });
-      for (let linkId = 0; linkId < ipld.Link.length; ++linkId) {
-        selector.push(linkId);
-        segments.push(ipld.Link[linkId].Name);
-        await DealPreparationWorker.populateGeneratedFileList(fileMap, ipld.Link[linkId], segments, selector, list);
-        selector.pop();
-        segments.pop();
-      }
     }
+    return list;
   }
 
   private readonly PollInterval = 5000;

@@ -9,7 +9,6 @@ import DealPreparationService from './deal-preparation/DealPreparationService';
 import Scanner from './deal-preparation/Scanner';
 import DealPreparationWorker, { GenerateCarOutput } from './deal-preparation/DealPreparationWorker';
 import { FileInfo } from './common/model/InputFileList';
-import { GeneratedFileList } from './common/model/OutputFileList';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import TaskQueue from '@goodware/task-queue';
@@ -24,9 +23,8 @@ program.name('singularity-prepare')
   .argument('<datasetName>', 'Name of the dataset')
   .argument('<datasetPath>', 'Directory path to the dataset')
   .argument('<outDir>', 'The output Directory to save CAR files and manifest files')
-  .requiredOption('-l, --url-prefix <urlPrefix>', 'The prefix of the download link, which will be followed by datacid.car, i.e. http://download.mysite.org/')
-  .option('-s, --deal-size <deal_size>', 'Target deal size, i.e. 32GiB', '32 GiB')
-  .option('-t, --tmp-dir <tmp_dir>', 'Temporary directory, may be useful when dataset source is slow, such as on S3 mount or NFS')
+  .option('-s, --deal-size <deal_size>', 'Target deal size, i.e. 32GiB', '32GiB')
+  .option('-t, --tmp-dir <tmp_dir>', 'Optional temporary directory. May be useful when it is at least 2x faster than the dataset source, such as when the dataset is on network mount, and the I/O is the bottleneck')
   .addOption(new Option('-m, --min-ratio <min_ratio>', 'Min ratio of deal to sector size, i.e. 0.55').default('0.55').argParser(parseFloat))
   .addOption(new Option('-M, --max-ratio <max_ratio>', 'Max ratio of deal to sector size, i.e. 0.95').default('0.95').argParser(parseFloat))
   .addOption(new Option('-j, --parallel <parallel>', 'How many generation jobs to run at the same time').default('1'))
@@ -64,10 +62,6 @@ program.name('singularity-prepare')
     const minSize = Math.round(minRatio * dealSizeNumber);
     const maxSize = Math.round(maxRatio * dealSizeNumber);
     console.error(`Generating with minSize ${minSize}, maxSize ${maxSize}`);
-    if (!options.urlPrefix.endsWith('/')) {
-      options.urlPrefix = options.urlPrefix + '/';
-    }
-
     const queue = new TaskQueue({ workers: parseInt(options.parallel) });
     let task;
     for await (const fileList of Scanner.scan(p, minSize, maxSize)) {
@@ -95,15 +89,14 @@ program.name('singularity-prepare')
         }
 
         const output :GenerateCarOutput = JSON.parse(stdout);
-        const carFile = path.join(outDir, output.DataCid + '.car');
+        const carFile = path.join(outDir, output.PieceCid + '.car');
         console.log(`Generated a new car ${carFile}`);
         const carFileStat = await fs.stat(carFile);
         const fileMap = new Map<string, FileInfo>();
         for (const fileInfo of fileList) {
-          fileMap.set(path.relative(p, fileInfo.path), fileInfo);
+          fileMap.set(path.relative(p, fileInfo.path).split(path.sep).join('/'), fileInfo);
         }
-        const generatedFileList: GeneratedFileList = [];
-        await DealPreparationWorker.populateGeneratedFileList(fileMap, output.Ipld, [], [], generatedFileList);
+        const generatedFileList = DealPreparationWorker.handleGeneratedFileList(fileMap, output.CidMap);
 
         const [contents, groupings] = DealPreparationService.getContentsAndGroupings(generatedFileList);
 
@@ -111,13 +104,12 @@ program.name('singularity-prepare')
           piece_cid: output.PieceCid,
           payload_cid: output.DataCid,
           raw_car_file_size: carFileStat.size,
-          car_file_link: options.urlPrefix + output.DataCid + '.car',
           dataset: name,
           contents,
           groupings
         };
 
-        await fs.writeJSON(path.join(outDir, `${output.DataCid}.manifest`), result);
+        await fs.writeJSON(path.join(outDir, `${output.PieceCid}.json`), result);
       });
     }
     if (task) {
