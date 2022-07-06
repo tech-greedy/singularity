@@ -7,9 +7,14 @@ export default class GenerateCar {
     if (!GenerateCar.path) {
       let dir = path.dirname(require.main!.filename);
       for (let i = 0; i < 10; ++i) {
-        const p = path.join(dir, 'node_modules', '.bin', 'generate-car');
-        if (fs.existsSync(p)) {
-          GenerateCar.path = p;
+        const p1 = path.join(dir, 'node_modules', '.bin', 'generate-car');
+        const p2 = path.join(dir, 'node_modules', 'bin', 'generate-car');
+        if (fs.existsSync(p1)) {
+          GenerateCar.path = p1;
+          break;
+        }
+        if (fs.existsSync(p2)) {
+          GenerateCar.path = p2;
           break;
         }
         dir = path.dirname(dir);
