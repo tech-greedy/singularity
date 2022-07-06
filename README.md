@@ -188,6 +188,48 @@ $ singularity prep generation-status -h
 $ singularity prep generation-manifest -h
 ```
 
+## Deal Replication
+Deal replication module supports both lotus-market and boost based storage providers (later on we might deprecate lotus-market support).
+Currently it is required to have both lotus and boost cli binary in order for this module to work. 
+
+### Configuration
+Look for `default.toml` in the initialized repo, verify in the [deal_replication_worker] section, both binary can be accessed.
+If you need to specify environment variable like FULLNODE_API_INFO, it can also be specified there.
+
+### Deal making
+```shell
+$ singularity repl start -h                                                                 
+Usage: singularity replication start [options] <datasetid> <storage-providers> <client> [# of replica]
+
+Start deal replication for a prepared local dataset
+
+Arguments:
+  datasetid                            Existing ID of dataset prepared.
+  storage-providers                    Comma separated storage provider list
+  client                               Client address where deals are proposed from
+  # of replica                         Number of targeting replica of the dataset (default: 10)
+
+Options:
+  -u, --url-prefix <urlprefix>         URL prefix for car downloading. Must be reachable by provider's boostd node. (default: "http://127.0.0.1/")
+  -p, --price <maxprice>               Maximum price per epoch per GiB in Fil. (default: "0")
+  -r, --verified <verified>            Whether to propose deal as verified. true|false. (default: "true")
+  -s, --start-delay <startdelay>       Deal start delay in days. (StartEpoch) (default: "7")
+  -d, --duration <duration>            Duration in days for deal length. (default: "525")
+  -o, --offline <offline>              Propose as offline deal. (default: "true")
+  -m, --max-deals <maxdeals>           Max number of deals in this replication request per SP, per cron triggered. (default: "0")
+  -c, --cron-schedule <cronschedule>   Optional cron to send deals at interval. Use double quote to wrap the format containing spaces.
+  -x, --cron-max-deals <cronmaxdeals>  When cron schedule specified, limit the total number of deals across entire cron, per SP.
+  -h, --help                           display help for command
+```
+A simple example to send all car files in one prepared dataset "CommonCrawl" to one storage provider f01234 immediately:
+```shell
+$ singularity repl start CommonCrawl f01234 f15djc5avdxihgu234231rfrrzbvnnqvzurxe55kja
+```
+A more complex example, send 10 deals to storage provider f01234 and f05678, every hour on the 1st minute from prepared dataset "CommonCrawl", until all CAR files are dealt.
+```shell
+$ singularity repl start -m 10 -c "1 * * * *" CommonCrawl f01234,f05678 f15djc5avdxihgu234231rfrrzbvnnqvzurxe55kja
+```
+
 ## Configuration
 Look for `default.toml` in the initialized repo
 
