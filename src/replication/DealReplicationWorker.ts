@@ -114,7 +114,11 @@ export default class DealReplicationWorker extends BaseService {
       } catch (err) {
         if (err instanceof Error) {
           this.logger.error(`${this.workerId} - Encountered an error - ${err.message}`);
-          await Datastore.ReplicationRequestModel.findByIdAndUpdate(newReplicationWork.id, { status: 'error', errorMessage: err.message });
+          await Datastore.ReplicationRequestModel.findByIdAndUpdate(newReplicationWork.id, {
+            status: 'error',
+            workerId: null,
+            errorMessage: err.message
+          });
           return true;
         }
         throw err;
@@ -125,14 +129,14 @@ export default class DealReplicationWorker extends BaseService {
   }
 
   /**
-   * Create providers list by criteria. Currently it is just a list of providers separated by comma.
+   * Create providers list by storageProviders. Currently it is just a list of providers separated by comma.
    * TODO marking this function as async pending future Pando integration
    *
-   * @param criteria
+   * @param storageProviders
    * @returns
    */
-  private static async generateProvidersList (criteria: string): Promise<Array<string>> {
-    return criteria.split(',');
+  private static async generateProvidersList (storageProviders: string): Promise<Array<string>> {
+    return storageProviders.split(',');
   }
 
   /**
@@ -197,14 +201,21 @@ export default class DealReplicationWorker extends BaseService {
     }
   }
 
-  private async createDealCmd (useLotus: boolean, provider: string, replicationRequest: ReplicationRequest, carFile: GenerationRequest): Promise<string> {
+  public static async getCurrentChainHeight (lotusCmd: string): Promise<number> {
+    const cmdOut = await exec(`${lotusCmd} chain list --count 1 --format "<height>"`);
+    return parseInt(cmdOut.stdout);
+  }
+
+  private async createDealCmd (useLotus: boolean, provider: string, replicationRequest: ReplicationRequest,
+    carFile: GenerationRequest, startEpoch: number): Promise<string> {
     if (useLotus) {
       if (replicationRequest.isOffline) {
-        const priceInFilWithSize = math.format(DealReplicationWorker.calculatePriceWithSize(replicationRequest.maxPrice, carFile.pieceSize!).toNumber(), { notation: 'fixed' });
+        const priceInFilWithSize = math.format(DealReplicationWorker.calculatePriceWithSize(replicationRequest.maxPrice, carFile.pieceSize!).toNumber(),
+          { notation: 'fixed' });
         const unpaddedSize = carFile.pieceSize! * 127 / 128;
         const manualStateless = replicationRequest.maxPrice > 0 ? '' : '--manual-stateless-deal';// only zero priced deal support manual stateless deal
         return `${this.lotusCMD} client deal --manual-piece-cid=${carFile.pieceCid} --manual-piece-size=${unpaddedSize} ` +
-          `${manualStateless} --from=${replicationRequest.client} --verified-deal=${replicationRequest.isVerfied} ` +
+          `${manualStateless} --from=${replicationRequest.client} --verified-deal=${replicationRequest.isVerfied} --start-epoch=${startEpoch} ` +
           `${carFile.dataCid} ${provider} ${priceInFilWithSize} ${replicationRequest.duration}`;
       } else {
         throw new Error(`Deal making failed. SP ${provider} only supports lotus and for lotus we only support offline deals.`);
@@ -222,19 +233,19 @@ export default class DealReplicationWorker extends BaseService {
         propose = `offline-deal`;
       }
       return `${this.boostCMD} ${propose} --provider=${provider}  --commp=${carFile.pieceCid} --car-size=${carFile.carSize} ` +
-        `--piece-size=${carFile.pieceSize} --payload-cid=${carFile.dataCid} --storage-price=${priceInAttoWithoutSize} ` +
+        `--piece-size=${carFile.pieceSize} --payload-cid=${carFile.dataCid} --storage-price=${priceInAttoWithoutSize} --start-epoch=${startEpoch} ` +
         `--verified=${replicationRequest.isVerfied} --wallet=${replicationRequest.client} --duration=${replicationRequest.duration}`;
     }
   }
 
   private async checkAndMarkCompletion (request2Check: ReplicationRequest, carCount: number): Promise<boolean> {
     const maxNumberOfDeals = request2Check.cronSchedule ? request2Check.cronMaxDeals : request2Check.maxNumberOfDeals;
-    const numberOfSPs = (await DealReplicationWorker.generateProvidersList(request2Check.criteria)).length;
+    const numberOfSPs = (await DealReplicationWorker.generateProvidersList(request2Check.storageProviders)).length;
     const actualDealsCount = await Datastore.DealStateModel.count({
       replicationRequestId: request2Check.id,
       state: {
         $nin: [
-          'slashed', 'error'
+          'slashed', 'error', 'expired', 'proposal_expired'
         ]
       }
     });
@@ -252,7 +263,8 @@ export default class DealReplicationWorker extends BaseService {
       await Datastore.ReplicationRequestModel.findOneAndUpdate({
         _id: request2Check.id
       }, {
-        status: 'completed'
+        status: 'completed',
+        workerId: null
       });
       if (request2Check.cronSchedule && this.cronRefArray.has(request2Check.id)) {
         const [schedule, taskRef] = this.cronRefArray.get(request2Check.id)!;
@@ -273,7 +285,7 @@ export default class DealReplicationWorker extends BaseService {
    */
   private async replicate (replicationRequest: ReplicationRequest): Promise<void> {
     this.logger.debug(`Start replication ${replicationRequest.id}`);
-    const providers = await DealReplicationWorker.generateProvidersList(replicationRequest.criteria);
+    const providers = await DealReplicationWorker.generateProvidersList(replicationRequest.storageProviders);
     const boostResultUUIDMatcher = /deal uuid: (\S+)/;
     let breakOuter = false; // set this to true will terminate all concurrent deal making thread
     const makeDealAll = providers.map(async (provider) => {
@@ -325,7 +337,7 @@ export default class DealReplicationWorker extends BaseService {
         // check if the car has already dealt or have enough replica
         const existingDeals = await Datastore.DealStateModel.find({
           pieceCid: carFile.pieceCid,
-          state: { $nin: ['slashed', 'error'] }
+          state: { $nin: ['slashed', 'error', 'expired', 'proposal_expired'] }
         });
         let alreadyDealt = false;
         for (let k = 0; k < existingDeals.length; k++) {
@@ -345,9 +357,13 @@ export default class DealReplicationWorker extends BaseService {
           continue; // go to next file
         }
 
+        const startDelay = replicationRequest.startDelay ? replicationRequest.startDelay : 20160;
+        const currentHeight = await DealReplicationWorker.getCurrentChainHeight(this.lotusCMD);
+        const startEpoch = startDelay + currentHeight;
+        this.logger.debug(`Calculated start epoch startDelay: ${startDelay} + currentHeight: ${currentHeight} = ${startEpoch}`);
         let dealCmd = '';
         try {
-          dealCmd = await this.createDealCmd(useLotus, provider, replicationRequest, carFile);
+          dealCmd = await this.createDealCmd(useLotus, provider, replicationRequest, carFile, startEpoch);
         } catch (error) {
           this.logger.error(`Deal CMD generation failed`, error);
           return;
@@ -402,7 +418,8 @@ export default class DealReplicationWorker extends BaseService {
           dealCid: dealCid,
           dataCid: carFile.dataCid,
           pieceCid: carFile.pieceCid,
-          expiration: 0,
+          startEpoch: startEpoch,
+          expiration: startEpoch + replicationRequest.duration,
           duration: replicationRequest.duration,
           price: replicationRequest.maxPrice, // unit is Fil per epoch per GB
           verified: replicationRequest.isVerfied,

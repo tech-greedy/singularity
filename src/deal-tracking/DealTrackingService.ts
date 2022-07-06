@@ -3,6 +3,7 @@ import { Category } from '../common/Logger';
 import config from 'config';
 import Datastore from '../common/Datastore';
 import axios, { AxiosRequestHeaders } from 'axios';
+import DealReplicationWorker from '../replication/DealReplicationWorker';
 
 export default class DealTrackingService extends BaseService {
   public constructor () {
@@ -36,6 +37,10 @@ export default class DealTrackingService extends BaseService {
       }
       try {
         await this.updateDealFromLotus(client);
+        // only clean up expired deals when updateDealFromLotus update success
+        if (config.get('deal_replication_worker.enabled')) {
+          await this.markExpired(client);
+        }
       } catch (error) {
         this.logger.error('Encountered an error when updating deals from lotus', error);
       }
@@ -60,7 +65,7 @@ export default class DealTrackingService extends BaseService {
       if (client.startsWith('t')) {
         url = 'https://calibration.filscan.io:8700/rpc/v1';
       }
-      this.logger.debug(`Fetching from ${url}`);
+      this.logger.debug(`Fetching from ${url}, page ${page}`);
       response = await axios.post(url, {
         id: 1,
         jsonrpc: '2.0',
@@ -110,6 +115,7 @@ export default class DealTrackingService extends BaseService {
               dealId: deal['dealid'],
               dealCid: deal['cid'],
               pieceCid: deal['piece_cid'],
+              startEpoch: deal['start_epoch'],
               expiration: deal['end_epoch'],
               duration: deal['end_epoch'] - deal['start_epoch'],
               state: 'published'
@@ -183,6 +189,40 @@ export default class DealTrackingService extends BaseService {
     } while (response.data['deals'].length > 0);
   }
   */
+  private async markExpired (client: string): Promise<void> {
+    const chainHeight = await DealReplicationWorker.getCurrentChainHeight(config.get('deal_replication_worker.lotus_cli_cmd'));
+    let modified = (await Datastore.DealStateModel.updateMany({
+      client,
+      state: {
+        $in: ['published', 'proposed']
+      },
+      startEpoch: {
+        $gt: 0,
+        $lt: chainHeight
+      }
+    }, {
+      $set: {
+        state: 'proposal_expired'
+      }
+    })).modifiedCount;
+    this.logger.info(`Marked ${modified} deals as proposal_expired from ${client}`);
+
+    modified = (await Datastore.DealStateModel.updateMany({
+      client,
+      state: {
+        $in: ['active']
+      },
+      expiration: {
+        $gt: 0,
+        $lt: chainHeight
+      }
+    }, {
+      $set: {
+        state: 'expired'
+      }
+    })).modifiedCount;
+    this.logger.info(`Marked ${modified} deals as expired from ${client}`);
+  }
 
   private async updateDealFromLotus (client: string): Promise<void> {
     this.logger.debug('Start update deal state from lotus.', { client });

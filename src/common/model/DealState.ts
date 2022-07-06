@@ -8,11 +8,12 @@ export default interface DealState {
   dealCid: string,
   dataCid: string,
   pieceCid: string,
+  startEpoch: number,
   expiration: number,
   duration: number,
   price: number, // unit is Fil
   verified: boolean,
-  state: 'proposed' | 'published' | 'active' | 'slashed' | 'error',
+  state: 'proposed' | 'published' | 'active' | 'proposal_expired' | 'expired' | 'slashed' | 'error',
   replicationRequestId: string,
   datasetId: string,
   dealId?: number,

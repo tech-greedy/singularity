@@ -2,7 +2,7 @@ export interface GetReplicationsResponseItem {
     id: string,
     datasetId: string,
     replica: number,
-    criteria: string,
+    storageProviders: string,
     client: string,
     maxNumberOfDeals: number,
     status: 'active' | 'paused' | 'completed' | 'error',

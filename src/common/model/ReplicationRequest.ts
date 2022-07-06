@@ -6,12 +6,13 @@ export default interface ReplicationRequest {
   workerId?: string,
   datasetId: string,
   maxReplicas: number, // targeted replica per piece
-  criteria: string, // comma separated SP
+  storageProviders: string, // comma separated SP
   client: string, // deal sent from client address
   urlPrefix: string,
   maxPrice: number, // unit in Fil
   maxNumberOfDeals: number, // per SP, unlimited if 0
   isVerfied: boolean,
+  startDelay: number, // in epoch
   duration: number, // in epoch
   isOffline: boolean,
   status: 'active' | 'paused' | 'completed' | 'error',
