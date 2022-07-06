@@ -138,7 +138,7 @@ export default class Datastore {
         index: 1
       },
       maxReplicas: Schema.Types.Number,
-      criteria: Schema.Types.String,
+      storageProviders: Schema.Types.String,
       client: Schema.Types.String,
       urlPrefix: Schema.Types.String,
       maxPrice: Schema.Types.Number,

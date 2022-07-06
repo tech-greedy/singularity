@@ -129,14 +129,14 @@ export default class DealReplicationWorker extends BaseService {
   }
 
   /**
-   * Create providers list by criteria. Currently it is just a list of providers separated by comma.
+   * Create providers list by storageProviders. Currently it is just a list of providers separated by comma.
    * TODO marking this function as async pending future Pando integration
    *
-   * @param criteria
+   * @param storageProviders
    * @returns
    */
-  private static async generateProvidersList (criteria: string): Promise<Array<string>> {
-    return criteria.split(',');
+  private static async generateProvidersList (storageProviders: string): Promise<Array<string>> {
+    return storageProviders.split(',');
   }
 
   /**
@@ -240,7 +240,7 @@ export default class DealReplicationWorker extends BaseService {
 
   private async checkAndMarkCompletion (request2Check: ReplicationRequest, carCount: number): Promise<boolean> {
     const maxNumberOfDeals = request2Check.cronSchedule ? request2Check.cronMaxDeals : request2Check.maxNumberOfDeals;
-    const numberOfSPs = (await DealReplicationWorker.generateProvidersList(request2Check.criteria)).length;
+    const numberOfSPs = (await DealReplicationWorker.generateProvidersList(request2Check.storageProviders)).length;
     const actualDealsCount = await Datastore.DealStateModel.count({
       replicationRequestId: request2Check.id,
       state: {
@@ -285,7 +285,7 @@ export default class DealReplicationWorker extends BaseService {
    */
   private async replicate (replicationRequest: ReplicationRequest): Promise<void> {
     this.logger.debug(`Start replication ${replicationRequest.id}`);
-    const providers = await DealReplicationWorker.generateProvidersList(replicationRequest.criteria);
+    const providers = await DealReplicationWorker.generateProvidersList(replicationRequest.storageProviders);
     const boostResultUUIDMatcher = /deal uuid: (\S+)/;
     let breakOuter = false; // set this to true will terminate all concurrent deal making thread
     const makeDealAll = providers.map(async (provider) => {

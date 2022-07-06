@@ -1,7 +1,7 @@
 export default interface GetReplicationDetailsResponse {
     id: string,
     datasetId: string,
-    criteria: string,
+    storageProviders: string,
     client: string,
     replica: number,
     urlPrefix: string,

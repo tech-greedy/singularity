@@ -64,7 +64,7 @@ export default class DealReplicationService extends BaseService {
         id: found.id,
         datasetId: found.datasetId,
         replica: found.maxReplicas,
-        criteria: found.criteria,
+        storageProviders: found.storageProviders,
         client: found.client,
         urlPrefix: found.urlPrefix,
         maxPrice: found.maxPrice,
@@ -89,7 +89,7 @@ export default class DealReplicationService extends BaseService {
           id: r.id,
           datasetId: r.datasetId,
           replica: r.maxReplicas,
-          criteria: r.criteria,
+          storageProviders: r.storageProviders,
           client: r.client,
           maxNumberOfDeals: r.maxNumberOfDeals,
           status: r.status,
@@ -174,7 +174,7 @@ export default class DealReplicationService extends BaseService {
       const {
         datasetId,
         replica,
-        criteria,
+        storageProviders,
         client,
         urlPrefix,
         maxPrice,
@@ -208,7 +208,7 @@ export default class DealReplicationService extends BaseService {
       const replicationRequest = new Datastore.ReplicationRequestModel();
       replicationRequest.datasetId = realDatasetId;
       replicationRequest.maxReplicas = replica;
-      replicationRequest.criteria = criteria;
+      replicationRequest.storageProviders = storageProviders;
       replicationRequest.client = client;
       replicationRequest.urlPrefix = urlPrefix;
       replicationRequest.maxPrice = maxPrice;

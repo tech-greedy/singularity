@@ -6,7 +6,7 @@ export default interface ReplicationRequest {
   workerId?: string,
   datasetId: string,
   maxReplicas: number, // targeted replica per piece
-  criteria: string, // comma separated SP
+  storageProviders: string, // comma separated SP
   client: string, // deal sent from client address
   urlPrefix: string,
   maxPrice: number, // unit in Fil

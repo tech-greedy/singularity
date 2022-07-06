@@ -1,7 +1,7 @@
 export default interface CreateReplicationRequest {
     datasetId: string,
     replica: number,
-    criteria: string,
+    storageProviders: string,
     client: string,
     urlPrefix: string,
     maxPrice: number,

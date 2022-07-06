@@ -338,35 +338,35 @@ const replication = program.command('replication')
 replication.command('start')
   .description('Start deal replication for a prepared local dataset')
   .argument('<datasetid>', 'Existing ID of dataset prepared.')
-  .argument('<# of replica>', 'Number of targeting replica of the dataset')
-  .argument('<criteria>', 'Comma separated miner list')
+  .argument('<storage-providers>', 'Comma separated storage provider list')
   .argument('<client>', 'Client address where deals are proposed from')
+  .argument('[# of replica]', 'Number of targeting replica of the dataset', 10)
   .option('-u, --url-prefix <urlprefix>', 'URL prefix for car downloading. Must be reachable by provider\'s boostd node.', 'http://127.0.0.1/')
-  .option('-p, --price <maxprice>', 'Maximum price per epoch per GiB in Fil.', '0.000000002')
+  .option('-p, --price <maxprice>', 'Maximum price per epoch per GiB in Fil.', '0')
   .option('-r, --verified <verified>', 'Whether to propose deal as verified. true|false.', 'true')
   .option('-s, --start-delay <startdelay>', 'Deal start delay in days. (StartEpoch)', '7')
-  .option('-d, --duration <duration>', 'Duration in days for deal length.', '500')
+  .option('-d, --duration <duration>', 'Duration in days for deal length.', '525')
   .option('-o, --offline <offline>', 'Propose as offline deal.', 'true')
   .option('-m, --max-deals <maxdeals>', 'Max number of deals in this replication request per SP, per cron triggered.', '0')
   .option('-c, --cron-schedule <cronschedule>', 'Optional cron to send deals at interval. Use double quote to wrap the format containing spaces.')
-  .option('-x, --cron-max <cronmax>', 'When cron schedule specified, limit the total number of deals across entire cron, per SP.')
-  .action(async (datasetid, replica, criteria, client, options) => {
+  .option('-x, --cron-max-deals <cronmaxdeals>', 'When cron schedule specified, limit the total number of deals across entire cron, per SP.')
+  .action(async (datasetid, storageProviders, client, replica, options) => {
     let response!: AxiosResponse;
     try {
-      console.log(options);
+      console.log(datasetid, storageProviders, client, replica, options);
       if (options.cronSchedule) {
         if (!cron.validate(options.cronSchedule)) {
           CliUtil.renderErrorAndExit(`Invalid cron schedule format ${options.cronSchedule}. Try https://crontab.guru/ for a sample.`);
         }
       }
-      if ((options.startDelay + options.duration) > 540) {
+      if ((options.startDelay * 1 + options.duration * 1) > 540) {
         CliUtil.renderErrorAndExit(`Start Delay + Duration cannot exceed 540 days.`);
       }
       const url: string = config.get('connection.deal_replication_service');
       response = await axios.post(`${url}/replication`, {
         datasetId: datasetid,
         replica: replica,
-        criteria: criteria,
+        storageProviders: storageProviders,
         client: client,
         urlPrefix: options.urlPrefix,
         maxPrice: options.price,
@@ -376,7 +376,7 @@ replication.command('start')
         isOffline: options.offline,
         maxNumberOfDeals: options.maxDeals,
         cronSchedule: options.cronSchedule ? options.cronSchedule : undefined,
-        cronMaxDeals: options.cronMax ? options.cronMax : undefined
+        cronMaxDeals: options.cronMaxDeals ? options.cronMaxDeals : undefined
       });
     } catch (error) {
       CliUtil.renderErrorAndExit(error);
@@ -418,8 +418,8 @@ replication.command('schedule')
   .description('Change an existing deal replication request\'s cron schedule.')
   .argument('<id>', 'Existing ID of deal replication request.')
   .argument('<schedule>', 'Updated cron schedule.')
-  .argument('<maxDeals>', 'Updated max number of deals across entire cron schedule, per SP. Specify 0 for unlimited.')
-  .action(async (id, schedule, maxDeals, options) => {
+  .argument('<cronMaxDeals>', 'Updated max number of deals across entire cron schedule, per SP. Specify 0 for unlimited.')
+  .action(async (id, schedule, cronMaxDeals, options) => {
     if (!cron.validate(schedule)) {
       CliUtil.renderErrorAndExit(`Invalid cron schedule format ${schedule}. Try https://crontab.guru/ for a sample.`);
     }
@@ -429,7 +429,7 @@ replication.command('schedule')
       const url: string = config.get('connection.deal_replication_service');
       response = await axios.post(`${url}/replication/${id}`, {
         cronSchedule: schedule,
-        cronMaxDeals: maxDeals
+        cronMaxDeals: cronMaxDeals
       });
     } catch (error) {
       CliUtil.renderErrorAndExit(error);
