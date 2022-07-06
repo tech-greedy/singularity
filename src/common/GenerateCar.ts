@@ -11,15 +11,19 @@ export default class GenerateCar {
         const p2 = path.join(dir, 'node_modules', 'bin', 'generate-car');
         const p3 = path.join(dir, '.bin', 'generate-car');
         const p4 = path.join(dir, 'bin', 'generate-car');
-	for (const p of [p1, p2, p3, p4]) {
+        for (const p of [p1, p2, p3, p4]) {
           if (fs.existsSync(p)) {
             GenerateCar.path = p;
             break;
           }
-	}
-	if (GenerateCar.path) {
+        }
+        if (GenerateCar.path) {
           break;
-	}
+        }
+        dir = path.dirname(dir);
+        if (dir === '/') {
+          break;
+        }
       }
       // Somehow, win32 has generate-car binary at same PATH as singularity executable
       if (!GenerateCar.path && process.platform !== 'win32') {
