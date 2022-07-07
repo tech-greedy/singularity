@@ -75,6 +75,7 @@ export default class DealPreparationService extends BaseService {
         await fs.access(dir, constants.F_OK);
       } catch (e) {
         this.logger.warn(`${dir} cannot be removed during cleanup.`, { error: e });
+        continue;
       }
       for (const file of await fs.readdir(dir)) {
         const regex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.car$/;
@@ -97,6 +98,7 @@ export default class DealPreparationService extends BaseService {
           await fs.access(dir, constants.F_OK);
         } catch (e) {
           this.logger.warn(`${dir} cannot be removed during cleanup.`, { error: e });
+          continue;
         }
         for (const file of await fs.readdir(dir)) {
           const regex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
