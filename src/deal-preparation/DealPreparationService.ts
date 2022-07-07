@@ -73,16 +73,20 @@ export default class DealPreparationService extends BaseService {
     for (const dir of dirs) {
       try {
         await fs.access(dir, constants.F_OK);
-        for (const file of await fs.readdir(dir)) {
-          const regex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.car$/;
-          if (regex.test(file)) {
-            const fullPath = path.join(dir, file);
-            this.logger.info(`Removing temporary file ${fullPath}`);
+      } catch (e) {
+        this.logger.warn(`${dir} cannot be removed during cleanup.`, { error: e });
+      }
+      for (const file of await fs.readdir(dir)) {
+        const regex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.car$/;
+        if (regex.test(file)) {
+          const fullPath = path.join(dir, file);
+          this.logger.info(`Removing temporary file ${fullPath}`);
+          try {
             await fs.rm(fullPath);
+          } catch (e) {
+            this.logger.warn(`${fullPath} cannot be removed during cleanup.`, { error: e });
           }
         }
-      } catch (e) {
-        this.logger.warn(`${dir} cannot be read during cleanup.`);
       }
     }
     let tmpDirs = (await Datastore.ScanningRequestModel.find()).map(r => r.tmpDir);
@@ -90,10 +94,21 @@ export default class DealPreparationService extends BaseService {
     for (const dir of tmpDirs) {
       if (dir) {
         try {
-          await fs.rm(dir, { recursive: true, force: true });
-          this.logger.info(`Removing temporary folder ${dir}`);
+          await fs.access(dir, constants.F_OK);
         } catch (e) {
-          this.logger.warn(`${dir} cannot be read during cleanup.`);
+          this.logger.warn(`${dir} cannot be removed during cleanup.`, { error: e });
+        }
+        for (const file of await fs.readdir(dir)) {
+          const regex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+          if (regex.test(file)) {
+            const fullPath = path.join(dir, file);
+            this.logger.info(`Removing temporary folder ${fullPath}`);
+            try {
+              await fs.rm(fullPath, { recursive: true, force: true });
+            } catch (e) {
+              this.logger.warn(`${fullPath} cannot be removed during cleanup.`, { error: e });
+            }
+          }
         }
       }
     }
@@ -309,10 +324,13 @@ export default class DealPreparationService extends BaseService {
     }
 
     if (purge) {
-      for await (const { dataCid } of Datastore.GenerationRequestModel.find({ datasetId: found.id }, { dataCid: 1 })) {
-        const filename = path.join(found.outDir, dataCid + '.car');
-        this.logger.info(`Removing file.`, { filename });
-        await fs.rm(filename, { force: true });
+      for await (const { dataCid, pieceCid } of Datastore.GenerationRequestModel.find({ datasetId: found.id }, { dataCid: 1, pieceCid: 1 })) {
+        const filename1 = path.join(found.outDir, dataCid + '.car');
+        const filename2 = path.join(found.outDir, pieceCid + '.car');
+        this.logger.info(`Removing file.`, { filename1 });
+        await fs.rm(filename1, { force: true });
+        this.logger.info(`Removing file.`, { filename2 });
+        await fs.rm(filename2, { force: true });
       }
     }
 
