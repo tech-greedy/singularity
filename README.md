@@ -27,7 +27,7 @@ cd singularity
 npm ci
 npm run build
 npm link
-npx singularity -h
+singularity -h
 ```
 ## 2. Build Dependency
 By default, npm will pull the pre-built binaries for dependencies. You can choose to build it from source and override the one pulled by npm.
@@ -40,6 +40,8 @@ make
 Then copy the generated binary to override the existing one from the PATH for your node environment, i.e.
 * singularity installed globally `/home/user/.nvm/versions/node/v16.xx.x/lib/node_modules/.bin`
 * singularity cloned locally `./node_modules/.bin`
+
+Note the path may change depending on the nodejs version, if you cannot find folder above, try search for generate-car binary first, i.e. `find ~/.nvm -name 'generate-car'`
 
 
 # Initialization
@@ -148,6 +150,7 @@ Arguments:
 
 Options:
   -s, --deal-size <deal_size>  Target deal size, i.e. 32GiB (default: "32 GiB")
+  -t, --tmp-dir <tmp_dir>      Optional temporary directory. May be useful when it is at least 2x faster than the dataset source, such as when the dataset is on network mount, and the I/O is the bottleneck
   -m, --min-ratio <min_ratio>  Min ratio of deal to sector size, i.e. 0.55
   -M, --max-ratio <max_ratio>  Max ratio of deal to sector size, i.e. 0.95
   -h, --help                   display help for command
@@ -273,10 +276,16 @@ Worker to scan the dataset, make plan and generate Car file and CIDs
 #### enabled, num_workers
 Whether to enable the worker and how many worker instances. As a rule of thumb, use `min(cpu_cores / 2.5, io_MBps / 50)`
 
-# FAQ
+# FAQ and common issues
 ### Does it work in Windows
 Only Deal Preparation works and Indexing works in Windows.
 Deal Replication and Retrieval only works in Linux/Mac due to dependency restrictions. 
 
 ### Error - too many open files
 In case that one CAR contains more files than allowed by OS, you will need to increase the open file limit with `ulimit`, or `LimitNOFILE` if using systemd.
+
+### Error - open /some/file: remote I/O error
+If you are using network mount such as NFS or Goofys, a temporary network issue may cause the CAR file generation to fail.
+If the error rate is less than 10%, you may assume they are transient and can be fixed by performing a [retry](#retry-a-request).
+If the error is consistent, you will need to dig into the root cause of what have gone wrong. It could be incorrectly configured permission or DNS resolver, etc. You can find more details in `/var/log/syslog`.
+
