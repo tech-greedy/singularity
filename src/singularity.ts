@@ -468,6 +468,20 @@ replication.command('resume').description('Resume a paused deal replication requ
     }
     CliUtil.renderResponse(response.data, options.json);
   });
+
+replication.command('csv').description('Write a deal replication result as csv.')
+  .argument('<id>', 'Existing ID of deal replication request.')
+  .action(async (id) => {
+    let response!: AxiosResponse;
+    try {
+      const url: string = config.get('connection.deal_replication_service');
+      response = await axios.get(`${url}/replication/${id}/csv`);
+    } catch (error) {
+      CliUtil.renderErrorAndExit(error);
+    }
+    CliUtil.renderResponse(response.data, false);
+  });
+
 program.showSuggestionAfterError();
 program.showHelpAfterError('(add --help for additional information)');
 program.parse();
