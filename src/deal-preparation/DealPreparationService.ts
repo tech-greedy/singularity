@@ -144,12 +144,10 @@ export default class DealPreparationService extends BaseService {
     if (ObjectId.isValid(id)) {
       this.logger.debug('id is valid ObjectId');
       found = await Datastore.GenerationRequestModel.findById(id);
-    } else if (ObjectId.isValid(dataset) && idIsInt) {
+    } else if (idIsInt) {
       this.logger.debug('id is valid integer and dataset is valid ObjectId');
-      found = await Datastore.GenerationRequestModel.findOne({ index: id, datasetId: dataset });
-    } else if (dataset !== undefined && idIsInt) {
-      this.logger.debug('id is valid integer and dataset is undefined');
-      found = await Datastore.GenerationRequestModel.findOne({ index: id, datasetName: dataset });
+      found = await Datastore.GenerationRequestModel.findOne({ index: id, datasetName: dataset }) ??
+        await Datastore.GenerationRequestModel.findOne({ index: id, datasetId: dataset });
     } else {
       this.sendError(response, ErrorCode.INVALID_OBJECT_ID);
       return undefined;
@@ -253,7 +251,8 @@ export default class DealPreparationService extends BaseService {
   private async handleGetPreparationRequest (request: Request, response: Response) {
     const id = request.params['id'];
     this.logger.info(`Received request to get details of dataset preparation request.`, { id });
-    const found = ObjectId.isValid(id) ? await Datastore.ScanningRequestModel.findById(id) : await Datastore.ScanningRequestModel.findOne({ name: id });
+    const found = await Datastore.ScanningRequestModel.findOne({ name: id }) ??
+      (ObjectId.isValid(id) ? await Datastore.ScanningRequestModel.findById(id) : undefined);
     if (!found) {
       this.sendError(response, ErrorCode.DATASET_NOT_FOUND);
       return;
@@ -319,7 +318,8 @@ export default class DealPreparationService extends BaseService {
     const generation = request.params['generation'];
     const { purge } = <DeletePreparationRequest>request.body;
     this.logger.info(`Received request to delete dataset preparation request.`, { id, generation, purge });
-    const found = ObjectId.isValid(id) ? await Datastore.ScanningRequestModel.findById(id) : await Datastore.ScanningRequestModel.findOne({ name: id });
+    const found = await Datastore.ScanningRequestModel.findOne({ name: id }) ??
+      (ObjectId.isValid(id) ? await Datastore.ScanningRequestModel.findById(id) : undefined);
     if (!found) {
       this.sendError(response, ErrorCode.DATASET_NOT_FOUND);
       return;
@@ -351,7 +351,8 @@ export default class DealPreparationService extends BaseService {
       this.sendError(response, ErrorCode.ACTION_INVALID);
       return;
     }
-    const found = ObjectId.isValid(id) ? await Datastore.ScanningRequestModel.findById(id) : await Datastore.ScanningRequestModel.findOne({ name: id });
+    const found = await Datastore.ScanningRequestModel.findOne({ name: id }) ??
+      (ObjectId.isValid(id) ? await Datastore.ScanningRequestModel.findById(id) : undefined);
     if (!found) {
       this.sendError(response, ErrorCode.DATASET_NOT_FOUND);
       return;
