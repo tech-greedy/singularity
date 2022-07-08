@@ -45,5 +45,7 @@ do
   else
     echo "[Error] $file does not exist - change the script to download from source"
     # wget http://example.com/${data_cid}.car
+    # echo "[Importing] lotus-miner storage-deals import-data $proposal $file"
+    # lotus-miner storage-deals import-data $proposal $file
   fi
 done
