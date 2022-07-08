@@ -236,6 +236,7 @@ preparation.command('list').description('List all deal preparation requests')
 preparation.command('generation-manifest').description('Get the Slingshot v3.x manifest data for a single deal generation request')
   .option('--dataset <dataset>', 'The dataset id or name, required if looking for generation request using index')
   .option('--pretty', 'Whether to add indents to output JSON')
+  .option('--name-override <name_override>', 'Override the dataset name in the output JSON. This is the slug name in Slingshot V3.')
   .argument('<generationId>', 'A unique id or index of the generation request')
   .action(async (id, options) => {
     const url: string = config.get('connection.deal_preparation_service');
@@ -246,6 +247,9 @@ preparation.command('generation-manifest').description('Get the Slingshot v3.x m
       CliUtil.renderErrorAndExit(error);
     }
     const data = response.data;
+    if (options.nameOverride) {
+      data.dataset = options.nameOverride;
+    }
     if (options.pretty) {
       console.log(JSON.stringify(data, null, 2));
     } else {

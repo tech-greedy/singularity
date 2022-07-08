@@ -11,16 +11,17 @@ if [ -z "${WEB3_STORAGE_TOKEN}" ]; then
   echo "Environment variable WEB3_STORAGE_TOKEN not set"
   exit 1
 fi
-if [ "$#" -ne 1 ]; then
-  echo "Argument not supplied. Example: ./upload-manifest-daemon.sh <manifest_folder>"
+if [ "$#" -ne 2 ]; then
+  echo "Argument not supplied. Example: ./upload-manifest-standalone.sh <manifest_folder> <slug_name>"
   echo "The <manifest_folder> is the folder where contains manifest json files."
   exit 1
 fi
 folder=$1
+slug=$2
 for path in $(find ${folder} -name '*.json')
 do
   basename=${path##*/}
   echo "Working on ${basename}"
-  cat $path | zstd -f | curl -X POST -H "Authorization: Bearer ${WEB3_STORAGE_TOKEN}" -H "X-NAME: ${basename}.zst" --data-binary @- https://api.web3.storage/upload
+  cat $path | jq ".dataset = \"${slug}\"" | zstd -f | curl -X POST -H "Authorization: Bearer ${WEB3_STORAGE_TOKEN}" -H "X-NAME: ${basename}.zst" --data-binary @- https://api.web3.storage/upload
   echo
 done
