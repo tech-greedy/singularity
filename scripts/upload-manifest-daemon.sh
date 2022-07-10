@@ -23,7 +23,7 @@ fi
 endpoint=${3:-http://127.0.0.1:7001}
 name=$1
 slug=$2
-for row in $(curl ${endpoint}/preparation/${name} 2>/dev/null | jq -c .generationRequests[])
+for row in $(curl ${endpoint}/preparation/${name} 2>/dev/null | jq -c '.generationRequests[]|del(.errorMessage)')
 do
   id=$(jq '.id' <<< "$row" | tr -d '"')
   pieceCid=$(jq '.pieceCid' <<< "$row" | tr -d '"')
