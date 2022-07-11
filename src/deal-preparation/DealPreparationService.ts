@@ -360,7 +360,7 @@ export default class DealPreparationService extends BaseService {
     const actionMap = {
       resume: [{ status: 'paused' }, { status: 'active', workerId: null }],
       pause: [{ status: 'active', workerId: null }, { status: 'paused' }],
-      retry: [{ status: 'error' }, { status: 'active', errorMessage: undefined, workerId: null }]
+      retry: [{ status: 'error' }, { status: 'active', errorMessage: null, workerId: null }]
     };
 
     const changed = (await Datastore.ScanningRequestModel.findOneAndUpdate({
