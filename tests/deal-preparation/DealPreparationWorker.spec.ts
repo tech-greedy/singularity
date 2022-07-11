@@ -227,6 +227,53 @@ describe('DealPreparationWorker', () => {
     })
   })
   describe('scan', () => {
+    it('should delete pending generations and start from last one', async () => {
+      const scanning = await Datastore.ScanningRequestModel.create({
+        name: 'name',
+        path: path.join('tests', 'test_folder'),
+        minSize: 12,
+        maxSize: 16,
+        status: 'active',
+        outDir: '.',
+        tmpDir: './tmpdir'
+      });
+      const active = await Datastore.GenerationRequestModel.create({
+        datasetId: scanning.id,
+        datasetName: 'name',
+        path: path.join('tests', 'test_folder'),
+        index: 0,
+        status: 'active',
+        outDir: '.',
+        tmpDir: './tmpdir'
+      })
+      await Datastore.InputFileListModel.create({
+        generationId: active.id,
+        index: 0,
+        fileList: [{
+          path: path.join('tests', 'test_folder', 'a', '1.txt'),
+          size: 3,
+        }, {
+          path: path.join('tests', 'test_folder', 'b', '2.txt'),
+          size: 27,
+          start: 0,
+          end: 9,
+        }],
+      });
+      const pending = await Datastore.GenerationRequestModel.create({
+        datasetId: scanning.id,
+        datasetName: 'name',
+        path: path.join('tests', 'test_folder'),
+        index: 1,
+        status: 'created',
+        outDir: '.',
+        tmpDir: './tmpdir'
+      })
+      await worker['scan'](scanning);
+      expect(await Datastore.GenerationRequestModel.findById(pending.id)).toBeNull();
+      expect(await Datastore.GenerationRequestModel.findById(active.id)).not.toBeNull();
+      const requests = await Datastore.GenerationRequestModel.find({}, null, { sort: { index: 1 } });
+      expect(requests.length).toEqual(4);
+    })
     it('should work with >1000 fileList', async () => {
       let fileList: FileList = Array(5000).fill(null).map((_, i) => ({
         path: `tests/test_folder/folder/${i}.txt`,

@@ -108,6 +108,22 @@ describe('DealPreparationService', () => {
     })
   })
   describe('GET /generation-manifest/:id', () => {
+    it('should throw if generation is not complete', async () => {
+      const generationRequest = await Datastore.GenerationRequestModel.create({
+        datasetId: 'datasetId',
+        status: 'active',
+        index: 0,
+        dataCid: 'dataCid',
+        pieceCid: 'pieceCid',
+        pieceSize: 10,
+      });
+      const response = await (supertest(service['app']))
+        .get('/generation-manifest/' + generationRequest.id);
+      expect(response.status).toEqual(400);
+      expect(response.body).toEqual({
+        error: ErrorCode.GENERATION_NOT_COMPLETED
+      });
+    })
     it('should return slingshot compliant manifest', async () => {
       const generationRequest = await Datastore.GenerationRequestModel.create({
         datasetId: 'datasetId',
@@ -535,15 +551,19 @@ describe('DealPreparationService', () => {
       await Datastore.ScanningRequestModel.create({
         name: 'test-deletion',
         outDir: '.',
+        tmpDir: './tmp'
       });
+      await fs.mkdir('./tmp/d715461e-8d42-4a53-9b33-e17ed4247304', { recursive: true });
       await fs.writeFile('./d715461e-8d42-4a53-9b33-e17ed4247304.car', 'something');
       await service['cleanupIncompleteFiles']();
       await expectAsync(fs.access('./d715461e-8d42-4a53-9b33-e17ed4247304.car')).toBeRejected();
+      await expectAsync(fs.access('./d715461e-8d42-4a53-9b33-e17ed4247304')).toBeRejected();
     })
     it('should skip nonexisting folders', async () => {
       await Datastore.ScanningRequestModel.create({
         name: 'test-deletion',
         outDir: './non-existing',
+        tmpDir: './non-existing',
       });
       await expectAsync(service['cleanupIncompleteFiles']()).toBeResolved();
     })
@@ -559,6 +579,12 @@ describe('DealPreparationService', () => {
         dataCid: 'bafy',
         outDir: '.',
       });
+      const inputList = await Datastore.InputFileListModel.create({
+        generationId: generation.id
+      });
+      const outputList = await Datastore.OutputFileListModel.create({
+        generationId: generation.id
+      });
       const filePath = path.resolve('./bafy.car');
       await fs.mkdir(path.dirname(filePath), {recursive: true});
       await fs.writeFile(filePath, 'some data');
@@ -567,6 +593,8 @@ describe('DealPreparationService', () => {
       expect(response.status).toEqual(200);
       await expectAsync(Datastore.ScanningRequestModel.findById(scanning.id)).toBeResolvedTo(null);
       await expectAsync(Datastore.GenerationRequestModel.findById(generation.id)).toBeResolvedTo(null);
+      await expectAsync(Datastore.GenerationRequestModel.findById(inputList.id)).toBeResolvedTo(null);
+      await expectAsync(Datastore.GenerationRequestModel.findById(outputList.id)).toBeResolvedTo(null);
       await expectAsync(fs.access(filePath)).toBeRejected();
     })
   })
@@ -612,6 +640,23 @@ describe('DealPreparationService', () => {
       expect(response.body).toEqual({
         error: ErrorCode.MAX_RATIO_INVALID
       });
+    });
+    it('should use min and max ratio if specified', async () => {
+      const response = await supertest(service['app'])
+        .post('/preparation').send({
+          name: 'name',
+          path: '.',
+          dealSize: '32GiB',
+          minRatio: 0.7,
+          maxRatio: 0.8,
+          outDir: '.',
+          tmpDir: '.',
+        }).set('Accept', 'application/json');
+      expect(response.status).toEqual(200);
+      expect(response.body).toEqual(jasmine.objectContaining({
+        minSize: 24051816858,
+        maxSize:27487790694
+      }));
     });
     it('should return error if deal size is not allowed', async () => {
       const response = await supertest(service['app'])
