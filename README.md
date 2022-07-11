@@ -17,7 +17,7 @@ nvm install 16
 # Install globally from npm
 ```shell
 npm i -g @techgreedy/singularity
-singularity-prepare -h
+singularity -h
 ```
 # Build and run from source
 ## 1. Transpile this project
@@ -198,6 +198,11 @@ Currently it is required to have both lotus and boost cli binary in order for th
 ### Configuration
 Look for `default.toml` in the initialized repo, verify in the [deal_replication_worker] section, both binary can be accessed.
 If you need to specify environment variable like FULLNODE_API_INFO, it can also be specified there.
+
+### Setup Lotus Lite node
+In order to make deals, we recommend setting up a [lite node](https://lotus.filecoin.io/lotus/install/lotus-lite/) to use with the tool. 
+
+Once you have the lite node setup, you can import your wallet key for the verified client address.
 
 ### Deal making
 ```shell
