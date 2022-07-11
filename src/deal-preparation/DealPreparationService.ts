@@ -336,8 +336,12 @@ export default class DealPreparationService extends BaseService {
       }
     }
 
-    await found.remove();
-    await Datastore.GenerationRequestModel.deleteMany({ datasetId: found.id });
+    await found.delete();
+    for (const generationRequest of await Datastore.GenerationRequestModel.find({ datasetId: found.id })) {
+      await Datastore.InputFileListModel.deleteMany({ generationId: generationRequest.id });
+      await Datastore.OutputFileListModel.deleteMany({ generationId: generationRequest.id });
+      await generationRequest.delete();
+    }
 
     response.end();
   }

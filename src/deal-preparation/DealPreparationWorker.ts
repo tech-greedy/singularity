@@ -75,6 +75,10 @@ export default class DealPreparationWorker extends BaseService {
         this.logger.info('The scanning request has been removed. Scanning stopped.', { id: request.id, name: request.name });
         return;
       }
+      if ((await Datastore.ScanningRequestModel.findById(request.id))?.status === 'paused') {
+        this.logger.info(`Scanning request has been paused.`, { id: request.id, name: request.name });
+        return;
+      }
       if (lastFile) {
         if (fileList.some(fileInfo => fileInfo.path === lastFile)) {
           this.logger.info(`Reached the last file ${lastFile}, resume creating generation request.`);
@@ -114,10 +118,6 @@ export default class DealPreparationWorker extends BaseService {
       }, { projection: { _id: 1 } });
       this.logger.info('Marking generation request to active', { id: request.id, name: request.name, index });
       index++;
-      if ((await Datastore.ScanningRequestModel.findById(request.id))?.status === 'paused') {
-        this.logger.info(`Scanning request has been paused.`);
-        return;
-      }
     }
     await Datastore.ScanningRequestModel.findByIdAndUpdate(request.id, { status: 'completed', workerId: null });
     this.logger.info(`Finished scanning. Marking scanning to completed. Inserted ${index} generation tasks.`);
@@ -229,6 +229,10 @@ export default class DealPreparationWorker extends BaseService {
         fileMap.set(path.relative(newGenerationWork.path, fileInfo.path).split(path.sep).join('/'), fileInfo);
       }
       const generatedFileList = DealPreparationWorker.handleGeneratedFileList(fileMap, output.CidMap);
+      if (!await Datastore.ScanningRequestModel.findById(newGenerationWork.datasetId)) {
+        this.logger.info('Scanning request has been removed. Give up updating the generation request', { datasetId: newGenerationWork.datasetId, datasetName: newGenerationWork.datasetName });
+        return true;
+      }
       for (let i = 0; i < generatedFileList.length; i += 1000) {
         await Datastore.OutputFileListModel.updateOne({
           generationId: newGenerationWork.id,
