@@ -336,8 +336,12 @@ export default class DealPreparationService extends BaseService {
       }
     }
 
-    await found.remove();
-    await Datastore.GenerationRequestModel.deleteMany({ datasetId: found.id });
+    await found.delete();
+    for (const generationRequest of await Datastore.GenerationRequestModel.find({ datasetId: found.id })) {
+      await Datastore.InputFileListModel.deleteMany({ generationId: generationRequest.id });
+      await Datastore.OutputFileListModel.deleteMany({ generationId: generationRequest.id });
+      await generationRequest.delete();
+    }
 
     response.end();
   }
@@ -360,7 +364,7 @@ export default class DealPreparationService extends BaseService {
     const actionMap = {
       resume: [{ status: 'paused' }, { status: 'active', workerId: null }],
       pause: [{ status: 'active', workerId: null }, { status: 'paused' }],
-      retry: [{ status: 'error' }, { status: 'active', errorMessage: undefined, workerId: null }]
+      retry: [{ status: 'error' }, { status: 'active', errorMessage: null, workerId: null }]
     };
 
     const changed = (await Datastore.ScanningRequestModel.findOneAndUpdate({

@@ -26,7 +26,7 @@ export default class GenerateCar {
         }
       }
       // Somehow, win32 has generate-car binary at same PATH as singularity executable
-      if (!GenerateCar.path && process.platform !== 'win32') {
+      if (!GenerateCar.path) {
         throw new Error('Cannot find generate-car, please report this as a bug');
       }
     }
