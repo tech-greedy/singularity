@@ -25,6 +25,7 @@ export default class DealPreparationService extends BaseService {
   public constructor () {
     super(Category.DealPreparationService);
     this.handleCreatePreparationRequest = this.handleCreatePreparationRequest.bind(this);
+    this.handleUpdateGenerationRequest = this.handleUpdateGenerationRequest.bind(this);
     this.handleUpdatePreparationRequest = this.handleUpdatePreparationRequest.bind(this);
     this.handleRemovePreparationRequest = this.handleRemovePreparationRequest.bind(this);
     this.handleListPreparationRequests = this.handleListPreparationRequests.bind(this);
@@ -46,7 +47,8 @@ export default class DealPreparationService extends BaseService {
     this.app.post('/preparation', this.handleCreatePreparationRequest);
     this.app.post('/preparation/:id', this.handleUpdatePreparationRequest);
     this.app.delete('/preparation/:id', this.handleRemovePreparationRequest);
-    this.app.post('/preparation/:id/:generation', this.handleUpdatePreparationRequest);
+    this.app.post('/generation/:dataset/:id', this.handleUpdateGenerationRequest);
+    this.app.post('/generation/:dataset', this.handleUpdateGenerationRequest);
     this.app.get('/preparations', this.handleListPreparationRequests);
     this.app.get('/preparation/:id', this.handleGetPreparationRequest);
     this.app.get('/generation/:dataset/:id', this.handleGetGenerationRequest);
@@ -348,9 +350,8 @@ export default class DealPreparationService extends BaseService {
 
   private async handleUpdatePreparationRequest (request: Request, response: Response) {
     const id = request.params['id'];
-    const generation = request.params['generation'];
     const { action } = <UpdatePreparationRequest>request.body;
-    this.logger.info(`Received request to update dataset preparation request.`, { id, generation, action });
+    this.logger.info(`Received request to update dataset preparation request.`, { id, action });
     if (!['resume', 'pause', 'retry'].includes(action)) {
       this.sendError(response, ErrorCode.ACTION_INVALID);
       return;
@@ -363,8 +364,8 @@ export default class DealPreparationService extends BaseService {
     }
     const actionMap = {
       resume: [{ status: 'paused' }, { status: 'active', workerId: null }],
-      pause: [{ status: 'active', workerId: null }, { status: 'paused' }],
-      retry: [{ status: 'error' }, { status: 'active', errorMessage: null, workerId: null }]
+      pause: [{ status: 'active' }, { status: 'paused', workerId: null }],
+      retry: [{ status: 'error' }, { status: 'active', $unset: { errorMessage: 1 }, workerId: null }]
     };
 
     const changed = (await Datastore.ScanningRequestModel.findOneAndUpdate({
@@ -373,6 +374,32 @@ export default class DealPreparationService extends BaseService {
     }, actionMap[action][1])) != null
       ? 1
       : 0;
+
+    response.end(JSON.stringify({
+      scanningRequestsChanged: changed
+    }));
+  }
+
+  private async handleUpdateGenerationRequest (request: Request, response: Response) {
+    const dataset = request.params['dataset'];
+    const generation = request.params['id'];
+    const { action } = <UpdatePreparationRequest>request.body;
+    this.logger.info(`Received request to update dataset preparation request.`, { dataset, generation, action });
+    if (!['resume', 'pause', 'retry'].includes(action)) {
+      this.sendError(response, ErrorCode.ACTION_INVALID);
+      return;
+    }
+    const found = await Datastore.ScanningRequestModel.findOne({ name: dataset }) ??
+      (ObjectId.isValid(dataset) ? await Datastore.ScanningRequestModel.findById(dataset) : undefined);
+    if (!found) {
+      this.sendError(response, ErrorCode.DATASET_NOT_FOUND);
+      return;
+    }
+    const actionMap = {
+      resume: [{ status: 'paused' }, { status: 'active', workerId: null }],
+      pause: [{ status: 'active' }, { status: 'paused', workerId: null }],
+      retry: [{ status: 'error' }, { status: 'active', $unset: { errorMessage: 1 }, workerId: null }]
+    };
 
     let changedGenerations;
     let changedGeneration;
@@ -404,7 +431,6 @@ export default class DealPreparationService extends BaseService {
     }
 
     response.end(JSON.stringify({
-      scanningRequestsChanged: changed,
       generationRequestsChanged: changedGenerations ?? changedGeneration
     }));
   }
