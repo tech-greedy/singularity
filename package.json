@@ -38,6 +38,7 @@
     "@types/node": "^14.17.6",
     "@types/supertest": "^2.0.12",
     "@types/typescript": "^2.0.0",
+    "@types/picomatch": "^2.3.0",
     "@typescript-eslint/eslint-plugin": "^5.15.0",
     "@typescript-eslint/parser": "^5.15.0",
     "copyfiles": "^2.4.1",
@@ -80,7 +81,7 @@
     "mongodb-memory-server": "^8.4.1",
     "mongoose": "^6.2.7",
     "node-cron": "^3.0.1",
-    "picomatch": "^2.2.2",
+    "picomatch": "^2.3.1",
     "toml": "^3.0.0",
     "winston": "^3.6.0",
     "xbytes": "^1.7.0"
@@ -106,6 +107,9 @@
     ],
     "include": [
       "src/**"
+    ],
+    "exclude": [
+      "src/deal-preparation/rrdir.js"
     ],
     "reporter": [
       "text",
