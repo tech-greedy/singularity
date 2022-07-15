@@ -268,11 +268,28 @@ describe('DealPreparationWorker', () => {
         outDir: '.',
         tmpDir: './tmpdir'
       })
+      const pendingList = await Datastore.InputFileListModel.create({
+        generationId: pending.id,
+        index: 0,
+        fileList: [{
+          path: path.join('tests', 'test_folder', 'b', '2.txt'),
+          size: 27,
+          start: 9,
+          end: 21,
+        }],
+      });
       await worker['scan'](scanning);
       expect(await Datastore.GenerationRequestModel.findById(pending.id)).toBeNull();
       expect(await Datastore.GenerationRequestModel.findById(active.id)).not.toBeNull();
+      expect(await Datastore.InputFileListModel.findById(pendingList.id)).toBeNull();
       const requests = await Datastore.GenerationRequestModel.find({}, null, { sort: { index: 1 } });
       expect(requests.length).toEqual(4);
+      expect((await Datastore.InputFileListModel.findOne({generationId: requests[1].id}))!.fileList).toEqual([jasmine.objectContaining({
+        path: path.join('tests', 'test_folder', 'b', '2.txt'),
+        size: 27,
+        start: 9,
+        end: 21,
+      })])
     })
     it('should work with >1000 fileList', async () => {
       let fileList: FileList = Array(5000).fill(null).map((_, i) => ({

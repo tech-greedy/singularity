@@ -55,22 +55,19 @@ export default class DealPreparationWorker extends BaseService {
   private async scan (request: ScanningRequest): Promise<void> {
     this.logger.info(`Started scanning.`, { id: request.id, name: request.name, path: request.path, minSize: request.minSize, maxSize: request.maxSize });
     let index = 0;
-    const deleted = (await Datastore.GenerationRequestModel.deleteMany({ datasetId: request.id, status: 'created' })).deletedCount;
-    if (deleted > 0) {
-      this.logger.info(`Deleted ${deleted} pending generation requests`);
+    for (const createdGenerationRequest of await Datastore.GenerationRequestModel.find({ datasetId: request.id, status: 'created' })) {
+      this.logger.info(`Deleting pending generation requests`, { id: createdGenerationRequest.id });
+      await Datastore.InputFileListModel.deleteMany({ generationId: createdGenerationRequest.id });
+      await createdGenerationRequest.delete();
     }
     const lastGeneration = await Datastore.GenerationRequestModel.findOne({ datasetId: request.id, status: { $ne: 'created' } }, { _id: 1, index: 1 }, { sort: { index: -1 } });
-    let lastFile: string | undefined;
+    let lastFileInfo: FileInfo | undefined;
     if (lastGeneration) {
       const lastFileList = await Datastore.InputFileListModel.findOne({ generationId: lastGeneration.id }, undefined, { sort: { index: -1 } });
-      if (!lastFileList) {
-        this.logger.error('Found last generation but not the file list. Please report this as a bug.', { id: lastGeneration.id, index: lastGeneration.index });
-        throw new Error('Found last generation but not the file list. Please report this as a bug.');
-      }
-      lastFile = lastFileList.fileList[lastFileList.fileList.length - 1].path;
-      this.logger.info(`Resuming scanning. Skip creating generation request until ${lastFile} is reached.`);
+      lastFileInfo = lastFileList!.fileList[lastFileList!.fileList.length - 1];
+      this.logger.info(`Resuming scanning. Start from ${lastFileInfo!.path}, offset: ${lastFileInfo!.end}.`);
     }
-    for await (const fileList of Scanner.scan(request.path, request.minSize, request.maxSize)) {
+    for await (const fileList of Scanner.scan(request.path, request.minSize, request.maxSize, lastFileInfo)) {
       if (!await Datastore.ScanningRequestModel.findById(request.id)) {
         this.logger.info('The scanning request has been removed. Scanning stopped.', { id: request.id, name: request.name });
         return;
@@ -78,14 +75,6 @@ export default class DealPreparationWorker extends BaseService {
       if ((await Datastore.ScanningRequestModel.findById(request.id))?.status === 'paused') {
         this.logger.info(`Scanning request has been paused.`, { id: request.id, name: request.name });
         return;
-      }
-      if (lastFile) {
-        if (fileList.some(fileInfo => fileInfo.path === lastFile)) {
-          this.logger.info(`Reached the last file ${lastFile}, resume creating generation request.`);
-          lastFile = undefined;
-        }
-        index++;
-        continue;
       }
       const generationRequest = await Datastore.GenerationRequestModel.create({
         datasetId: request.id,
@@ -259,9 +248,6 @@ export default class DealPreparationWorker extends BaseService {
         workerId: null
       }, {
         projection: { _id: 1 }
-      });
-      await Datastore.InputFileListModel.deleteMany({
-        generationId: newGenerationWork.id
       });
       this.logger.info(`${this.workerId} - Finished Generation of dataset.`,
         { id: newGenerationWork.id, datasetName: newGenerationWork.datasetName, index: newGenerationWork.index, timeSpentInMs: timeSpentInMs });
