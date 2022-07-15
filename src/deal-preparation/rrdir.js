@@ -68,6 +68,15 @@ export async function * rrdir (dir, opts = {}, { includeMatcher, excludeMatcher,
 
   for (const dirent of dirents) {
     const path = makePath(dirent, dir, encoding);
+    if (opts.startFrom) {
+      if (dirent.isDirectory() && !opts.startFrom.startsWith(path)) {
+        continue;
+      }
+      if (!dirent.isDirectory() && path < opts.startFrom) {
+        continue;
+      }
+      opts.startFrom = undefined;
+    }
     if (excludeMatcher && excludeMatcher(encoding === 'buffer' ? String(path) : path)) continue;
 
     const isSymbolicLink = opts.followSymlinks && dirent.isSymbolicLink();

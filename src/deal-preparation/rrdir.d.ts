@@ -8,6 +8,7 @@ interface Options {
   include?: string[] | undefined;
   strict?: boolean | undefined;
   match?: PicomatchOptions | undefined;
+  startFrom?: string;
 }
 
 interface Entry<T extends string | Buffer> {
