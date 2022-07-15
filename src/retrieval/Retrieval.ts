@@ -4,7 +4,9 @@ import { CID, IPFS } from 'ipfs-core';
 import * as pth from 'path';
 import { spawnSync } from 'child_process';
 import fs, { ReadStream, WriteStream } from 'fs';
-import rrdir from 'rrdir';
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+import { rrdir } from '../deal-preparation/rrdir';
 
 export interface FileStat {
   type: 'file' | 'dir',
