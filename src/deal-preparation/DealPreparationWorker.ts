@@ -139,7 +139,7 @@ export default class DealPreparationWorker extends BaseService {
     if (child.exitCode) {
       return;
     }
-    setTimeout(() => DealPreparationWorker.checkPauseOrRemove(generationId, child), 1000);
+    setTimeout(() => DealPreparationWorker.checkPauseOrRemove(generationId, child), 5000);
   }
 
   public static async invokeGenerateCar (generationId: string | undefined, input: string, outDir: string, p: string, tmpDir?: string)
