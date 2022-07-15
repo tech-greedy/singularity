@@ -1,12 +1,14 @@
-import rrdir from 'rrdir';
 import { FileList } from '../common/model/InputFileList';
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+import { rrdir } from './rrdir';
 
 export default class Scanner {
   public static async * scan (root: string, minSize: number, maxSize: number): AsyncGenerator<FileList> {
     let currentList: FileList = [];
     let currentSize = 0;
     for await (const entry of rrdir(root, {
-      stats: true, followSymlinks: true
+      stats: true, followSymlinks: true, sort: true
     })) {
       if (entry.directory) {
         continue;

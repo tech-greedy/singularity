@@ -62,7 +62,7 @@ export default class DealPreparationWorker extends BaseService {
     const lastGeneration = await Datastore.GenerationRequestModel.findOne({ datasetId: request.id, status: { $ne: 'created' } }, { _id: 1, index: 1 }, { sort: { index: -1 } });
     let lastFile: string | undefined;
     if (lastGeneration) {
-      const lastFileList = await Datastore.InputFileListModel.findOne({ generationId: lastGeneration.id, index: lastGeneration.index });
+      const lastFileList = await Datastore.InputFileListModel.findOne({ generationId: lastGeneration.id }, undefined, { sort: { index: -1 } });
       if (!lastFileList) {
         this.logger.error('Found last generation but not the file list. Please report this as a bug.', { id: lastGeneration.id, index: lastGeneration.index });
         throw new Error('Found last generation but not the file list. Please report this as a bug.');
@@ -255,7 +255,7 @@ export default class DealPreparationWorker extends BaseService {
         pieceSize: output.PieceSize,
         pieceCid: output.PieceCid,
         carSize: carFileStat.size,
-        errorMessage: null,
+        $unset: { errorMessage: 1 },
         workerId: null
       }, {
         projection: { _id: 1 }

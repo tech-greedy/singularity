@@ -128,9 +128,9 @@ Commands:
   list [options]                                         List all deal preparation requests
   generation-manifest [options] <generationId>           Get the Slingshot v3.x manifest data for a single deal generation request
   generation-status [options] <generationId>             Check the status of a single deal generation request
-  pause [options] <dataset> [generationId]               Pause an active deal preparation request and its active deal generation requests
-  resume [options] <dataset> [generationId]              Resume a paused deal preparation request and its paused deal generation requests
-  retry [options] <dataset> [generationId]               Retry an errored preparation request and its errored deal generation requests
+  pause                                                  Pause scanning or generation requests
+  resume                                                 Resume scanning or generation requests
+  retry                                                  Retry scanning or generation requests
   remove [options] <dataset>                             Remove all records from database for a dataset
   help [command]                                         display help for command
 ```
@@ -155,15 +155,13 @@ Options:
   -M, --max-ratio <max_ratio>  Max ratio of deal to sector size, i.e. 0.95
   -h, --help                   display help for command
 ```
-### Pause/Resume a request
-You can pause the entire deal preparation or a specific generation request. However, all ongoing generation requests taken by the workers will not be paused.
+### Pause/Resume/Retry a request
+For each dataset preparation request, it always starts with scanning request, once enough files can be packed into a single deal, it will create a generation request. In other words, each preparation request is a single scanning request and a bunch of generation requests.
+
+You can pause/resume/retry the scanning request or generation requests. 
 ```shell
 $ singularity prep pause -h
 $ singularity prep resume -h
-```
-### Retry a request
-Sometimes, the request may fail due to reasons such as I/O error. Once they hit the error state, you can choose to retry those requests after you've solved underlying issues.
-```shell
 $ singularity prep retry -h
 ```
 ### Remove a request

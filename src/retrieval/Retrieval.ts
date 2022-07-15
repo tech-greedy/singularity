@@ -4,7 +4,9 @@ import { CID, IPFS } from 'ipfs-core';
 import * as pth from 'path';
 import { spawnSync } from 'child_process';
 import fs, { ReadStream, WriteStream } from 'fs';
-import rrdir from 'rrdir';
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+import { rrdirSync } from '../deal-preparation/rrdir';
 
 export interface FileStat {
   type: 'file' | 'dir',
@@ -135,7 +137,7 @@ export default class Retrieval {
         process.exit(1);
       }
 
-      for (const entry of rrdir.sync(tempDir, { stats: true })) {
+      for (const entry of rrdirSync(tempDir, { stats: true })) {
         const relative = pth.relative(tempDir, entry.path);
         const target = pth.join(dest, relative);
         if (entry.directory) {
