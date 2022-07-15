@@ -78,7 +78,7 @@ program.name('singularity-prepare')
         if (options.tmpDir) {
           tmpDir = path.join(path.resolve(options.tmpDir), randomUUID());
         }
-        const [stdout, stderr, exitCode] = await DealPreparationWorker.invokeGenerateCar(input, outDir, p, tmpDir);
+        const [stdout, stderr, exitCode] = await DealPreparationWorker.invokeGenerateCar(undefined, input, outDir, p, tmpDir);
 
         if (tmpDir) {
           await fs.rm(tmpDir, { recursive: true, force: true });

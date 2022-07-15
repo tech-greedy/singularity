@@ -1,5 +1,5 @@
 import { onExit, readableToString, streamEnd, streamWrite } from '@rauschma/stringio';
-import { spawn } from 'child_process';
+import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
 import { randomUUID } from 'crypto';
 import BaseService from '../common/BaseService';
 import Datastore from '../common/Datastore';
@@ -119,7 +119,7 @@ export default class DealPreparationWorker extends BaseService {
     if (request.tmpDir) {
       tmpDir = path.join(request.tmpDir, randomUUID());
     }
-    const [stdout, stderr, exitCode] = await DealPreparationWorker.invokeGenerateCar(input, request.outDir, request.path, tmpDir);
+    const [stdout, stderr, exitCode] = await DealPreparationWorker.invokeGenerateCar(request.id, input, request.outDir, request.path, tmpDir);
     if (tmpDir) {
       await fs.rm(tmpDir, { recursive: true, force: true });
     }
@@ -127,7 +127,22 @@ export default class DealPreparationWorker extends BaseService {
     return [stdout, stderr, exitCode];
   }
 
-  public static async invokeGenerateCar (input: string, outDir: string, p: string, tmpDir?: string)
+  private static async checkPauseOrRemove (generationId: string, child: ChildProcessWithoutNullStreams) {
+    const generation = await Datastore.GenerationRequestModel.findById(generationId);
+    if (generation?.status !== 'active') {
+      try {
+        child.kill();
+      } catch (_) {
+      }
+      return;
+    }
+    if (child.exitCode) {
+      return;
+    }
+    setTimeout(() => DealPreparationWorker.checkPauseOrRemove(generationId, child), 1000);
+  }
+
+  public static async invokeGenerateCar (generationId: string | undefined, input: string, outDir: string, p: string, tmpDir?: string)
     : Promise<[stdout: string, stderr: string, statusCode: number | null]> {
     const cmd = GenerateCar.path!;
     const args = ['-o', outDir, '-p', p];
@@ -141,6 +156,9 @@ export default class DealPreparationWorker extends BaseService {
       await streamWrite(child.stdin, input);
       await streamEnd(child.stdin);
     })();
+    if (generationId) {
+      DealPreparationWorker.checkPauseOrRemove(generationId, child);
+    }
     const stdout = await readableToString(child.stdout);
     let stderr = '';
     child.stderr.on('data', function (chunk) {
@@ -205,8 +223,8 @@ export default class DealPreparationWorker extends BaseService {
       // Parse the output and update the database
       const [stdout, stderr, statusCode] = result!;
       if (statusCode !== 0) {
-        this.logger.error(`${this.workerId} - Encountered an error.`, { stderr });
-        await Datastore.GenerationRequestModel.findByIdAndUpdate(newGenerationWork.id, { status: 'error', errorMessage: stderr, workerId: null }, { projection: { _id: 1 } });
+        this.logger.error(`${this.workerId} - Encountered an error.`, { stderr, statusCode });
+        await Datastore.GenerationRequestModel.findOneAndUpdate({ _id: newGenerationWork.id, status: 'active' }, { status: 'error', errorMessage: stderr, workerId: null }, { projection: { _id: 1 } });
         return true;
       }
 
