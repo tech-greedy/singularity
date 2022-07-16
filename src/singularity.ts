@@ -399,6 +399,7 @@ replication.command('start')
   .option('-m, --max-deals <maxdeals>', 'Max number of deals in this replication request per SP, per cron triggered.', '0')
   .option('-c, --cron-schedule <cronschedule>', 'Optional cron to send deals at interval. Use double quote to wrap the format containing spaces.')
   .option('-x, --cron-max-deals <cronmaxdeals>', 'When cron schedule specified, limit the total number of deals across entire cron, per SP.')
+  .option('-xp, --cron-max-pending-deals <cronmaxpendingdeals>', 'When cron schedule specified, limit the total number of pending deals determined by dealtracking service, per SP.')
   .action(async (datasetid, storageProviders, client, replica, options) => {
     let response!: AxiosResponse;
     try {
@@ -425,7 +426,8 @@ replication.command('start')
         isOffline: options.offline,
         maxNumberOfDeals: options.maxDeals,
         cronSchedule: options.cronSchedule ? options.cronSchedule : undefined,
-        cronMaxDeals: options.cronMaxDeals ? options.cronMaxDeals : undefined
+        cronMaxDeals: options.cronMaxDeals ? options.cronMaxDeals : undefined,
+        cronMaxPendingDeals: options.cronMaxPendingDeals ? options.cronMaxPendingDeals : undefined
       });
     } catch (error) {
       CliUtil.renderErrorAndExit(error);
@@ -468,7 +470,8 @@ replication.command('schedule')
   .argument('<id>', 'Existing ID of deal replication request.')
   .argument('<schedule>', 'Updated cron schedule.')
   .argument('<cronMaxDeals>', 'Updated max number of deals across entire cron schedule, per SP. Specify 0 for unlimited.')
-  .action(async (id, schedule, cronMaxDeals, options) => {
+  .argument('<cronMaxPendingDeals>', 'Updated max number of pending deals across entire cron schedule, per SP. Specify 0 for unlimited.')
+  .action(async (id, schedule, cronMaxDeals, cronMaxPendingDeals, options) => {
     if (!cron.validate(schedule)) {
       CliUtil.renderErrorAndExit(`Invalid cron schedule format ${schedule}. Try https://crontab.guru/ for a sample.`);
     }
@@ -478,7 +481,8 @@ replication.command('schedule')
       const url: string = config.get('connection.deal_replication_service');
       response = await axios.post(`${url}/replication/${id}`, {
         cronSchedule: schedule,
-        cronMaxDeals: cronMaxDeals
+        cronMaxDeals: cronMaxDeals,
+        cronMaxPendingDeals: cronMaxPendingDeals
       });
     } catch (error) {
       CliUtil.renderErrorAndExit(error);

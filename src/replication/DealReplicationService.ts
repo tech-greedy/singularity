@@ -75,7 +75,8 @@ export default class DealReplicationService extends BaseService {
         isOffline: String(found.isOffline),
         status: found.status,
         cronSchedule: found.cronSchedule,
-        cronMaxDeals: found.cronMaxDeals
+        cronMaxDeals: found.cronMaxDeals,
+        cronMaxPendingDeals: found.cronMaxPendingDeals
       };
       response.end(JSON.stringify(result));
     }
@@ -110,7 +111,7 @@ export default class DealReplicationService extends BaseService {
         this.sendError(response, ErrorCode.INVALID_OBJECT_ID);
         return;
       }
-      const { status, cronSchedule, cronMaxDeals } = <UpdateReplicationRequest>request.body;
+      const { status, cronSchedule, cronMaxDeals, cronMaxPendingDeals } = <UpdateReplicationRequest>request.body;
       this.logger.info(`Received request to update replication request "${id}" with ` +
       `status: "${status}", cron schedule: ${cronSchedule} and cronMaxDeal: ${cronMaxDeals}.`);
       const found = await Datastore.ReplicationRequestModel.findById(id);
@@ -137,7 +138,8 @@ export default class DealReplicationService extends BaseService {
           }
         }, {
           cronSchedule,
-          cronMaxDeals
+          cronMaxDeals,
+          cronMaxPendingDeals
         }, {
           new: true
         });
@@ -184,7 +186,8 @@ export default class DealReplicationService extends BaseService {
         isOffline,
         maxNumberOfDeals,
         cronSchedule,
-        cronMaxDeals
+        cronMaxDeals,
+        cronMaxPendingDeals
       } = <CreateReplicationRequest>request.body;
       this.logger.info(`Received request to replicate dataset "${datasetId}" from client "${client}.`);
       let realDatasetId = datasetId;
@@ -220,6 +223,7 @@ export default class DealReplicationService extends BaseService {
       replicationRequest.status = 'active';
       replicationRequest.cronSchedule = cronSchedule;
       replicationRequest.cronMaxDeals = cronMaxDeals;
+      replicationRequest.cronMaxPendingDeals = cronMaxPendingDeals;
       try {
         await replicationRequest.save();
         // Create a deal tracking request if not exist
