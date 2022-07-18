@@ -18,5 +18,6 @@ export default interface ReplicationRequest {
   status: 'active' | 'paused' | 'completed' | 'error',
   cronSchedule?: string, // if specified, each cron will trigger sending the next maxNumberOfDeals
   cronMaxDeals?: number, // per SP total with cron considered
+  cronMaxPendingDeals?: number, // per SP pending total with cron considered
   errorMessage?: string
 }

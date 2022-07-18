@@ -324,6 +324,24 @@ export default class DealReplicationWorker extends BaseService {
           return;
         }
 
+        // check if reached max pending deal during a cron
+        if (config.get('deal_tracking_service.enabled') && existingRec.cronSchedule && existingRec.cronMaxPendingDeals && existingRec.cronMaxPendingDeals > 0) {
+          const pendingDeals = await Datastore.DealStateModel.count({
+            provider: provider,
+            state: {
+              $in: [
+                'proposed', 'published'
+              ]
+            }
+          });
+          if (pendingDeals >= existingRec.cronMaxPendingDeals) {
+            this.logger.warn(`This SP ${provider} has reached max pending deals allowed (${existingRec.cronMaxPendingDeals}) by request ${existingRec.id}.`);
+            return;
+          } else {
+            this.logger.debug(`This SP ${provider} has ${pendingDeals} / ${existingRec.cronMaxPendingDeals} pending deals.`);
+          }
+        }
+
         // check if reached max deals needed to be sent
         if (existingRec.maxNumberOfDeals > 0 && dealsMadePerSP >= existingRec.maxNumberOfDeals) {
           this.logger.warn(`This SP ${provider} has made max deals planned (${existingRec.maxNumberOfDeals}) by the request ${existingRec.id}.`);

@@ -150,6 +150,7 @@ export default class Datastore {
       status: Schema.Types.String,
       cronSchedule: Schema.Types.String,
       cronMaxDeals: Schema.Types.Number,
+      cronMaxPendingDeals: Schema.Types.Number,
       errorMessage: Schema.Types.String
     }, {
       timestamps: true
