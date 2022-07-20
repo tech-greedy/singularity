@@ -13,10 +13,10 @@ describe('DealPreparationWorker', () => {
     worker = new DealPreparationWorker();
   });
   beforeEach(async () => {
-    await Datastore.ScanningRequestModel.remove();
-    await Datastore.GenerationRequestModel.remove();
-    await Datastore.InputFileListModel.remove();
-    await Datastore.OutputFileListModel.remove();
+    await Datastore.ScanningRequestModel.deleteMany();
+    await Datastore.GenerationRequestModel.deleteMany();
+    await Datastore.InputFileListModel.deleteMany();
+    await Datastore.OutputFileListModel.deleteMany();
   });
   afterAll(async () => {
     for (const file of await fs.readdir('.')) {
@@ -295,7 +295,6 @@ describe('DealPreparationWorker', () => {
       let fileList: FileList = Array(5000).fill(null).map((_, i) => ({
         path: `tests/test_folder/folder/${i}.txt`,
         size: 100,
-        selector: [],
         start: 0,
         end: 0,
         dir: false

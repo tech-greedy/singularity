@@ -40,11 +40,8 @@ export default class IndexService extends BaseService {
       const type = (<DirNode | FileNode>entry).type;
       if (type === 'dir') {
         dir.entries.set(name, await this.pinIndex(<DirNode>entry));
-      } else if (type === 'file') {
-        (<FileNode>entry).sourcesMap = null;
       }
     }
-    dir.sourcesMap = null;
     return this.ipfsClient.dag.put(dir, {
       pin: true
     });
@@ -66,67 +63,58 @@ export default class IndexService extends BaseService {
     const root : DirNode = {
       entries: new Map(),
       name: '',
-      sourcesMap: new Map(),
       sources: [],
       type: 'dir'
     };
     for await (const generation of Datastore.GenerationRequestModel.find({ datasetId: found.id, status: 'completed' }).sort({ index: 1 })) {
-      const dataCid = generation.dataCid!;
-      const pieceCid = generation.pieceCid!;
       const generatedFileList = (await Datastore.OutputFileListModel.find({ generationId: generation.id }, null, { sort: { index: 1 } }))
         .map(r => r.generatedFileList).flat();
       for (const file of generatedFileList) {
-        if (file.dir) {
+        if (file.path === '') {
+          root.sources.push(generation.dataCid!);
           continue;
         }
         let node = root;
         const segments = file.path.split(path.sep);
         // Enter directories
         for (let i = 0; i < segments.length - 1; ++i) {
-          const source = {
-            dataCid, pieceCid, selector: file.selector!.slice(0, i)
-          };
-          if (!node.sourcesMap!.has(dataCid)) {
-            node.sourcesMap!.set(dataCid, source);
-            node.sources.push(source);
-          }
           if (!node.entries.has(segments[i])) {
-            const entry : DirNode = {
-              entries: new Map(),
-              sourcesMap: new Map(),
+            this.logger.error(`Unexpected empty subnode ${segments[i]}. The file list may not have correct order or there may be missing file or folder.`,
+              { path: file.path });
+            node.entries.set(segments[i], {
               sources: [],
-              type: 'dir',
-              name: segments[i]
-            };
-            node.entries.set(segments[i], entry);
+              name: segments[i],
+              entries: new Map(),
+              type: 'dir'
+            });
           }
           node = <DirNode>node.entries.get(segments[i]);
         }
-        // Handle file node
-        const segment = segments[segments.length - 1];
-        const source = {
-          dataCid, pieceCid, selector: file.selector!.slice(0, file.selector!.length - 1)
-        };
-        if (!node.sourcesMap!.has(dataCid)) {
-          node.sourcesMap!.set(dataCid, source);
-          node.sources.push(source);
-        }
-        if (!node.entries.has(segment)) {
-          node.entries.set(segment, {
-            name: segment,
-            size: file.size!,
-            sourcesMap: new Map(),
-            sources: [],
-            type: 'file'
+        const filename = segments[segments.length - 1];
+        if (file.dir) {
+          if (!node.entries.has(filename)) {
+            node.entries.set(filename, {
+              sources: [],
+              name: filename,
+              entries: new Map(),
+              type: 'dir'
+            });
+          }
+          (<DirNode>node.entries.get(filename)).sources.push(file.cid);
+        } else {
+          if (!node.entries.has(filename)) {
+            node.entries.set(filename, {
+              sources: [],
+              name: filename,
+              size: file.size!,
+              type: 'file'
+            });
+          }
+          (<FileNode>node.entries.get(filename)).sources.push({
+            cid: file.cid,
+            from: file.start ?? 0,
+            to: file.end ?? file.size!
           });
-        }
-        const fileSource = {
-          dataCid, pieceCid, selector: file.selector, from: file.start ?? 0, to: file.end ?? file.size
-        };
-        const sourceMap = (<FileNode>node.entries.get(segment)).sourcesMap!;
-        if (!sourceMap.has(dataCid)) {
-          sourceMap.set(dataCid, fileSource);
-          (<FileNode>node.entries.get(segment)).sources.push(fileSource);
         }
       }
     }

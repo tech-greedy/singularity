@@ -16,8 +16,8 @@ describe('IndexService', () => {
     service['ipfsClient'] = ipfs;
   });
   beforeEach(async () => {
-    await Datastore.ScanningRequestModel.remove();
-    await Datastore.GenerationRequestModel.remove();
+    await Datastore.ScanningRequestModel.deleteMany();
+    await Datastore.GenerationRequestModel.deleteMany();
   });
   describe('start', () => {
     it('should start the service', () => {
@@ -78,18 +78,30 @@ describe('IndexService', () => {
         index: 0,
         generatedFileList: [
           {
+            path: '',
+            dir: true,
+            cid: 'data1'
+          },
+          {
+            path: path.join('a'),
+            dir: true,
+            cid: 'cid2'
+          },
+          {
             path: path.join('a', 'b.mp4'),
-            selector: [0, 0],
             size: 100,
             start: 0,
-            end: 100
+            end: 100,
+            dir: false,
+            cid: 'cid3'
           },
           {
             path: path.join('a', 'c.mp4'),
-            selector: [0, 1],
             size: 100,
             start: 0,
-            end: 50
+            end: 50,
+            dir: false,
+            cid: 'cid4'
           },
         ]
       })
@@ -103,21 +115,33 @@ describe('IndexService', () => {
         generationId: generation2.id,
         generatedFileList: [
           {
+            path: '',
+            dir: true,
+            cid: 'data2'
+          },
+          {
             path: path.join('a'),
-            selector: [0],
-            dir: true
+            dir: true,
+            cid: 'cid6'
           },
           {
             path: path.join('a', 'c.mp4'),
-            selector: [0, 0],
             size: 100,
             start: 50,
-            end: 100
+            end: 100,
+            dir: false,
+            cid: 'cid7'
+          },
+          {
+            path: path.join('d'),
+            dir: true,
+            cid: 'cid8'
           },
           {
             path: path.join('d', 'e.mp4'),
-            selector: [1, 0],
-            size: 100
+            size: 100,
+            dir: false,
+            cid: 'cid9'
           },
         ]
       });
@@ -125,13 +149,13 @@ describe('IndexService', () => {
         .get(`/create/${scanningRequest.id}`)
         .set('Accept', 'application/json');
       expect(response.status).toEqual(200);
-      const expectCid = 'bafyreigk3f2znurdgrmtjxemcegd5m7662aymxtzpkx7msobsb75f6xkya';
+      const expectCid = 'bafyreierxb23v5bfuopejyuofp5tp75ywjwttflq5rvky7x2zutok7gusm';
       expect(response.body).toEqual({
         rootCid: expectCid
       });
       const result = await service['ipfsClient'].dag.get(CID.parse(expectCid));
-      const expectedCidA = CID.parse('bafyreidn23unhic76og5u3khw76i4fz7hhn5hdtvb7tmhzy3zqxkluw7tm');
-      const expectedCidD = CID.parse('bafyreigs4ma6yormosommvf44yrv2cniqtzaskln3zejyy5kvd4sexdgom');
+      const expectedCidA = CID.parse('bafyreiawgqtrxyps4w34nzpnv42ry32kaiuafqvam4e5ou55kxjf2yyn5a');
+      const expectedCidD = CID.parse('bafyreidvdz5gffokecbuazmlritxmwntk3oucng4auc7oxdqdwd2pgttdu');
       const expectedResult = {
         name: '',
         type: 'dir',
@@ -139,16 +163,7 @@ describe('IndexService', () => {
           a: expectedCidA,
           d: expectedCidD
         },
-        sourcesMap: null,
-        sources: [{
-            dataCid: 'data1',
-            pieceCid: 'piece1',
-            selector: []
-          },{
-            dataCid: 'data2',
-            pieceCid: 'piece2',
-            selector: []
-          }]
+        sources: ['data1', 'data2']
       };
       expect(result.value).toEqual(expectedResult);
       const resultA = await service['ipfsClient'].dag.get(expectedCidA);
@@ -161,47 +176,30 @@ describe('IndexService', () => {
             name: 'b.mp4',
             size: 100,
             type: 'file',
-            sourcesMap: null,
             sources: [
               {
                 to: 100,
                 from: 0,
-                dataCid: 'data1',
-                pieceCid: 'piece1',
-                selector: [0, 0]
+                cid: "cid3"
               }]
           },
           'c.mp4': {
             name: 'c.mp4',
             size: 100,
             type: 'file',
-            sourcesMap: null,
             sources: [{
                 to: 50,
                 from: 0,
-                dataCid: 'data1',
-                pieceCid: 'piece1',
-                selector: [0, 1]
+                cid: "cid4"
               },
               {
                 to: 100,
                 from: 50,
-                dataCid: 'data2',
-                pieceCid: 'piece2',
-                selector: [0, 0]
+                cid: "cid7"
               }]
           }
         },
-        sourcesMap: null,
-        sources: [{
-            dataCid: 'data1',
-            pieceCid: 'piece1',
-            selector: [0]
-          },{
-            dataCid: 'data2',
-            pieceCid: 'piece2',
-            selector: [0]
-          }]
+        sources: ['cid2', 'cid6']
       };
       const expectedResultD = {
         name: 'd',
@@ -211,22 +209,14 @@ describe('IndexService', () => {
             name: 'e.mp4',
             size: 100,
             type: 'file',
-            sourcesMap: null,
             sources: [{
                 to: 100,
                 from: 0,
-                dataCid: 'data2',
-                pieceCid: 'piece2',
-                selector: [1, 0]
+                cid: 'cid9'
               }]
           }
         },
-        sourcesMap: null,
-        sources: [{
-            dataCid: 'data2',
-            pieceCid: 'piece2',
-            selector: [1]
-          }]
+        sources: ['cid8']
       }
       expect(resultA.value).toEqual(expectedResultA);
       expect(resultD.value).toEqual(expectedResultD);
