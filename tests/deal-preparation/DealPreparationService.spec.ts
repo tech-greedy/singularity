@@ -14,10 +14,10 @@ describe('DealPreparationService', () => {
     service = new DealPreparationService();
   });
   beforeEach(async () => {
-    await Datastore.ScanningRequestModel.remove();
-    await Datastore.GenerationRequestModel.remove();
-    await Datastore.InputFileListModel.remove();
-    await Datastore.OutputFileListModel.remove();
+    await Datastore.ScanningRequestModel.deleteMany();
+    await Datastore.GenerationRequestModel.deleteMany();
+    await Datastore.InputFileListModel.deleteMany();
+    await Datastore.OutputFileListModel.deleteMany();
   });
   describe('cleanupHealthCheck', () => {
     it('should clean up scanningrequest and generationrequest table', async () => {
@@ -142,12 +142,10 @@ describe('DealPreparationService', () => {
           end: 60,
           size: 100,
           cid: 'file_cid',
-          selector: [],
           dir: false
         }, {
           path: '/data',
           cid: 'dir_cid',
-          selector: [],
           dir: true
         },{
           path: '',
@@ -219,7 +217,6 @@ describe('DealPreparationService', () => {
           end: 0,
           size: 100,
           cid: 'cid',
-          selector: [],
           dir: false
         }]
       })
@@ -248,7 +245,6 @@ describe('DealPreparationService', () => {
         end: 0,
         size: 100,
         cid: 'cid',
-        selector: [],
         dir: false
       }));
     });

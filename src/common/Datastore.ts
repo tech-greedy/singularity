@@ -81,7 +81,6 @@ export default class Datastore {
       end: Schema.Types.Number,
       dir: Schema.Types.Boolean,
       cid: Schema.Types.String,
-      selector: [Schema.Types.Number]
     });
     const schema = new Schema<OutputFileList>({
       generationId: {

@@ -227,7 +227,7 @@ export default class DealPreparationService extends BaseService {
     const generatedFileList = (await Datastore.OutputFileListModel.find({
       generationId: found.id
     })).map(r => r.generatedFileList).flat().map(r => ({
-      path: r.path, size: r.size, start: r.start, end: r.end, dir: r.dir, selector: r.selector, cid: r.cid
+      path: r.path, size: r.size, start: r.start, end: r.end, dir: r.dir, cid: r.cid
     }));
 
     const result = {

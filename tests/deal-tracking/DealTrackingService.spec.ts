@@ -10,8 +10,8 @@ describe('DealTrackingService', () => {
     service = new DealTrackingService();
   });
   beforeEach(async () => {
-    await Datastore.DealStateModel.remove();
-    await Datastore.DealTrackingStateModel.remove();
+    await Datastore.DealStateModel.deleteMany();
+    await Datastore.DealTrackingStateModel.deleteMany();
   })
   describe('start', () => {
     it('should start the service', () => {
@@ -170,7 +170,7 @@ describe('DealTrackingService', () => {
       }))
     })
   })
-  
+
   xdescribe('insertDealFromFilscan', () => {
     xit('should download all deal ids for a client - real network call', async () => {
       await service['insertDealFromFilscan']('f3vfs6f7tagrcpnwv65wq3leznbajqyg77bmijrpvoyjv3zjyi3urq25vigfbs3ob6ug5xdihajumtgsxnz2pa', 0);

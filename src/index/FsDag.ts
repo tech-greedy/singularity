@@ -1,15 +1,12 @@
 import { CID } from 'ipfs-core';
 
 export interface Source {
-  dataCid: string,
-  pieceCid: string,
-  selector?: number[],
-  from?: number,
-  to?: number,
+  from: number,
+  to: number,
+  cid: string,
 }
 
 export interface FileNode {
-  sourcesMap: Map<string, Source> | null,
   sources: Source[],
   name: string,
   size: number,
@@ -17,8 +14,7 @@ export interface FileNode {
 }
 
 export interface DirNode {
-  sourcesMap: Map<string, Source> | null,
-  sources: Source[],
+  sources: string[],
   name: string,
   entries: Map<string, FileNode | DirNode | CID>,
   type: 'dir'
