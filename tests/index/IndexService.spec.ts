@@ -62,7 +62,7 @@ describe('IndexService', () => {
         error: ErrorCode.DATASET_NOT_FOUND
       });
     })
-    fit('should return rootCid', async () => {
+    it('should return rootCid', async () => {
       const scanningRequest = await Datastore.ScanningRequestModel.create({
         status: 'completed',
         path: path.join('base', 'path')
