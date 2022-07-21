@@ -277,7 +277,7 @@ export default class DealReplicationService extends BaseService {
           const csv = new ObjectsToCsv(csvRow);
           const configDir = config.util.getEnv('NODE_CONFIG_DIR');
           await fs.mkdirp(path.join(configDir, 'csv'));
-          if (await fs.pathExists('${configDir}/csv')) {
+          if (await fs.pathExists(path.join(configDir, 'csv'))) {
             const filename = `${configDir}/csv/${deals[0].provider}_${id}.csv`;
             await csv.toDisk(filename);
             response.end(`CSV saved to ${filename}`);
