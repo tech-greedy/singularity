@@ -281,8 +281,8 @@ Worker to scan the dataset, make plan and generate Car file and CIDs
 Whether to enable the worker and how many worker instances. As a rule of thumb, use `min(cpu_cores / 2.5, io_MBps / 50)`
 
 # FAQ and common issues
-### Does it work in Windows
-Only Deal Preparation works and Indexing works in Windows.
+### Does it work on Windows
+Only Deal Preparation works and Indexing works on Windows.
 Deal Replication and Retrieval only works in Linux/Mac due to dependency restrictions. 
 
 ### Error - too many open files
@@ -293,3 +293,10 @@ If you are using network mount such as NFS or Goofys, a temporary network issue 
 If the error rate is less than 10%, you may assume they are transient and can be fixed by performing a [retry](#retry-a-request).
 If the error is consistent, you will need to dig into the root cause of what have gone wrong. It could be incorrectly configured permission or DNS resolver, etc. You can find more details in `/var/log/syslog`.
 
+### Installation failed when using root
+Avoid using root, or try the fix below
+```shell
+chown -R $(whoami) ~/
+npm config set unsafe-perm true
+npm config set user 0
+```
