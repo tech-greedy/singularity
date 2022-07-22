@@ -80,8 +80,7 @@ export default class Datastore {
       start: Schema.Types.Number,
       end: Schema.Types.Number,
       dir: Schema.Types.Boolean,
-      cid: Schema.Types.String,
-      selector: [Schema.Types.Number]
+      cid: Schema.Types.String
     });
     const schema = new Schema<OutputFileList>({
       generationId: {
@@ -150,6 +149,7 @@ export default class Datastore {
       status: Schema.Types.String,
       cronSchedule: Schema.Types.String,
       cronMaxDeals: Schema.Types.Number,
+      cronMaxPendingDeals: Schema.Types.Number,
       errorMessage: Schema.Types.String
     }, {
       timestamps: true

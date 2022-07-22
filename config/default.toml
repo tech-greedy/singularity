@@ -48,7 +48,7 @@ port = 7003
 ipfs_http = "http://localhost:5001"
 
 [ipfs]
-# Whether to start a built-in IPFS daemon
+# Whether to start a built-in IPFS daemon - experimental
 enabled = false
 
 [http_hosting_service]

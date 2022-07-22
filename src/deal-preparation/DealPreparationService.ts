@@ -25,6 +25,7 @@ export default class DealPreparationService extends BaseService {
   public constructor () {
     super(Category.DealPreparationService);
     this.handleCreatePreparationRequest = this.handleCreatePreparationRequest.bind(this);
+    this.handleUpdateGenerationRequest = this.handleUpdateGenerationRequest.bind(this);
     this.handleUpdatePreparationRequest = this.handleUpdatePreparationRequest.bind(this);
     this.handleRemovePreparationRequest = this.handleRemovePreparationRequest.bind(this);
     this.handleListPreparationRequests = this.handleListPreparationRequests.bind(this);
@@ -46,7 +47,8 @@ export default class DealPreparationService extends BaseService {
     this.app.post('/preparation', this.handleCreatePreparationRequest);
     this.app.post('/preparation/:id', this.handleUpdatePreparationRequest);
     this.app.delete('/preparation/:id', this.handleRemovePreparationRequest);
-    this.app.post('/preparation/:id/:generation', this.handleUpdatePreparationRequest);
+    this.app.post('/generation/:dataset/:id', this.handleUpdateGenerationRequest);
+    this.app.post('/generation/:dataset', this.handleUpdateGenerationRequest);
     this.app.get('/preparations', this.handleListPreparationRequests);
     this.app.get('/preparation/:id', this.handleGetPreparationRequest);
     this.app.get('/generation/:dataset/:id', this.handleGetGenerationRequest);
@@ -73,16 +75,21 @@ export default class DealPreparationService extends BaseService {
     for (const dir of dirs) {
       try {
         await fs.access(dir, constants.F_OK);
-        for (const file of await fs.readdir(dir)) {
-          const regex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.car$/;
-          if (regex.test(file)) {
-            const fullPath = path.join(dir, file);
-            this.logger.info(`Removing temporary file ${fullPath}`);
+      } catch (e) {
+        this.logger.warn(`${dir} cannot be removed during cleanup.`, { error: e });
+        continue;
+      }
+      for (const file of await fs.readdir(dir)) {
+        const regex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.car$/;
+        if (regex.test(file)) {
+          const fullPath = path.join(dir, file);
+          this.logger.info(`Removing temporary file ${fullPath}`);
+          try {
             await fs.rm(fullPath);
+          } catch (e) {
+            this.logger.warn(`${fullPath} cannot be removed during cleanup.`, { error: e });
           }
         }
-      } catch (e) {
-        this.logger.warn(`${dir} cannot be read during cleanup.`);
       }
     }
     let tmpDirs = (await Datastore.ScanningRequestModel.find()).map(r => r.tmpDir);
@@ -90,10 +97,22 @@ export default class DealPreparationService extends BaseService {
     for (const dir of tmpDirs) {
       if (dir) {
         try {
-          await fs.rm(dir, { recursive: true, force: true });
-          this.logger.info(`Removing temporary folder ${dir}`);
+          await fs.access(dir, constants.F_OK);
         } catch (e) {
-          this.logger.warn(`${dir} cannot be read during cleanup.`);
+          this.logger.warn(`${dir} cannot be removed during cleanup.`, { error: e });
+          continue;
+        }
+        for (const file of await fs.readdir(dir)) {
+          const regex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+          if (regex.test(file)) {
+            const fullPath = path.join(dir, file);
+            this.logger.info(`Removing temporary folder ${fullPath}`);
+            try {
+              await fs.rm(fullPath, { recursive: true, force: true });
+            } catch (e) {
+              this.logger.warn(`${fullPath} cannot be removed during cleanup.`, { error: e });
+            }
+          }
         }
       }
     }
@@ -127,12 +146,10 @@ export default class DealPreparationService extends BaseService {
     if (ObjectId.isValid(id)) {
       this.logger.debug('id is valid ObjectId');
       found = await Datastore.GenerationRequestModel.findById(id);
-    } else if (ObjectId.isValid(dataset) && idIsInt) {
+    } else if (idIsInt) {
       this.logger.debug('id is valid integer and dataset is valid ObjectId');
-      found = await Datastore.GenerationRequestModel.findOne({ index: id, datasetId: dataset });
-    } else if (dataset !== undefined && idIsInt) {
-      this.logger.debug('id is valid integer and dataset is undefined');
-      found = await Datastore.GenerationRequestModel.findOne({ index: id, datasetName: dataset });
+      found = await Datastore.GenerationRequestModel.findOne({ index: id, datasetName: dataset }) ??
+        await Datastore.GenerationRequestModel.findOne({ index: id, datasetId: dataset });
     } else {
       this.sendError(response, ErrorCode.INVALID_OBJECT_ID);
       return undefined;
@@ -210,7 +227,7 @@ export default class DealPreparationService extends BaseService {
     const generatedFileList = (await Datastore.OutputFileListModel.find({
       generationId: found.id
     })).map(r => r.generatedFileList).flat().map(r => ({
-      path: r.path, size: r.size, start: r.start, end: r.end, dir: r.dir, selector: r.selector, cid: r.cid
+      path: r.path, size: r.size, start: r.start, end: r.end, dir: r.dir, cid: r.cid
     }));
 
     const result = {
@@ -236,7 +253,8 @@ export default class DealPreparationService extends BaseService {
   private async handleGetPreparationRequest (request: Request, response: Response) {
     const id = request.params['id'];
     this.logger.info(`Received request to get details of dataset preparation request.`, { id });
-    const found = ObjectId.isValid(id) ? await Datastore.ScanningRequestModel.findById(id) : await Datastore.ScanningRequestModel.findOne({ name: id });
+    const found = await Datastore.ScanningRequestModel.findOne({ name: id }) ??
+      (ObjectId.isValid(id) ? await Datastore.ScanningRequestModel.findById(id) : undefined);
     if (!found) {
       this.sendError(response, ErrorCode.DATASET_NOT_FOUND);
       return;
@@ -302,44 +320,52 @@ export default class DealPreparationService extends BaseService {
     const generation = request.params['generation'];
     const { purge } = <DeletePreparationRequest>request.body;
     this.logger.info(`Received request to delete dataset preparation request.`, { id, generation, purge });
-    const found = ObjectId.isValid(id) ? await Datastore.ScanningRequestModel.findById(id) : await Datastore.ScanningRequestModel.findOne({ name: id });
+    const found = await Datastore.ScanningRequestModel.findOne({ name: id }) ??
+      (ObjectId.isValid(id) ? await Datastore.ScanningRequestModel.findById(id) : undefined);
     if (!found) {
       this.sendError(response, ErrorCode.DATASET_NOT_FOUND);
       return;
     }
 
     if (purge) {
-      for await (const { dataCid } of Datastore.GenerationRequestModel.find({ datasetId: found.id }, { dataCid: 1 })) {
-        const filename = path.join(found.outDir, dataCid + '.car');
-        this.logger.info(`Removing file.`, { filename });
-        await fs.rm(filename, { force: true });
+      for await (const { dataCid, pieceCid } of Datastore.GenerationRequestModel.find({ datasetId: found.id }, { dataCid: 1, pieceCid: 1 })) {
+        const filename1 = path.join(found.outDir, dataCid + '.car');
+        const filename2 = path.join(found.outDir, pieceCid + '.car');
+        this.logger.info(`Removing file.`, { filename1 });
+        await fs.rm(filename1, { force: true });
+        this.logger.info(`Removing file.`, { filename2 });
+        await fs.rm(filename2, { force: true });
       }
     }
 
-    await found.remove();
-    await Datastore.GenerationRequestModel.deleteMany({ datasetId: found.id });
+    await found.delete();
+    for (const generationRequest of await Datastore.GenerationRequestModel.find({ datasetId: found.id })) {
+      await Datastore.InputFileListModel.deleteMany({ generationId: generationRequest.id });
+      await Datastore.OutputFileListModel.deleteMany({ generationId: generationRequest.id });
+      await generationRequest.delete();
+    }
 
     response.end();
   }
 
   private async handleUpdatePreparationRequest (request: Request, response: Response) {
     const id = request.params['id'];
-    const generation = request.params['generation'];
     const { action } = <UpdatePreparationRequest>request.body;
-    this.logger.info(`Received request to update dataset preparation request.`, { id, generation, action });
+    this.logger.info(`Received request to update dataset preparation request.`, { id, action });
     if (!['resume', 'pause', 'retry'].includes(action)) {
       this.sendError(response, ErrorCode.ACTION_INVALID);
       return;
     }
-    const found = ObjectId.isValid(id) ? await Datastore.ScanningRequestModel.findById(id) : await Datastore.ScanningRequestModel.findOne({ name: id });
+    const found = await Datastore.ScanningRequestModel.findOne({ name: id }) ??
+      (ObjectId.isValid(id) ? await Datastore.ScanningRequestModel.findById(id) : undefined);
     if (!found) {
       this.sendError(response, ErrorCode.DATASET_NOT_FOUND);
       return;
     }
     const actionMap = {
       resume: [{ status: 'paused' }, { status: 'active', workerId: null }],
-      pause: [{ status: 'active', workerId: null }, { status: 'paused' }],
-      retry: [{ status: 'error' }, { status: 'active', errorMessage: undefined, workerId: null }]
+      pause: [{ status: 'active' }, { status: 'paused', workerId: null }],
+      retry: [{ status: 'error' }, { status: 'active', $unset: { errorMessage: 1 }, workerId: null }]
     };
 
     const changed = (await Datastore.ScanningRequestModel.findOneAndUpdate({
@@ -348,6 +374,32 @@ export default class DealPreparationService extends BaseService {
     }, actionMap[action][1])) != null
       ? 1
       : 0;
+
+    response.end(JSON.stringify({
+      scanningRequestsChanged: changed
+    }));
+  }
+
+  private async handleUpdateGenerationRequest (request: Request, response: Response) {
+    const dataset = request.params['dataset'];
+    const generation = request.params['id'];
+    const { action } = <UpdatePreparationRequest>request.body;
+    this.logger.info(`Received request to update dataset preparation request.`, { dataset, generation, action });
+    if (!['resume', 'pause', 'retry'].includes(action)) {
+      this.sendError(response, ErrorCode.ACTION_INVALID);
+      return;
+    }
+    const found = await Datastore.ScanningRequestModel.findOne({ name: dataset }) ??
+      (ObjectId.isValid(dataset) ? await Datastore.ScanningRequestModel.findById(dataset) : undefined);
+    if (!found) {
+      this.sendError(response, ErrorCode.DATASET_NOT_FOUND);
+      return;
+    }
+    const actionMap = {
+      resume: [{ status: 'paused' }, { status: 'active', workerId: null }],
+      pause: [{ status: 'active' }, { status: 'paused', workerId: null }],
+      retry: [{ status: 'error' }, { status: 'active', $unset: { errorMessage: 1 }, workerId: null }]
+    };
 
     let changedGenerations;
     let changedGeneration;
@@ -379,7 +431,6 @@ export default class DealPreparationService extends BaseService {
     }
 
     response.end(JSON.stringify({
-      scanningRequestsChanged: changed,
       generationRequestsChanged: changedGenerations ?? changedGeneration
     }));
   }

@@ -39,9 +39,9 @@ describe('Datastore', () => {
     it('should be able to create and fetch entries', async () => {
       const model = new Datastore.OutputFileListModel();
       model.generationId = 'generationId';
-      const fileInfo1 = {path: 'path1', start: 0, end: 0 , size: 1024, dir: false, selector: [], cid: 'cid1' }
-      const fileInfo2 = {path: 'path2', start: 0, end: 0 , size: 1024, dir: false, selector: [], cid: 'cid2' }
-      const fileInfo3 = {path: 'path3', start: 0, end: 0 , size: 1024, dir: false, selector: [], cid: 'cid3' }
+      const fileInfo1 = {path: 'path1', start: 0, end: 0 , size: 1024, dir: false, cid: 'cid1' }
+      const fileInfo2 = {path: 'path2', start: 0, end: 0 , size: 1024, dir: false, cid: 'cid2' }
+      const fileInfo3 = {path: 'path3', start: 0, end: 0 , size: 1024, dir: false, cid: 'cid3' }
       model.generatedFileList = [fileInfo1, fileInfo2, fileInfo3];
       await model.save();
       const found = await Datastore.OutputFileListModel.findOne({ generationId: model.generationId });

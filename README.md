@@ -17,7 +17,7 @@ nvm install 16
 # Install globally from npm
 ```shell
 npm i -g @techgreedy/singularity
-singularity-prepare -h
+singularity -h
 ```
 # Build and run from source
 ## 1. Transpile this project
@@ -27,7 +27,7 @@ cd singularity
 npm ci
 npm run build
 npm link
-npx singularity -h
+singularity -h
 ```
 ## 2. Build Dependency
 By default, npm will pull the pre-built binaries for dependencies. You can choose to build it from source and override the one pulled by npm.
@@ -40,6 +40,8 @@ make
 Then copy the generated binary to override the existing one from the PATH for your node environment, i.e.
 * singularity installed globally `/home/user/.nvm/versions/node/v16.xx.x/lib/node_modules/.bin`
 * singularity cloned locally `./node_modules/.bin`
+
+Note the path may change depending on the nodejs version, if you cannot find folder above, try search for generate-car binary first, i.e. `find ~/.nvm -name 'generate-car'`
 
 
 # Initialization
@@ -126,9 +128,9 @@ Commands:
   list [options]                                         List all deal preparation requests
   generation-manifest [options] <generationId>           Get the Slingshot v3.x manifest data for a single deal generation request
   generation-status [options] <generationId>             Check the status of a single deal generation request
-  pause [options] <dataset> [generationId]               Pause an active deal preparation request and its active deal generation requests
-  resume [options] <dataset> [generationId]              Resume a paused deal preparation request and its paused deal generation requests
-  retry [options] <dataset> [generationId]               Retry an errored preparation request and its errored deal generation requests
+  pause                                                  Pause scanning or generation requests
+  resume                                                 Resume scanning or generation requests
+  retry                                                  Retry scanning or generation requests
   remove [options] <dataset>                             Remove all records from database for a dataset
   help [command]                                         display help for command
 ```
@@ -148,19 +150,18 @@ Arguments:
 
 Options:
   -s, --deal-size <deal_size>  Target deal size, i.e. 32GiB (default: "32 GiB")
+  -t, --tmp-dir <tmp_dir>      Optional temporary directory. May be useful when it is at least 2x faster than the dataset source, such as when the dataset is on network mount, and the I/O is the bottleneck
   -m, --min-ratio <min_ratio>  Min ratio of deal to sector size, i.e. 0.55
   -M, --max-ratio <max_ratio>  Max ratio of deal to sector size, i.e. 0.95
   -h, --help                   display help for command
 ```
-### Pause/Resume a request
-You can pause the entire deal preparation or a specific generation request. However, all ongoing generation requests taken by the workers will not be paused.
+### Pause/Resume/Retry a request
+For each dataset preparation request, it always starts with scanning request, once enough files can be packed into a single deal, it will create a generation request. In other words, each preparation request is a single scanning request and a bunch of generation requests.
+
+You can pause/resume/retry the scanning request or generation requests. 
 ```shell
 $ singularity prep pause -h
 $ singularity prep resume -h
-```
-### Retry a request
-Sometimes, the request may fail due to reasons such as I/O error. Once they hit the error state, you can choose to retry those requests after you've solved underlying issues.
-```shell
 $ singularity prep retry -h
 ```
 ### Remove a request
@@ -196,6 +197,11 @@ Currently it is required to have both lotus and boost cli binary in order for th
 Look for `default.toml` in the initialized repo, verify in the [deal_replication_worker] section, both binary can be accessed.
 If you need to specify environment variable like FULLNODE_API_INFO, it can also be specified there.
 
+### Setup Lotus Lite node
+In order to make deals, we recommend setting up a [lite node](https://lotus.filecoin.io/lotus/install/lotus-lite/) to use with the tool. 
+
+Once you have the lite node setup, you can import your wallet key for the verified client address.
+
 ### Deal making
 ```shell
 $ singularity repl start -h                                                                 
@@ -204,22 +210,23 @@ Usage: singularity replication start [options] <datasetid> <storage-providers> <
 Start deal replication for a prepared local dataset
 
 Arguments:
-  datasetid                            Existing ID of dataset prepared.
-  storage-providers                    Comma separated storage provider list
-  client                               Client address where deals are proposed from
-  # of replica                         Number of targeting replica of the dataset (default: 10)
+  datasetid                                            Existing ID of dataset prepared.
+  storage-providers                                    Comma separated storage provider list
+  client                                               Client address where deals are proposed from
+  # of replica                                         Number of targeting replica of the dataset (default: 10)
 
 Options:
-  -u, --url-prefix <urlprefix>         URL prefix for car downloading. Must be reachable by provider's boostd node. (default: "http://127.0.0.1/")
-  -p, --price <maxprice>               Maximum price per epoch per GiB in Fil. (default: "0")
-  -r, --verified <verified>            Whether to propose deal as verified. true|false. (default: "true")
-  -s, --start-delay <startdelay>       Deal start delay in days. (StartEpoch) (default: "7")
-  -d, --duration <duration>            Duration in days for deal length. (default: "525")
-  -o, --offline <offline>              Propose as offline deal. (default: "true")
-  -m, --max-deals <maxdeals>           Max number of deals in this replication request per SP, per cron triggered. (default: "0")
-  -c, --cron-schedule <cronschedule>   Optional cron to send deals at interval. Use double quote to wrap the format containing spaces.
-  -x, --cron-max-deals <cronmaxdeals>  When cron schedule specified, limit the total number of deals across entire cron, per SP.
-  -h, --help                           display help for command
+  -u, --url-prefix <urlprefix>                         URL prefix for car downloading. Must be reachable by provider's boostd node. (default: "http://127.0.0.1/")
+  -p, --price <maxprice>                               Maximum price per epoch per GiB in Fil. (default: "0")
+  -r, --verified <verified>                            Whether to propose deal as verified. true|false. (default: "true")
+  -s, --start-delay <startdelay>                       Deal start delay in days. (StartEpoch) (default: "7")
+  -d, --duration <duration>                            Duration in days for deal length. (default: "525")
+  -o, --offline <offline>                              Propose as offline deal. (default: "true")
+  -m, --max-deals <maxdeals>                           Max number of deals in this replication request per SP, per cron triggered. (default: "0")
+  -c, --cron-schedule <cronschedule>                   Optional cron to send deals at interval. Use double quote to wrap the format containing spaces.
+  -x, --cron-max-deals <cronmaxdeals>                  When cron schedule specified, limit the total number of deals across entire cron, per SP.
+  -xp, --cron-max-pending-deals <cronmaxpendingdeals>  When cron schedule specified, limit the total number of pending deals determined by dealtracking service, per SP.
+  -h, --help                                           display help for command
 ```
 A simple example to send all car files in one prepared dataset "CommonCrawl" to one storage provider f01234 immediately:
 ```shell
@@ -273,10 +280,23 @@ Worker to scan the dataset, make plan and generate Car file and CIDs
 #### enabled, num_workers
 Whether to enable the worker and how many worker instances. As a rule of thumb, use `min(cpu_cores / 2.5, io_MBps / 50)`
 
-# FAQ
-### Does it work in Windows
-Only Deal Preparation works and Indexing works in Windows.
+# FAQ and common issues
+### Does it work on Windows
+Only Deal Preparation works and Indexing works on Windows.
 Deal Replication and Retrieval only works in Linux/Mac due to dependency restrictions. 
 
 ### Error - too many open files
 In case that one CAR contains more files than allowed by OS, you will need to increase the open file limit with `ulimit`, or `LimitNOFILE` if using systemd.
+
+### Error - open /some/file: remote I/O error
+If you are using network mount such as NFS or Goofys, a temporary network issue may cause the CAR file generation to fail.
+If the error rate is less than 10%, you may assume they are transient and can be fixed by performing a [retry](#retry-a-request).
+If the error is consistent, you will need to dig into the root cause of what have gone wrong. It could be incorrectly configured permission or DNS resolver, etc. You can find more details in `/var/log/syslog`.
+
+### Installation failed when using root
+Avoid using root, or try the fix below
+```shell
+chown -R $(whoami) ~/
+npm config set unsafe-perm true
+npm config set user 0
+```

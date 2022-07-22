@@ -13,10 +13,10 @@ describe('DealPreparationWorker', () => {
     worker = new DealPreparationWorker();
   });
   beforeEach(async () => {
-    await Datastore.ScanningRequestModel.remove();
-    await Datastore.GenerationRequestModel.remove();
-    await Datastore.InputFileListModel.remove();
-    await Datastore.OutputFileListModel.remove();
+    await Datastore.ScanningRequestModel.deleteMany();
+    await Datastore.GenerationRequestModel.deleteMany();
+    await Datastore.InputFileListModel.deleteMany();
+    await Datastore.OutputFileListModel.deleteMany();
   });
   afterAll(async () => {
     for (const file of await fs.readdir('.')) {
@@ -123,8 +123,12 @@ describe('DealPreparationWorker', () => {
       await worker['pollWork']();
     })
     it('should generate commp, car files', async () => {
+      const scanning = await Datastore.ScanningRequestModel.create({
+        name: 'name',
+        status: 'completed'
+      })
       const created = await Datastore.GenerationRequestModel.create({
-        datasetId: 'id',
+        datasetId: scanning.id,
         datasetName: 'name',
         path: 'tests/test_folder',
         index: 0,
@@ -223,11 +227,74 @@ describe('DealPreparationWorker', () => {
     })
   })
   describe('scan', () => {
+    it('should delete pending generations and start from last one', async () => {
+      const scanning = await Datastore.ScanningRequestModel.create({
+        name: 'name',
+        path: path.join('tests', 'test_folder'),
+        minSize: 12,
+        maxSize: 16,
+        status: 'active',
+        outDir: '.',
+        tmpDir: './tmpdir'
+      });
+      const active = await Datastore.GenerationRequestModel.create({
+        datasetId: scanning.id,
+        datasetName: 'name',
+        path: path.join('tests', 'test_folder'),
+        index: 0,
+        status: 'active',
+        outDir: '.',
+        tmpDir: './tmpdir'
+      })
+      await Datastore.InputFileListModel.create({
+        generationId: active.id,
+        index: 0,
+        fileList: [{
+          path: path.join('tests', 'test_folder', 'a', '1.txt'),
+          size: 3,
+        }, {
+          path: path.join('tests', 'test_folder', 'b', '2.txt'),
+          size: 27,
+          start: 0,
+          end: 9,
+        }],
+      });
+      const pending = await Datastore.GenerationRequestModel.create({
+        datasetId: scanning.id,
+        datasetName: 'name',
+        path: path.join('tests', 'test_folder'),
+        index: 1,
+        status: 'created',
+        outDir: '.',
+        tmpDir: './tmpdir'
+      })
+      const pendingList = await Datastore.InputFileListModel.create({
+        generationId: pending.id,
+        index: 0,
+        fileList: [{
+          path: path.join('tests', 'test_folder', 'b', '2.txt'),
+          size: 27,
+          start: 9,
+          end: 21,
+        }],
+      });
+      await worker['scan'](scanning);
+      expect(await Datastore.GenerationRequestModel.findById(pending.id)).toBeNull();
+      expect(await Datastore.GenerationRequestModel.findById(active.id)).not.toBeNull();
+      expect(await Datastore.InputFileListModel.findById(pendingList.id)).toBeNull();
+      const requests = await Datastore.GenerationRequestModel.find({}, null, { sort: { index: 1 } });
+      expect(requests.length).toEqual(4);
+      expect((await Datastore.InputFileListModel.findOne({generationId: requests[1].id}))!.fileList).toEqual([jasmine.objectContaining({
+        path: path.join('tests', 'test_folder', 'b', '2.txt'),
+        size: 27,
+        start: 9,
+        end: 21,
+      })])
+    })
     it('should work with >1000 fileList', async () => {
       let fileList: FileList = Array(5000).fill(null).map((_, i) => ({
         path: `tests/test_folder/folder/${i}.txt`,
         size: 100,
-        selector: [],
         start: 0,
         end: 0,
         dir: false
@@ -236,15 +303,15 @@ describe('DealPreparationWorker', () => {
         yield fileList;
       };
       spyOn(Scanner, 'scan').and.returnValue(f());
-      await worker['scan']({
-        id: '507f1f77bcf86cd799439011',
+      const scanning = await Datastore.ScanningRequestModel.create({
         name: 'name',
         path: 'tests/test_folder',
         minSize: 12,
         maxSize: 16,
         status: 'active',
         outDir: '.'
-      });
+      })
+      await worker['scan'](scanning);
       const requests = await Datastore.GenerationRequestModel.find({}, null, { sort: { index: 1 } });
       expect(requests.length).toEqual(1);
       const list = await Datastore.InputFileListModel.find({generationId: requests[0].id}, null, {sort: {index: 1}});
@@ -255,8 +322,7 @@ describe('DealPreparationWorker', () => {
       expect(list[4].fileList[999].path).toEqual('tests/test_folder/folder/4999.txt');
     })
     it('should get the correct fileList', async () => {
-      await worker['scan']({
-        id: '507f191e810c19729de860ea',
+      const scanning = await Datastore.ScanningRequestModel.create({
         name: 'name',
         path: path.join('tests', 'test_folder'),
         minSize: 12,
@@ -264,7 +330,8 @@ describe('DealPreparationWorker', () => {
         status: 'active',
         outDir: '.',
         tmpDir: './tmpdir'
-      });
+      })
+      await worker['scan'](scanning);
       const requests = await Datastore.GenerationRequestModel.find({}, null, { sort: { index: 1 } });
       /**
        * a/1.txt -> 3 bytes
@@ -278,7 +345,6 @@ describe('DealPreparationWorker', () => {
        */
       expect(requests.length).toEqual(4);
       expect(requests[0]).toEqual(jasmine.objectContaining({
-        datasetId: '507f191e810c19729de860ea',
         datasetName: 'name',
         path: path.join('tests', 'test_folder'),
         index: 0,
@@ -298,7 +364,6 @@ describe('DealPreparationWorker', () => {
         })],
       }))
       expect(requests[1]).toEqual(jasmine.objectContaining({
-        datasetId: '507f191e810c19729de860ea',
         datasetName: 'name',
         path: path.join('tests', 'test_folder'),
         index: 1,
@@ -315,7 +380,6 @@ describe('DealPreparationWorker', () => {
         })],
       }));
       expect(requests[2]).toEqual(jasmine.objectContaining({
-        datasetId: '507f191e810c19729de860ea',
         datasetName: 'name',
         path: path.join('tests', 'test_folder'),
         index: 2,
@@ -337,7 +401,6 @@ describe('DealPreparationWorker', () => {
       // windows does not support symbolic link
       const dtxtsize = process.platform === 'win32' ? 7 : 9;
       expect(requests[3]).toEqual(jasmine.objectContaining({
-        datasetId: '507f191e810c19729de860ea',
         datasetName: 'name',
         path: path.join('tests', 'test_folder'),
         index: 3,

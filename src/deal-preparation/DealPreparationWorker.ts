@@ -1,5 +1,5 @@
 import { onExit, readableToString, streamEnd, streamWrite } from '@rauschma/stringio';
-import { spawn } from 'child_process';
+import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
 import { randomUUID } from 'crypto';
 import BaseService from '../common/BaseService';
 import Datastore from '../common/Datastore';
@@ -53,16 +53,28 @@ export default class DealPreparationWorker extends BaseService {
   }
 
   private async scan (request: ScanningRequest): Promise<void> {
-    this.logger.debug(`Started scanning.`, { id: request.id, name: request.name, path: request.path, minSize: request.minSize, maxSize: request.maxSize });
+    this.logger.info(`Started scanning.`, { id: request.id, name: request.name, path: request.path, minSize: request.minSize, maxSize: request.maxSize });
     let index = 0;
-    for await (const fileList of Scanner.scan(request.path, request.minSize, request.maxSize)) {
-      const existing = await Datastore.GenerationRequestModel.findOne({ datasetId: request.id, index }, { _id: 1, status: 1 });
-      if (existing) {
-        if (existing.status === 'created') {
-          await Datastore.GenerationRequestModel.findByIdAndDelete(existing.id, { projection: { _id: 1 } });
-        } else {
-          continue;
-        }
+    for (const createdGenerationRequest of await Datastore.GenerationRequestModel.find({ datasetId: request.id, status: 'created' })) {
+      this.logger.info(`Deleting pending generation requests`, { id: createdGenerationRequest.id });
+      await Datastore.InputFileListModel.deleteMany({ generationId: createdGenerationRequest.id });
+      await createdGenerationRequest.delete();
+    }
+    const lastGeneration = await Datastore.GenerationRequestModel.findOne({ datasetId: request.id, status: { $ne: 'created' } }, { _id: 1, index: 1 }, { sort: { index: -1 } });
+    let lastFileInfo: FileInfo | undefined;
+    if (lastGeneration) {
+      const lastFileList = await Datastore.InputFileListModel.findOne({ generationId: lastGeneration.id }, undefined, { sort: { index: -1 } });
+      lastFileInfo = lastFileList!.fileList[lastFileList!.fileList.length - 1];
+      this.logger.info(`Resuming scanning. Start from ${lastFileInfo!.path}, offset: ${lastFileInfo!.end}.`);
+    }
+    for await (const fileList of Scanner.scan(request.path, request.minSize, request.maxSize, lastFileInfo)) {
+      if (!await Datastore.ScanningRequestModel.findById(request.id)) {
+        this.logger.info('The scanning request has been removed. Scanning stopped.', { id: request.id, name: request.name });
+        return;
+      }
+      if ((await Datastore.ScanningRequestModel.findById(request.id))?.status === 'paused') {
+        this.logger.info(`Scanning request has been paused.`, { id: request.id, name: request.name });
+        return;
       }
       const generationRequest = await Datastore.GenerationRequestModel.create({
         datasetId: request.id,
@@ -73,6 +85,7 @@ export default class DealPreparationWorker extends BaseService {
         index,
         status: 'created'
       });
+      this.logger.info('Created a new generation request.', { id: request.id, name: request.name, index });
       for (let i = 0; i < fileList.length; i += 1000) {
         await Datastore.InputFileListModel.updateOne({
           generationId: generationRequest.id,
@@ -87,18 +100,16 @@ export default class DealPreparationWorker extends BaseService {
           upsert: true,
           projection: { _id: 1 }
         });
+        this.logger.debug('Created new INPUT file list for the generation request.', { id: request.id, name: request.name, index, from: i, to: i + 1000 });
       }
       await Datastore.GenerationRequestModel.findByIdAndUpdate(generationRequest.id, {
         status: 'active'
       }, { projection: { _id: 1 } });
+      this.logger.info('Marking generation request to active', { id: request.id, name: request.name, index });
       index++;
-      if ((await Datastore.ScanningRequestModel.findById(request.id))?.status === 'paused') {
-        this.logger.info(`Scanning request has been paused.`);
-        return;
-      }
     }
-    this.logger.debug(`Finished scanning. Inserted ${index} tasks.`);
     await Datastore.ScanningRequestModel.findByIdAndUpdate(request.id, { status: 'completed', workerId: null });
+    this.logger.info(`Finished scanning. Marking scanning to completed. Inserted ${index} generation tasks.`);
   }
 
   private async generate (request: GenerationRequest, input: string): Promise<[stdout: string, stderr: string, statusCode: number | null]> {
@@ -108,7 +119,7 @@ export default class DealPreparationWorker extends BaseService {
     if (request.tmpDir) {
       tmpDir = path.join(request.tmpDir, randomUUID());
     }
-    const [stdout, stderr, exitCode] = await DealPreparationWorker.invokeGenerateCar(input, request.outDir, request.path, tmpDir);
+    const [stdout, stderr, exitCode] = await DealPreparationWorker.invokeGenerateCar(request.id, input, request.outDir, request.path, tmpDir);
     if (tmpDir) {
       await fs.rm(tmpDir, { recursive: true, force: true });
     }
@@ -116,9 +127,24 @@ export default class DealPreparationWorker extends BaseService {
     return [stdout, stderr, exitCode];
   }
 
-  public static async invokeGenerateCar (input: string, outDir: string, p: string, tmpDir?: string)
+  private static async checkPauseOrRemove (generationId: string, child: ChildProcessWithoutNullStreams) {
+    const generation = await Datastore.GenerationRequestModel.findById(generationId);
+    if (generation?.status !== 'active') {
+      try {
+        child.kill();
+      } catch (_) {
+      }
+      return;
+    }
+    if (child.exitCode) {
+      return;
+    }
+    setTimeout(() => DealPreparationWorker.checkPauseOrRemove(generationId, child), 5000);
+  }
+
+  public static async invokeGenerateCar (generationId: string | undefined, input: string, outDir: string, p: string, tmpDir?: string)
     : Promise<[stdout: string, stderr: string, statusCode: number | null]> {
-    const cmd = GenerateCar.path ?? 'generate-car';
+    const cmd = GenerateCar.path!;
     const args = ['-o', outDir, '-p', p];
     if (tmpDir) {
       args.push('-t', tmpDir);
@@ -130,6 +156,9 @@ export default class DealPreparationWorker extends BaseService {
       await streamWrite(child.stdin, input);
       await streamEnd(child.stdin);
     })();
+    if (generationId) {
+      DealPreparationWorker.checkPauseOrRemove(generationId, child);
+    }
     const stdout = await readableToString(child.stdout);
     let stderr = '';
     child.stderr.on('data', function (chunk) {
@@ -194,8 +223,8 @@ export default class DealPreparationWorker extends BaseService {
       // Parse the output and update the database
       const [stdout, stderr, statusCode] = result!;
       if (statusCode !== 0) {
-        this.logger.error(`${this.workerId} - Encountered an error.`, { stderr });
-        await Datastore.GenerationRequestModel.findByIdAndUpdate(newGenerationWork.id, { status: 'error', errorMessage: stderr, workerId: null }, { projection: { _id: 1 } });
+        this.logger.error(`${this.workerId} - Encountered an error.`, { stderr, statusCode });
+        await Datastore.GenerationRequestModel.findOneAndUpdate({ _id: newGenerationWork.id, status: 'active' }, { status: 'error', errorMessage: stderr, workerId: null }, { projection: { _id: 1 } });
         return true;
       }
 
@@ -207,6 +236,10 @@ export default class DealPreparationWorker extends BaseService {
         fileMap.set(path.relative(newGenerationWork.path, fileInfo.path).split(path.sep).join('/'), fileInfo);
       }
       const generatedFileList = DealPreparationWorker.handleGeneratedFileList(fileMap, output.CidMap);
+      if (!await Datastore.ScanningRequestModel.findById(newGenerationWork.datasetId)) {
+        this.logger.info('Scanning request has been removed. Give up updating the generation request', { datasetId: newGenerationWork.datasetId, datasetName: newGenerationWork.datasetName });
+        return true;
+      }
       for (let i = 0; i < generatedFileList.length; i += 1000) {
         await Datastore.OutputFileListModel.updateOne({
           generationId: newGenerationWork.id,
@@ -221,6 +254,7 @@ export default class DealPreparationWorker extends BaseService {
           upsert: true,
           projection: { _id: 1 }
         });
+        this.logger.debug('Created new OUTPUT file list for the generation request.', { id: newGenerationWork.id, name: newGenerationWork.datasetName, index: newGenerationWork.index, from: i, to: i + 1000 });
       }
       await Datastore.GenerationRequestModel.findByIdAndUpdate(newGenerationWork.id, {
         status: 'completed',
@@ -228,12 +262,10 @@ export default class DealPreparationWorker extends BaseService {
         pieceSize: output.PieceSize,
         pieceCid: output.PieceCid,
         carSize: carFileStat.size,
+        $unset: { errorMessage: 1 },
         workerId: null
       }, {
         projection: { _id: 1 }
-      });
-      await Datastore.InputFileListModel.deleteMany({
-        generationId: newGenerationWork.id
       });
       this.logger.info(`${this.workerId} - Finished Generation of dataset.`,
         { id: newGenerationWork.id, datasetName: newGenerationWork.datasetName, index: newGenerationWork.index, timeSpentInMs: timeSpentInMs });

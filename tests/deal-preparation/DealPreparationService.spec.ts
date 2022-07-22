@@ -14,10 +14,10 @@ describe('DealPreparationService', () => {
     service = new DealPreparationService();
   });
   beforeEach(async () => {
-    await Datastore.ScanningRequestModel.remove();
-    await Datastore.GenerationRequestModel.remove();
-    await Datastore.InputFileListModel.remove();
-    await Datastore.OutputFileListModel.remove();
+    await Datastore.ScanningRequestModel.deleteMany();
+    await Datastore.GenerationRequestModel.deleteMany();
+    await Datastore.InputFileListModel.deleteMany();
+    await Datastore.OutputFileListModel.deleteMany();
   });
   describe('cleanupHealthCheck', () => {
     it('should clean up scanningrequest and generationrequest table', async () => {
@@ -108,6 +108,22 @@ describe('DealPreparationService', () => {
     })
   })
   describe('GET /generation-manifest/:id', () => {
+    it('should throw if generation is not complete', async () => {
+      const generationRequest = await Datastore.GenerationRequestModel.create({
+        datasetId: 'datasetId',
+        status: 'active',
+        index: 0,
+        dataCid: 'dataCid',
+        pieceCid: 'pieceCid',
+        pieceSize: 10,
+      });
+      const response = await (supertest(service['app']))
+        .get('/generation-manifest/' + generationRequest.id);
+      expect(response.status).toEqual(400);
+      expect(response.body).toEqual({
+        error: ErrorCode.GENERATION_NOT_COMPLETED
+      });
+    })
     it('should return slingshot compliant manifest', async () => {
       const generationRequest = await Datastore.GenerationRequestModel.create({
         datasetId: 'datasetId',
@@ -126,12 +142,10 @@ describe('DealPreparationService', () => {
           end: 60,
           size: 100,
           cid: 'file_cid',
-          selector: [],
           dir: false
         }, {
           path: '/data',
           cid: 'dir_cid',
-          selector: [],
           dir: true
         },{
           path: '',
@@ -203,7 +217,6 @@ describe('DealPreparationService', () => {
           end: 0,
           size: 100,
           cid: 'cid',
-          selector: [],
           dir: false
         }]
       })
@@ -232,7 +245,6 @@ describe('DealPreparationService', () => {
         end: 0,
         size: 100,
         cid: 'cid',
-        selector: [],
         dir: false
       }));
     });
@@ -366,6 +378,8 @@ describe('DealPreparationService', () => {
         error: ErrorCode.DATASET_NOT_FOUND
       });
     });
+  });
+  describe('POST /generation/:dataset', () => {
     it('should change status for all generation requests if generation is not given', async () => {
       const scanning = await Datastore.ScanningRequestModel.create({
         name: 'name',
@@ -380,11 +394,11 @@ describe('DealPreparationService', () => {
         status: 'completed'
       });
       const response = await supertest(service['app'])
-        .post('/preparation/' + scanning.id)
+        .post('/generation/' + scanning.id)
         .send({ action: 'pause' }).set('Accept', 'application/json');
       expect(response.status).toEqual(200);
       expect(await Datastore.ScanningRequestModel.findById(scanning.id)).toEqual(jasmine.objectContaining({
-        status: 'paused'
+        status: 'active'
       }));
       expect(await Datastore.GenerationRequestModel.findById(r1.id)).toEqual(jasmine.objectContaining({
         status: 'paused'
@@ -393,7 +407,6 @@ describe('DealPreparationService', () => {
         status: 'completed'
       }));
       expect(response.body).toEqual({
-        scanningRequestsChanged: 1,
         generationRequestsChanged: 1
       });
     });
@@ -403,11 +416,10 @@ describe('DealPreparationService', () => {
         status: 'active'
       });
       const response = await supertest(service['app'])
-        .post(`/preparation/${scanning.id}/${fakeId}`)
+        .post(`/generation/${scanning.id}/${fakeId}`)
         .send({ action: 'resume' }).set('Accept', 'application/json');
       expect(response.status).toEqual(200);
       expect(response.body).toEqual({
-        scanningRequestsChanged: 0,
         generationRequestsChanged: 0
       });
     });
@@ -417,7 +429,7 @@ describe('DealPreparationService', () => {
         status: 'active'
       });
       const response = await supertest(service['app'])
-        .post(`/preparation/${scanning.id}/fffff`)
+        .post(`/generation/${scanning.id}/fffff`)
         .send({ action: 'resume' }).set('Accept', 'application/json');
       expect(response.status).toEqual(400);
       expect(response.body).toEqual({
@@ -427,7 +439,7 @@ describe('DealPreparationService', () => {
     it('should change status for specific generation request', async () => {
       const scanning = await Datastore.ScanningRequestModel.create({
         name: 'name',
-        status: 'completed'
+        status: 'active'
       });
       const r1 = await Datastore.GenerationRequestModel.create({
         datasetId: scanning.id,
@@ -439,11 +451,11 @@ describe('DealPreparationService', () => {
         status: 'active'
       });
       const response = await supertest(service['app'])
-        .post(`/preparation/${scanning.id}/${r1.id}`)
+        .post(`/generation/${scanning.id}/${r1.id}`)
         .send({ action: 'pause' }).set('Accept', 'application/json');
       expect(response.status).toEqual(200);
       expect(await Datastore.ScanningRequestModel.findById(scanning.id)).toEqual(jasmine.objectContaining({
-        status: 'completed'
+        status: 'active'
       }));
       expect(await Datastore.GenerationRequestModel.findById(r1.id)).toEqual(jasmine.objectContaining({
         status: 'paused'
@@ -452,7 +464,6 @@ describe('DealPreparationService', () => {
         status: 'active'
       }));
       expect(response.body).toEqual({
-        scanningRequestsChanged: 0,
         generationRequestsChanged: 1
       });
     });
@@ -460,7 +471,7 @@ describe('DealPreparationService', () => {
   it('should change status for specific generation request by index', async () => {
     const scanning = await Datastore.ScanningRequestModel.create({
       name: 'name',
-      status: 'completed'
+      status: 'active'
     });
     const r1 = await Datastore.GenerationRequestModel.create({
       datasetId: scanning.id,
@@ -472,11 +483,11 @@ describe('DealPreparationService', () => {
       status: 'active'
     });
     const response = await supertest(service['app'])
-      .post(`/preparation/${scanning.id}/${r2.index}`)
+      .post(`/generation/${scanning.id}/${r2.index}`)
       .send({ action: 'pause' }).set('Accept', 'application/json');
     expect(response.status).toEqual(200);
     expect(await Datastore.ScanningRequestModel.findById(scanning.id)).toEqual(jasmine.objectContaining({
-      status: 'completed'
+      status: 'active'
     }));
     expect(await Datastore.GenerationRequestModel.findById(r1.id)).toEqual(jasmine.objectContaining({
       status: 'active'
@@ -485,7 +496,6 @@ describe('DealPreparationService', () => {
       status: 'paused'
     }));
     expect(response.body).toEqual({
-      scanningRequestsChanged: 0,
       generationRequestsChanged: 1
     });
   });
@@ -511,14 +521,14 @@ describe('DealPreparationService', () => {
       status: 'active'
     });
     const response = await supertest(service['app'])
-      .post(`/preparation/${scanning2.id}`)
+      .post(`/generation/${scanning2.id}`)
       .send({ action: 'pause' }).set('Accept', 'application/json');
     expect(response.status).toEqual(200);
     expect(await Datastore.ScanningRequestModel.findById(scanning1.id)).toEqual(jasmine.objectContaining({
       status: 'active'
     }));
     expect(await Datastore.ScanningRequestModel.findById(scanning2.id)).toEqual(jasmine.objectContaining({
-      status: 'paused'
+      status: 'active'
     }));
     expect(await Datastore.GenerationRequestModel.findById(g1.id)).toEqual(jasmine.objectContaining({
       status: 'active'
@@ -535,15 +545,19 @@ describe('DealPreparationService', () => {
       await Datastore.ScanningRequestModel.create({
         name: 'test-deletion',
         outDir: '.',
+        tmpDir: './tmp'
       });
+      await fs.mkdir('./tmp/d715461e-8d42-4a53-9b33-e17ed4247304', { recursive: true });
       await fs.writeFile('./d715461e-8d42-4a53-9b33-e17ed4247304.car', 'something');
       await service['cleanupIncompleteFiles']();
       await expectAsync(fs.access('./d715461e-8d42-4a53-9b33-e17ed4247304.car')).toBeRejected();
+      await expectAsync(fs.access('./d715461e-8d42-4a53-9b33-e17ed4247304')).toBeRejected();
     })
     it('should skip nonexisting folders', async () => {
       await Datastore.ScanningRequestModel.create({
         name: 'test-deletion',
         outDir: './non-existing',
+        tmpDir: './non-existing',
       });
       await expectAsync(service['cleanupIncompleteFiles']()).toBeResolved();
     })
@@ -559,6 +573,12 @@ describe('DealPreparationService', () => {
         dataCid: 'bafy',
         outDir: '.',
       });
+      const inputList = await Datastore.InputFileListModel.create({
+        generationId: generation.id
+      });
+      const outputList = await Datastore.OutputFileListModel.create({
+        generationId: generation.id
+      });
       const filePath = path.resolve('./bafy.car');
       await fs.mkdir(path.dirname(filePath), {recursive: true});
       await fs.writeFile(filePath, 'some data');
@@ -567,6 +587,8 @@ describe('DealPreparationService', () => {
       expect(response.status).toEqual(200);
       await expectAsync(Datastore.ScanningRequestModel.findById(scanning.id)).toBeResolvedTo(null);
       await expectAsync(Datastore.GenerationRequestModel.findById(generation.id)).toBeResolvedTo(null);
+      await expectAsync(Datastore.GenerationRequestModel.findById(inputList.id)).toBeResolvedTo(null);
+      await expectAsync(Datastore.GenerationRequestModel.findById(outputList.id)).toBeResolvedTo(null);
       await expectAsync(fs.access(filePath)).toBeRejected();
     })
   })
@@ -612,6 +634,23 @@ describe('DealPreparationService', () => {
       expect(response.body).toEqual({
         error: ErrorCode.MAX_RATIO_INVALID
       });
+    });
+    it('should use min and max ratio if specified', async () => {
+      const response = await supertest(service['app'])
+        .post('/preparation').send({
+          name: 'name',
+          path: '.',
+          dealSize: '32GiB',
+          minRatio: 0.7,
+          maxRatio: 0.8,
+          outDir: '.',
+          tmpDir: '.',
+        }).set('Accept', 'application/json');
+      expect(response.status).toEqual(200);
+      expect(response.body).toEqual(jasmine.objectContaining({
+        minSize: 24051816858,
+        maxSize:27487790694
+      }));
     });
     it('should return error if deal size is not allowed', async () => {
       const response = await supertest(service['app'])
