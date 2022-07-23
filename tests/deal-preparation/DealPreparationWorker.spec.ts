@@ -227,6 +227,50 @@ describe('DealPreparationWorker', () => {
     })
   })
   describe('scan', () => {
+    it('should start from last finished one', async () => {
+      const scanning = await Datastore.ScanningRequestModel.create({
+        name: 'name',
+        path: path.join('tests', 'test_folder'),
+        minSize: 12,
+        maxSize: 16,
+        status: 'active',
+        outDir: '.',
+        tmpDir: './tmpdir'
+      });
+      const active = await Datastore.GenerationRequestModel.create({
+        datasetId: scanning.id,
+        datasetName: 'name',
+        path: path.join('tests', 'test_folder'),
+        index: 0,
+        status: 'active',
+        outDir: '.',
+        tmpDir: './tmpdir'
+      })
+      await Datastore.InputFileListModel.create({
+        generationId: active.id,
+        index: 0,
+        fileList: [{
+          path: path.join('tests', 'test_folder', 'a', '1.txt'),
+          size: 3,
+        }, {
+          path: path.join('tests', 'test_folder', 'b', '2.txt'),
+          size: 27,
+        }],
+      });
+      await worker['scan'](scanning);
+      expect(await Datastore.GenerationRequestModel.findById(active.id)).not.toBeNull();
+      const requests = await Datastore.GenerationRequestModel.find({}, null, { sort: { index: 1 } });
+      expect(requests.length).toEqual(3);
+      expect((await Datastore.InputFileListModel.findOne({generationId: requests[1].id}))!.fileList).toEqual([jasmine.objectContaining({
+        path: path.join('tests', 'test_folder', 'c', '3.txt'),
+        size: 9
+      }),jasmine.objectContaining({
+        path: path.join('tests', 'test_folder', 'd.txt'),
+        size: 9,
+        start: 0,
+        end: 3
+      })])
+    })
     it('should delete pending generations and start from last one', async () => {
       const scanning = await Datastore.ScanningRequestModel.create({
         name: 'name',

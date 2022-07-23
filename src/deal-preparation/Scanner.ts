@@ -17,11 +17,11 @@ export default class Scanner {
         throw entry.err;
       }
       if (last && last.path === entry.path) {
-        if (last.end === last.size) {
+        if (last.end === undefined || last.end === last.size) {
           last = undefined;
           continue;
         } else {
-          entry.stats!.size = entry.stats!.size - last.end!;
+          entry.stats!.size = entry.stats!.size - last.end;
           entry.offset = last.end;
           last = undefined;
         }
