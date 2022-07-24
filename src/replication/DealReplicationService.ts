@@ -12,6 +12,7 @@ import UpdateReplicationRequest from './UpdateReplicationRequest';
 import { ObjectId } from 'mongodb';
 import ObjectsToCsv from 'objects-to-csv';
 import GenerateCSVRequest from './GenerateCSVRequest';
+import path from 'path';
 
 export default class DealReplicationService extends BaseService {
 
@@ -259,7 +260,7 @@ export default class DealReplicationService extends BaseService {
         const deals = await Datastore.DealStateModel.find({
           replicationRequestId: id
         });
-        console.log(`Found ${deals.length} deals from replication request ${id}`);
+        this.logger.info(`Found ${deals.length} deals from replication request ${id}`);
         if (deals.length > 0) {
           const csvRow = [];
           for (let i = 0; i < deals.length; i++) {
@@ -274,12 +275,12 @@ export default class DealReplicationService extends BaseService {
             });
           }
           const csv = new ObjectsToCsv(csvRow);
-          const filename = `${outDir}/${deals[0].provider}_${id}.csv`;
+          const filename = `${outDir}${path.sep}${deals[0].provider}_${id}.csv`;
           await csv.toDisk(filename);
           response.end(`CSV saved to ${filename}`);
         }
       } else {
-        console.error(`Could not find replication request ${id}`);
+        this.logger.error(`Could not find replication request ${id}`);
       }
       response.end();
     }
