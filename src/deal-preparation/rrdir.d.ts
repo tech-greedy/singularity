@@ -11,15 +11,16 @@ interface Options {
   startFrom?: string;
 }
 
-interface Entry<T extends string | Buffer> {
+export interface Entry<T extends string | Buffer> {
   path: T;
   directory?: boolean | undefined;
   symlink?: boolean | undefined;
   stats?: fs.Stats | undefined;
   err?: Error | undefined;
+  offset?: number;
 }
 
-interface rrdir {
+export default interface rrdir {
   async(dir: string, options?: Options): Promise<Array<Entry<string>>>;
   async(dir: Buffer, options?: Options): Promise<Array<Entry<Buffer>>>;
 
@@ -29,6 +30,3 @@ interface rrdir {
   (dir: string, options?: Options): AsyncIterable<Entry<string>>;
   (dir: Buffer, options?: Options): AsyncIterable<Entry<Buffer>>;
 }
-
-declare const c: rrdir;
-export = c;

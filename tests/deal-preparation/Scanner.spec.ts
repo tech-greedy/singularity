@@ -2,6 +2,19 @@ import Scanner from '../../src/deal-preparation/Scanner';
 import path from 'path';
 
 describe('Scanner', () => {
+  describe('detectS3Region', () => {
+    it('should detect region us-east-1 for gatk-sv-data-us-east-1', async () => {
+      await expectAsync(Scanner.detectS3Region('gatk-sv-data-us-east-1')).toBeResolvedTo('us-east-1');
+    })
+    it('should detect region us-east-2 for gatk-sv-data-us-east-2', async () => {
+      await expectAsync(Scanner.detectS3Region('gatk-sv-data-us-east-2')).toBeResolvedTo('us-east-2');
+    })
+  })
+  describe('listS3Path', () => {
+    it('should work with public dataset', async () => {
+      await Scanner.listS3Path('gatk-sv-data-us-east-1');
+    })
+  })
   describe('scan', () => {
     it('should work without startFile', async () => {
       const arr = [];

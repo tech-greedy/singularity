@@ -1,15 +1,66 @@
 import { FileInfo, FileList } from '../common/model/InputFileList';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
-import { rrdir } from './rrdir';
+import { Entry, rrdir } from './rrdir';
+import { S3Client, ListObjectsV2Command, ListObjectsV2CommandOutput } from '@aws-sdk/client-s3';
+import { RequestSigner } from '@aws-sdk/types/dist-types/signature';
+import { HttpRequest, RequestSigningArguments } from '@aws-sdk/types';
+import axios from 'axios';
+
+class NoopRequestSigner implements RequestSigner {
+  public sign (requestToSign: HttpRequest, _options?: RequestSigningArguments): Promise<HttpRequest> {
+    return Promise.resolve(requestToSign);
+  }
+}
 
 export default class Scanner {
+  public static async detectS3Region (bucketName: string) : Promise<string> {
+    const response = await axios.head(`https://s3.amazonaws.com/${encodeURIComponent(bucketName)}`, {
+      validateStatus: status => status < 400
+    });
+    const region = response.headers['x-amz-bucket-region'];
+    if (region === undefined) {
+      throw new Error(`Detect S3 Region failed: ${response.status} - ${response.statusText}`);
+    }
+    return region;
+  }
+
+  public static async * listS3Path (path: string, lastPath?: string) : AsyncGenerator<Entry<string>> {
+    const bucketName = path.split('/')[0];
+    const region = await Scanner.detectS3Region(bucketName);
+    const client = new S3Client({ region, signer: new NoopRequestSigner() });
+    const command = new ListObjectsV2Command({
+      Bucket: path,
+      StartAfter: lastPath
+    });
+    const response: ListObjectsV2CommandOutput = await client.send(command);
+    for (const content of response.Contents!) {
+      yield {
+        path: content.Key!,
+        directory: false,
+        stats: {
+          size: content.Size!
+        }
+      };
+    }
+  }
+
+  private static listPath (path: string, lastPath?: string): AsyncGenerator<Entry<string>> {
+    return rrdir(path, {
+      stats: true, followSymlinks: true, sort: true, startFrom: lastPath
+    });
+  }
+
   public static async * scan (root: string, minSize: number, maxSize: number, last?: FileInfo): AsyncGenerator<FileList> {
     let currentList: FileList = [];
     let currentSize = 0;
-    for await (const entry of rrdir(root, {
-      stats: true, followSymlinks: true, sort: true, startFrom: last?.path
-    })) {
+    let entries;
+    if (root.startsWith('s3://')) {
+      entries = Scanner.listS3Path(root, last?.path);
+    } else {
+      entries = Scanner.listPath(root, last?.path);
+    }
+    for await (const entry of entries) {
       if (entry.directory) {
         continue;
       }
