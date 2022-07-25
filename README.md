@@ -288,6 +288,10 @@ Deal Replication and Retrieval only works in Linux/Mac due to dependency restric
 ### Error - too many open files
 In case that one CAR contains more files than allowed by OS, you will need to increase the open file limit with `ulimit`, or `LimitNOFILE` if using systemd.
 
+### Error: Reached heap limit Allocation failed - JavaScript heap out of memory
+Depending on the version, NodeJS by default has a max heap memory of 2GB. To increase this limit, i.e. to increase to 4G, set environment variable
+`NODE_OPTIONS="--max-old-space-size=4096"`.
+
 ### Error - open /some/file: remote I/O error
 If you are using network mount such as NFS or Goofys, a temporary network issue may cause the CAR file generation to fail.
 If the error rate is less than 10%, you may assume they are transient and can be fixed by performing a [retry](#retry-a-request).
