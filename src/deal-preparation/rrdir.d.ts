@@ -17,7 +17,6 @@ export interface Entry<T extends string | Buffer> {
   symlink?: boolean | undefined;
   stats?: fs.Stats | undefined;
   err?: Error | undefined;
-  offset?: number;
 }
 
 export default interface rrdir {

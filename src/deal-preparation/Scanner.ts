@@ -1,16 +1,15 @@
 import { FileInfo, FileList } from '../common/model/InputFileList';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
-import { Entry, rrdir } from './rrdir';
+import { rrdir } from './rrdir';
 import { S3Client, ListObjectsV2Command, ListObjectsV2CommandOutput } from '@aws-sdk/client-s3';
-import { RequestSigner } from '@aws-sdk/types/dist-types/signature';
-import { HttpRequest, RequestSigningArguments } from '@aws-sdk/types';
 import axios from 'axios';
+import NoopRequestSigner from './NoopRequestSigner';
 
-class NoopRequestSigner implements RequestSigner {
-  public sign (requestToSign: HttpRequest, _options?: RequestSigningArguments): Promise<HttpRequest> {
-    return Promise.resolve(requestToSign);
-  }
+interface Entry {
+  path: string,
+  size: number,
+  offset?: number,
 }
 
 export default class Scanner {
@@ -25,30 +24,48 @@ export default class Scanner {
     return region;
   }
 
-  public static async * listS3Path (path: string, lastPath?: string) : AsyncGenerator<Entry<string>> {
-    const bucketName = path.split('/')[0];
+  public static async * listS3Path (path: string, startFrom?: Entry) : AsyncGenerator<Entry> {
+    const s3Path = path.slice('s3://'.length);
+    const bucketName = s3Path.split('/')[0];
+    const prefix = s3Path.slice(bucketName.length + 1);
     const region = await Scanner.detectS3Region(bucketName);
     const client = new S3Client({ region, signer: new NoopRequestSigner() });
-    const command = new ListObjectsV2Command({
-      Bucket: path,
-      StartAfter: lastPath
-    });
-    const response: ListObjectsV2CommandOutput = await client.send(command);
-    for (const content of response.Contents!) {
-      yield {
-        path: content.Key!,
-        directory: false,
-        stats: {
-          size: content.Size!
-        }
-      };
+    let token: string | undefined;
+    if (startFrom) {
+      yield startFrom;
     }
+    do {
+      const command = new ListObjectsV2Command({
+        Bucket: bucketName,
+        Prefix: prefix,
+        StartAfter: startFrom?.path?.slice('s3://'.length + bucketName.length + 1),
+        ContinuationToken: token
+      });
+      const response: ListObjectsV2CommandOutput = await client.send(command);
+      token = response.NextContinuationToken;
+      for (const content of response.Contents!) {
+        yield {
+          path: `s3://${bucketName}/${content.Key!}`,
+          size: content.Size!
+        };
+      }
+    } while (token !== undefined);
   }
 
-  private static listPath (path: string, lastPath?: string): AsyncGenerator<Entry<string>> {
-    return rrdir(path, {
+  private static async * listPath (path: string, lastPath?: string): AsyncGenerator<Entry> {
+    for await (const entry of rrdir(path, {
       stats: true, followSymlinks: true, sort: true, startFrom: lastPath
-    });
+    })) {
+      if (entry.err) {
+        throw entry.err;
+      }
+      if (!entry.directory) {
+        yield {
+          path: entry.path,
+          size: entry.stats.size
+        };
+      }
+    }
   }
 
   public static async * scan (root: string, minSize: number, maxSize: number, last?: FileInfo): AsyncGenerator<FileList> {
@@ -56,40 +73,41 @@ export default class Scanner {
     let currentSize = 0;
     let entries;
     if (root.startsWith('s3://')) {
-      entries = Scanner.listS3Path(root, last?.path);
+      if (last) {
+        entries = Scanner.listS3Path(root, {
+          path: last.path,
+          size: last.size
+        });
+      } else {
+        entries = Scanner.listS3Path(root);
+      }
     } else {
       entries = Scanner.listPath(root, last?.path);
     }
     for await (const entry of entries) {
-      if (entry.directory) {
-        continue;
-      }
-      if (entry.err) {
-        throw entry.err;
-      }
       if (last && last.path === entry.path) {
         if (last.end === undefined || last.end === last.size) {
           last = undefined;
           continue;
         } else {
-          entry.stats!.size = entry.stats!.size - last.end;
+          entry.size = entry.size - last.end;
           entry.offset = last.end;
           last = undefined;
         }
       }
-      const newSize = currentSize + entry.stats!.size;
+      const newSize = currentSize + entry.size;
       if (newSize <= maxSize) {
         if (!entry.offset) {
           currentList.push({
-            size: entry.stats!.size,
+            size: entry.size,
             path: entry.path
           });
         } else {
           currentList.push({
-            size: entry.stats!.size + entry.offset,
+            size: entry.size + entry.offset,
             path: entry.path,
             start: entry.offset,
-            end: entry.stats!.size + entry.offset
+            end: entry.size + entry.offset
           });
         }
         currentSize = newSize;
@@ -99,7 +117,7 @@ export default class Scanner {
           currentSize = 0;
         }
       } else {
-        let remaining = entry.stats!.size;
+        let remaining = entry.size;
         do {
           let splitSize = minSize - currentSize;
           if (splitSize > remaining) {
@@ -107,16 +125,16 @@ export default class Scanner {
           }
           if (!entry.offset) {
             currentList.push({
-              size: entry.stats!.size,
-              start: entry.stats!.size - remaining,
-              end: entry.stats!.size - remaining + splitSize,
+              size: entry.size,
+              start: entry.size - remaining,
+              end: entry.size - remaining + splitSize,
               path: entry.path
             });
           } else {
             currentList.push({
-              size: entry.stats!.size + entry.offset,
-              start: entry.stats!.size - remaining + entry.offset,
-              end: entry.stats!.size - remaining + splitSize + entry.offset,
+              size: entry.size + entry.offset,
+              start: entry.size - remaining + entry.offset,
+              end: entry.size - remaining + splitSize + entry.offset,
               path: entry.path
             });
           }

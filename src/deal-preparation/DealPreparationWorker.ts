@@ -11,8 +11,11 @@ import fs from 'fs-extra';
 import path from 'path';
 import { performance } from 'perf_hooks';
 import { GeneratedFileList } from '../common/model/OutputFileList';
-import { FileInfo } from '../common/model/InputFileList';
+import { FileInfo, FileList } from '../common/model/InputFileList';
 import GenerateCar from '../common/GenerateCar';
+import { pipeline } from 'stream/promises';
+import { S3Client, GetObjectCommand, GetObjectCommandInput } from '@aws-sdk/client-s3';
+import NoopRequestSigner from './NoopRequestSigner';
 
 interface IpldNode {
   Name: string,
@@ -112,14 +115,70 @@ export default class DealPreparationWorker extends BaseService {
     this.logger.info(`Finished scanning. Marking scanning to completed. Inserted ${index} generation tasks.`);
   }
 
-  private async generate (request: GenerationRequest, input: string): Promise<[stdout: string, stderr: string, statusCode: number | null]> {
+  private async moveS3FileList (fileList: FileList, parentPath: string, tmpDir: string): Promise<void> {
+    const s3Path = parentPath.slice('s3://'.length);
+    const bucketName = s3Path.split('/')[0];
+    const region = await Scanner.detectS3Region(bucketName);
+    const client = new S3Client({ region, signer: new NoopRequestSigner() });
+    for (const fileInfo of fileList) {
+      const key = fileInfo.path.slice('s3://'.length + bucketName.length + 1);
+      const commandInput : GetObjectCommandInput = {
+        Bucket: bucketName,
+        Key: key
+      };
+      if (fileInfo.start !== undefined && fileInfo.end !== undefined) {
+        commandInput.Range = `bytes=${fileInfo.start}-${fileInfo.end - 1}`;
+      }
+      const command = new GetObjectCommand(commandInput);
+      const rel = path.relative(parentPath.slice('s3://'.length), fileInfo.path.slice('s3://'.length));
+      const dest = path.resolve(tmpDir, rel);
+      const response = await client.send(command);
+      const writeStream = fs.createWriteStream(dest);
+      this.logger.debug(`Download from ${fileInfo.path} to ${dest}`, { start: fileInfo.start, end: fileInfo.end });
+      await pipeline(response.Body, writeStream);
+    }
+  }
+
+  private async moveFileList (fileList: FileList, parentPath: string, tmpDir: string): Promise<void> {
+    for (const fileInfo of fileList) {
+      const rel = path.relative(parentPath, fileInfo.path);
+      const dest = path.resolve(tmpDir, rel);
+      const destDir = path.dirname(dest);
+      await fs.mkdirp(destDir);
+      if (fileInfo.start === undefined || fileInfo.end === undefined || (fileInfo.start === 0 && fileInfo.end === fileInfo.size)) {
+        this.logger.debug(`Copy from ${fileInfo.path} to ${dest}`);
+        await fs.copyFile(fileInfo.path, dest);
+      } else {
+        const readStream = fs.createReadStream(fileInfo.path, {
+          start: fileInfo.start,
+          end: fileInfo.end
+        });
+        const writeStream = fs.createWriteStream(dest);
+        this.logger.debug(`Partial Copy from ${fileInfo.path} to ${dest}`, { start: fileInfo.start, end: fileInfo.end });
+        await pipeline(readStream, writeStream);
+      }
+    }
+  }
+
+  private async generate (request: GenerationRequest, fileList: FileList): Promise<[stdout: string, stderr: string, statusCode: number | null]> {
     await fs.mkdir(request.outDir, { recursive: true });
-    this.logger.debug(`Spawning generate-car.`, { outPath: request.outDir, parentPath: request.path, tmpDir: request.tmpDir });
     let tmpDir: string | undefined;
     if (request.tmpDir) {
       tmpDir = path.join(request.tmpDir, randomUUID());
+      if (request.path.startsWith('s3://')) {
+        await this.moveS3FileList(fileList, request.path, tmpDir);
+      } else {
+        await this.moveFileList(fileList, request.path, tmpDir);
+      }
     }
-    const [stdout, stderr, exitCode] = await DealPreparationWorker.invokeGenerateCar(request.id, input, request.outDir, request.path, tmpDir);
+    this.logger.debug(`Spawning generate-car.`, { outPath: request.outDir, parentPath: request.path, tmpDir });
+    const input = JSON.stringify(fileList.map(file => ({
+      Path: file.path,
+      Size: file.size,
+      Start: file.start,
+      End: file.end
+    })));
+    const [stdout, stderr, exitCode] = await DealPreparationWorker.invokeGenerateCar(request.id, input, request.outDir, request.path);
     if (tmpDir) {
       await fs.rm(tmpDir, { recursive: true, force: true });
     }
@@ -210,14 +269,8 @@ export default class DealPreparationWorker extends BaseService {
       const fileList = (await Datastore.InputFileListModel.find({
         generationId: newGenerationWork.id
       }, null, { sort: { index: 1 } })).map(r => r.fileList).flat();
-      const input = JSON.stringify(fileList.map(file => ({
-        Path: file.path,
-        Size: file.size,
-        Start: file.start,
-        End: file.end
-      })));
       let timeSpentInMs = performance.now();
-      const result = await this.generate(newGenerationWork, input);
+      const result = await this.generate(newGenerationWork, fileList);
       timeSpentInMs = performance.now() - timeSpentInMs;
 
       // Parse the output and update the database
