@@ -79,7 +79,7 @@ describe('DealPreparationWorker', () => {
         },
       ];
       const tmpDir = './moveFileList-tests-tmp';
-      await DealPreparationWorker.moveFileList(fileList, 's3://gdc-beataml1.0-crenolanib-phs001628-2-open', tmpDir);
+      await DealPreparationWorker.moveS3FileList(fileList, 's3://gdc-beataml1.0-crenolanib-phs001628-2-open', tmpDir);
       const file1 = tmpDir + '/gdc-beataml1.0-crenolanib-phs001628-2-open/Supplementary Data 3 final paper w map.xlsx';
       const file2 = tmpDir + '/gdc-beataml1.0-crenolanib-phs001628-2-open/d7410180-f387-46e6-b12f-de29d4fbae0e/Supplementary Data 3 final paper w map.xlsx';
       expect((await fs.stat(file1)).size).toEqual(41464);

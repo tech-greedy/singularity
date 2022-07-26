@@ -167,7 +167,7 @@ export default class DealPreparationWorker extends BaseService {
   }
 
   private async generate (request: GenerationRequest, fileList: FileList, tmpDir: string | undefined)
-    : Promise<[stdout: string, stderr: string, statusCode: number | null]> {
+    : Promise<[stdout: string, stderr: string, statusCode: number | null, signalCode: NodeJS.Signals | null]> {
     await fs.mkdir(request.outDir, { recursive: true });
     if (tmpDir) {
       if (request.path.startsWith('s3://')) {
@@ -184,9 +184,9 @@ export default class DealPreparationWorker extends BaseService {
       Start: file.start,
       End: file.end
     })));
-    const [stdout, stderr, exitCode] = await DealPreparationWorker.invokeGenerateCar(request.id, input, request.outDir, tmpDir ?? request.path);
-    this.logger.debug(`Child process finished.`, { stdout, stderr, exitCode });
-    return [stdout, stderr, exitCode];
+    const [stdout, stderr, exitCode, signalCode] = await DealPreparationWorker.invokeGenerateCar(request.id, input, request.outDir, tmpDir ?? request.path);
+    this.logger.debug(`Child process finished.`, { stdout, stderr, exitCode, signalCode });
+    return [stdout, stderr, exitCode, signalCode];
   }
 
   private static async checkPauseOrRemove (generationId: string, child: ChildProcessWithoutNullStreams) {
@@ -205,7 +205,7 @@ export default class DealPreparationWorker extends BaseService {
   }
 
   public static async invokeGenerateCar (generationId: string | undefined, input: string, outDir: string, p: string)
-    : Promise<[stdout: string, stderr: string, statusCode: number | null]> {
+    : Promise<[stdout: string, stderr: string, statusCode: number | null, signalCode: NodeJS.Signals | null]> {
     const cmd = GenerateCar.path!;
     const args = ['-o', outDir, '-p', p];
     const child = spawn(cmd, args, {
@@ -226,7 +226,7 @@ export default class DealPreparationWorker extends BaseService {
     try {
       await onExit(child);
     } catch (_) {}
-    return [stdout, stderr, child.exitCode];
+    return [stdout, stderr, child.exitCode, child.signalCode];
   }
 
   private async pollScanningWork (): Promise<boolean> {
@@ -285,9 +285,9 @@ export default class DealPreparationWorker extends BaseService {
       timeSpentInMs = performance.now() - timeSpentInMs;
 
       // Parse the output and update the database
-      const [stdout, stderr, statusCode] = result!;
+      const [stdout, stderr, statusCode, signalCode] = result!;
       if (statusCode !== 0) {
-        this.logger.error(`${this.workerId} - Encountered an error.`, { stderr, statusCode });
+        this.logger.error(`${this.workerId} - Encountered an error.`, { stderr, statusCode, signalCode });
         await Datastore.GenerationRequestModel.findOneAndUpdate({ _id: newGenerationWork.id, status: 'active' }, { status: 'error', errorMessage: stderr, workerId: null }, { projection: { _id: 1 } });
         return true;
       }

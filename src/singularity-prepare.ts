@@ -39,7 +39,9 @@ program.name('singularity-prepare')
       console.error('tmp_dir needs to specified for S3 dataset');
       process.exit(1);
     }
-    p = path.resolve(p);
+    if (!p.startsWith('s3://')) {
+      p = path.resolve(p);
+    }
     outDir = path.resolve(outDir);
     const dealSize: string = options.dealSize;
     const minRatio: number = options.minRatio;
