@@ -31,8 +31,12 @@ program.name('singularity-prepare')
   .action(async (name, p, outDir, options) => {
     GenerateCar.initialize();
     await fs.mkdir(outDir, { recursive: true });
-    if (!await fs.pathExists(p)) {
+    if (!p.startsWith('s3://') && !await fs.pathExists(p)) {
       console.error(`Dataset path "${p}" does not exist.`);
+      process.exit(1);
+    }
+    if (p.startsWith('s3://') && !options.tmpDir) {
+      console.error('tmp_dir needs to specified for S3 dataset');
       process.exit(1);
     }
     p = path.resolve(p);
@@ -67,21 +71,33 @@ program.name('singularity-prepare')
     for await (const fileList of Scanner.scan(p, minSize, maxSize)) {
       console.log('Pushed a new generation request');
       task = await queue.push(async () => {
-        const input = JSON.stringify(fileList.map(file => ({
-          Path: file.path,
-          Size: file.size,
-          Start: file.start,
-          End: file.end
-        })));
 
-        let tmpDir: string | undefined;
+        let tmpDir : string | undefined;
         if (options.tmpDir) {
-          tmpDir = path.join(path.resolve(options.tmpDir), randomUUID());
+          tmpDir = path.join(options.tmpDir, randomUUID());
         }
-        const [stdout, stderr, exitCode] = await DealPreparationWorker.invokeGenerateCar(undefined, input, outDir, p, tmpDir);
-
-        if (tmpDir) {
-          await fs.rm(tmpDir, { recursive: true, force: true });
+        let stdout, stderr, exitCode;
+        try {
+          await fs.mkdir(outDir, { recursive: true });
+          if (tmpDir) {
+            if (p.startsWith('s3://')) {
+              await DealPreparationWorker.moveS3FileList(fileList, p, tmpDir);
+            } else {
+              await DealPreparationWorker.moveFileList(fileList, p, tmpDir);
+            }
+            tmpDir = path.resolve(tmpDir);
+          }
+          const input = JSON.stringify(fileList.map(file => ({
+            Path: file.path,
+            Size: file.size,
+            Start: file.start,
+            End: file.end
+          })));
+          [stdout, stderr, exitCode] = await DealPreparationWorker.invokeGenerateCar(undefined, input, outDir, tmpDir ?? p);
+        } finally {
+          if (tmpDir) {
+            await fs.rm(tmpDir, { recursive: true });
+          }
         }
 
         if (exitCode !== 0) {
@@ -93,8 +109,9 @@ program.name('singularity-prepare')
         console.log(`Generated a new car ${carFile}`);
         const carFileStat = await fs.stat(carFile);
         const fileMap = new Map<string, FileInfo>();
+        const parentPath = tmpDir ?? p;
         for (const fileInfo of fileList) {
-          fileMap.set(path.relative(p, fileInfo.path).split(path.sep).join('/'), fileInfo);
+          fileMap.set(path.relative(parentPath, fileInfo.path).split(path.sep).join('/'), fileInfo);
         }
         const generatedFileList = DealPreparationWorker.handleGeneratedFileList(fileMap, output.CidMap);
 

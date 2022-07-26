@@ -481,6 +481,9 @@ export default class DealPreparationService extends BaseService {
       maxSize = maxRatio * dealSizeNumber;
     }
     maxSize = Math.round(maxSize);
+    if (path.startsWith('s3://') && !tmpDir) {
+      this.sendError(response, ErrorCode.TMPDIR_MISSING_FOR_S3);
+    }
     try {
       if (!path.startsWith('s3://')) {
         await fs.access(path, constants.F_OK);

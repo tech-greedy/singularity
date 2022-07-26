@@ -6,6 +6,7 @@ import Scanner from '../../src/deal-preparation/Scanner';
 import fs from 'fs-extra';
 import { FileList } from '../../src/common/model/InputFileList';
 import { Stream } from 'stream';
+import GenerateCar from '../../src/common/GenerateCar';
 async function stream2buffer (stream: Stream): Promise<Buffer> {
 
   return new Promise < Buffer > ((resolve, reject) => {
@@ -23,6 +24,7 @@ describe('DealPreparationWorker', () => {
   beforeAll(async () => {
     await Utils.initDatabase();
     worker = new DealPreparationWorker();
+    GenerateCar.initialize();
   });
   beforeEach(async () => {
     await Datastore.ScanningRequestModel.deleteMany();
@@ -53,7 +55,7 @@ describe('DealPreparationWorker', () => {
         }
       ]
       const tmpDir = './moveFileList-tests-tmp';
-      await worker['moveFileList'](fileList, './tests/test_folder', tmpDir);
+      await DealPreparationWorker.moveFileList(fileList, './tests/test_folder', tmpDir);
       expect((await fs.stat(tmpDir + '/a/1.txt')).size).toEqual(3);
       expect((await fs.stat(tmpDir + '/b/2.txt')).size).toEqual(11);
       expect((await fs.readFile(tmpDir + '/b/2.txt')).toLocaleString()).toEqual('hello world');
@@ -62,7 +64,7 @@ describe('DealPreparationWorker', () => {
       await fs.rm(tmpDir, { recursive: true, force: true });
     })
   })
-  fdescribe('moveS3FileList', () => {
+  describe('moveS3FileList', () => {
     it('should move all s3 files to tmpdir', async () => {
       const fileList: FileList = [
         {
@@ -77,9 +79,9 @@ describe('DealPreparationWorker', () => {
         },
       ];
       const tmpDir = './moveFileList-tests-tmp';
-      await worker['moveS3FileList'](fileList, 's3://gdc-beataml1.0-crenolanib-phs001628-2-open', tmpDir);
-      const file1 = tmpDir + '/Supplementary Data 3 final paper w map.xlsx';
-      const file2 = tmpDir + '/d7410180-f387-46e6-b12f-de29d4fbae0e/Supplementary Data 3 final paper w map.xlsx';
+      await DealPreparationWorker.moveFileList(fileList, 's3://gdc-beataml1.0-crenolanib-phs001628-2-open', tmpDir);
+      const file1 = tmpDir + '/gdc-beataml1.0-crenolanib-phs001628-2-open/Supplementary Data 3 final paper w map.xlsx';
+      const file2 = tmpDir + '/gdc-beataml1.0-crenolanib-phs001628-2-open/d7410180-f387-46e6-b12f-de29d4fbae0e/Supplementary Data 3 final paper w map.xlsx';
       expect((await fs.stat(file1)).size).toEqual(41464);
       expect((await fs.stat(file2)).size).toEqual(100);
       const buffer1 = await stream2buffer(fs.createReadStream(file1, { start: 100, end: 199 }));

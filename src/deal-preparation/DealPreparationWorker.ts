@@ -16,6 +16,7 @@ import GenerateCar from '../common/GenerateCar';
 import { pipeline } from 'stream/promises';
 import { S3Client, GetObjectCommand, GetObjectCommandInput } from '@aws-sdk/client-s3';
 import NoopRequestSigner from './NoopRequestSigner';
+import winston from 'winston';
 
 interface IpldNode {
   Name: string,
@@ -115,7 +116,7 @@ export default class DealPreparationWorker extends BaseService {
     this.logger.info(`Finished scanning. Marking scanning to completed. Inserted ${index} generation tasks.`);
   }
 
-  private async moveS3FileList (fileList: FileList, parentPath: string, tmpDir: string): Promise<void> {
+  public static async moveS3FileList (fileList: FileList, parentPath: string, tmpDir: string, logger?: winston.Logger): Promise<void> {
     const s3Path = parentPath.slice('s3://'.length);
     const bucketName = s3Path.split('/')[0];
     const region = await Scanner.detectS3Region(bucketName);
@@ -137,20 +138,20 @@ export default class DealPreparationWorker extends BaseService {
       await fs.mkdirp(destDir);
       const response = await client.send(command);
       const writeStream = fs.createWriteStream(dest);
-      this.logger.debug(`Download from ${fileInfo.path} to ${dest}`, { start: fileInfo.start, end: fileInfo.end });
+      logger?.debug(`Download from ${fileInfo.path} to ${dest}`, { start: fileInfo.start, end: fileInfo.end });
       await pipeline(response.Body, writeStream);
       fileInfo.path = dest;
     }
   }
 
-  private async moveFileList (fileList: FileList, parentPath: string, tmpDir: string): Promise<void> {
+  public static async moveFileList (fileList: FileList, parentPath: string, tmpDir: string, logger?: winston.Logger): Promise<void> {
     for (const fileInfo of fileList) {
       const rel = path.relative(parentPath, fileInfo.path);
       const dest = path.resolve(tmpDir, rel);
       const destDir = path.dirname(dest);
       await fs.mkdirp(destDir);
       if (fileInfo.start === undefined || fileInfo.end === undefined || (fileInfo.start === 0 && fileInfo.end === fileInfo.size)) {
-        this.logger.debug(`Copy from ${fileInfo.path} to ${dest}`);
+        logger?.debug(`Copy from ${fileInfo.path} to ${dest}`);
         await fs.copyFile(fileInfo.path, dest);
       } else {
         const readStream = fs.createReadStream(fileInfo.path, {
@@ -158,21 +159,23 @@ export default class DealPreparationWorker extends BaseService {
           end: fileInfo.end - 1
         });
         const writeStream = fs.createWriteStream(dest);
-        this.logger.debug(`Partial Copy from ${fileInfo.path} to ${dest}`, { start: fileInfo.start, end: fileInfo.end });
+        logger?.debug(`Partial Copy from ${fileInfo.path} to ${dest}`, { start: fileInfo.start, end: fileInfo.end });
         await pipeline(readStream, writeStream);
       }
       fileInfo.path = dest;
     }
   }
 
-  private async generate (request: GenerationRequest, fileList: FileList, tmpDir: string | undefined): Promise<[stdout: string, stderr: string, statusCode: number | null]> {
+  private async generate (request: GenerationRequest, fileList: FileList, tmpDir: string | undefined)
+    : Promise<[stdout: string, stderr: string, statusCode: number | null]> {
     await fs.mkdir(request.outDir, { recursive: true });
     if (tmpDir) {
       if (request.path.startsWith('s3://')) {
-        await this.moveS3FileList(fileList, request.path, tmpDir);
+        await DealPreparationWorker.moveS3FileList(fileList, request.path, tmpDir, this.logger);
       } else {
-        await this.moveFileList(fileList, request.path, tmpDir);
+        await DealPreparationWorker.moveFileList(fileList, request.path, tmpDir, this.logger);
       }
+      tmpDir = path.resolve(tmpDir);
     }
     this.logger.debug(`Spawning generate-car.`, { outPath: request.outDir, parentPath: request.path, tmpDir });
     const input = JSON.stringify(fileList.map(file => ({
@@ -201,13 +204,10 @@ export default class DealPreparationWorker extends BaseService {
     setTimeout(() => DealPreparationWorker.checkPauseOrRemove(generationId, child), 5000);
   }
 
-  public static async invokeGenerateCar (generationId: string | undefined, input: string, outDir: string, p: string, tmpDir?: string)
+  public static async invokeGenerateCar (generationId: string | undefined, input: string, outDir: string, p: string)
     : Promise<[stdout: string, stderr: string, statusCode: number | null]> {
     const cmd = GenerateCar.path!;
     const args = ['-o', outDir, '-p', p];
-    if (tmpDir) {
-      args.push('-t', tmpDir);
-    }
     const child = spawn(cmd, args, {
       stdio: ['pipe', 'pipe', 'pipe']
     });

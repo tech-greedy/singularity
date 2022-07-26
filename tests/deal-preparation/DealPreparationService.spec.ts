@@ -690,6 +690,19 @@ describe('DealPreparationService', () => {
         error: ErrorCode.PATH_NOT_ACCESSIBLE
       });
     });
+    it('should return error if s3 path is used but tmpdir is not specified', async () => {
+      const response = await supertest(service['app'])
+        .post('/preparation').send({
+          name: 'name',
+          path: 's3://dummy',
+          outDir: '.',
+          dealSize: '32GiB'
+        }).set('Accept', 'application/json');
+      expect(response.status).toEqual(400);
+      expect(response.body).toEqual({
+        error: ErrorCode.TMPDIR_MISSING_FOR_S3
+      });
+    });
     it('should return error if the dataset name is already taken', async () => {
       let response = await supertest(service['app'])
         .post('/preparation').send({

@@ -164,6 +164,10 @@ preparation.command('create').description('Start deal preparation for a local da
       logger.error(`Dataset path "${p}" does not exist.`);
       process.exit(1);
     }
+    if (p.startsWith('s3://') && !options.tmpDir) {
+      logger.error('tmp_dir needs to specified for S3 dataset');
+      process.exit(1);
+    }
     await fs.mkdirp(outDir);
     if (options.tmpDir) {
       await fs.mkdirp(options.tmpDir);
