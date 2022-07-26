@@ -71,6 +71,7 @@ export default class DealPreparationWorker extends BaseService {
       const lastFileList = await Datastore.InputFileListModel.findOne({ generationId: lastGeneration.id }, undefined, { sort: { index: -1 } });
       lastFileInfo = lastFileList!.fileList[lastFileList!.fileList.length - 1];
       this.logger.info(`Resuming scanning. Start from ${lastFileInfo!.path}, offset: ${lastFileInfo!.end}.`);
+      index = lastGeneration.index + 1;
     }
     for await (const fileList of Scanner.scan(request.path, request.minSize, request.maxSize, lastFileInfo)) {
       if (!await Datastore.ScanningRequestModel.findById(request.id)) {
