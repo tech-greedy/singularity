@@ -3,6 +3,19 @@ console_level = 'info'
 file_level = 'debug'
 file_path = './logs'
 
+[s3]
+# The base number of milliseconds to use in calculating a suitable cool-down
+# time when a retryable error is encountered
+retry_delay_base_ms = 100
+# The maximum amount of time (in milliseconds) that will be used as a delay
+# between retry attempts.
+maximum_retry_delay_ms = 20000
+# The retry delay base (in milliseconds) to use when a throttling error is
+# encountered.
+throttling_retry_delay_ms = 500
+# The maximum number of retry count
+max_retry_count = 5
+
 [connection]
 # Connection string to MongoDB, it can be either a built-in mongodb
 # shipped with this software or a standalone mongodb server

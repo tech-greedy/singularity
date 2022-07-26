@@ -5,6 +5,7 @@ import { rrdir } from './rrdir';
 import { S3Client, ListObjectsV2Command, ListObjectsV2CommandOutput } from '@aws-sdk/client-s3';
 import axios from 'axios';
 import NoopRequestSigner from './NoopRequestSigner';
+import { getRetryStrategy } from '../common/S3RetryStrategy';
 
 interface Entry {
   path: string,
@@ -29,7 +30,7 @@ export default class Scanner {
     const bucketName = s3Path.split('/')[0];
     const prefix = s3Path.slice(bucketName.length + 1);
     const region = await Scanner.detectS3Region(bucketName);
-    const client = new S3Client({ region, signer: new NoopRequestSigner() });
+    const client = new S3Client({ region, signer: new NoopRequestSigner(), retryStrategy: getRetryStrategy() });
     let token: string | undefined;
     if (startFrom) {
       yield startFrom;

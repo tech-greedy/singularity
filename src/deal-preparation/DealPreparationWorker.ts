@@ -17,6 +17,7 @@ import { pipeline } from 'stream/promises';
 import { S3Client, GetObjectCommand, GetObjectCommandInput } from '@aws-sdk/client-s3';
 import NoopRequestSigner from './NoopRequestSigner';
 import winston from 'winston';
+import { getRetryStrategy } from '../common/S3RetryStrategy';
 
 interface IpldNode {
   Name: string,
@@ -120,7 +121,7 @@ export default class DealPreparationWorker extends BaseService {
     const s3Path = parentPath.slice('s3://'.length);
     const bucketName = s3Path.split('/')[0];
     const region = await Scanner.detectS3Region(bucketName);
-    const client = new S3Client({ region, signer: new NoopRequestSigner() });
+    const client = new S3Client({ region, signer: new NoopRequestSigner(), retryStrategy: getRetryStrategy() });
     for (const fileInfo of fileList) {
       const key = fileInfo.path.slice('s3://'.length + bucketName.length + 1);
       const commandInput : GetObjectCommandInput = {
@@ -268,7 +269,9 @@ export default class DealPreparationWorker extends BaseService {
         { id: newGenerationWork.id, datasetName: newGenerationWork.datasetName, index: newGenerationWork.index });
       const fileList = (await Datastore.InputFileListModel.find({
         generationId: newGenerationWork.id
-      }, null, { sort: { index: 1 } })).map(r => r.fileList).flat();
+      }))
+        .sort((a, b) => a.index - b.index)
+        .map(r => r.fileList).flat();
       let timeSpentInMs = performance.now();
       let tmpDir : string | undefined;
       if (newGenerationWork.tmpDir) {
