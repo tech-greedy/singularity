@@ -6,6 +6,7 @@ import { S3Client, ListObjectsV2Command, ListObjectsV2CommandOutput } from '@aws
 import axios from 'axios';
 import NoopRequestSigner from './NoopRequestSigner';
 import { getRetryStrategy } from '../common/S3RetryStrategy';
+import winston from 'winston';
 
 interface Entry {
   path: string,
@@ -25,7 +26,7 @@ export default class Scanner {
     return region;
   }
 
-  public static async * listS3Path (path: string, startFrom?: Entry) : AsyncGenerator<Entry> {
+  public static async * listS3Path (path: string, startFrom?: Entry, logger?: winston.Logger) : AsyncGenerator<Entry> {
     const s3Path = path.slice('s3://'.length);
     const bucketName = s3Path.split('/')[0];
     const prefix = s3Path.slice(bucketName.length + 1);
@@ -44,6 +45,12 @@ export default class Scanner {
       });
       const response: ListObjectsV2CommandOutput = await client.send(command);
       token = response.NextContinuationToken;
+      const contents = response.Contents!;
+      if (logger) {
+        logger.info(`Scanned ${contents.length} entries from ${path}.`, { from: contents[0].Key, to: contents[contents.length - 1].Key });
+      } else {
+        console.log(`Scanned ${contents.length} entries from ${contents[0].Key} to ${contents[contents.length - 1].Key}`);
+      }
       for (const content of response.Contents!) {
         yield {
           path: `s3://${bucketName}/${content.Key!}`,
