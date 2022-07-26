@@ -482,7 +482,9 @@ export default class DealPreparationService extends BaseService {
     }
     maxSize = Math.round(maxSize);
     try {
-      await fs.access(path, constants.F_OK);
+      if (!path.startsWith('s3://')) {
+        await fs.access(path, constants.F_OK);
+      }
       await fs.access(outDir, constants.F_OK);
       if (tmpDir) {
         await fs.access(tmpDir, constants.F_OK);

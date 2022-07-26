@@ -130,12 +130,16 @@ export default class DealPreparationWorker extends BaseService {
         commandInput.Range = `bytes=${fileInfo.start}-${fileInfo.end - 1}`;
       }
       const command = new GetObjectCommand(commandInput);
-      const rel = path.relative(parentPath.slice('s3://'.length), fileInfo.path.slice('s3://'.length));
+      // For S3 bucket, always use the path that contains the bucketName - TODO override this behavior with a flag
+      const rel = fileInfo.path.slice('s3://'.length);
       const dest = path.resolve(tmpDir, rel);
+      const destDir = path.dirname(dest);
+      await fs.mkdirp(destDir);
       const response = await client.send(command);
       const writeStream = fs.createWriteStream(dest);
       this.logger.debug(`Download from ${fileInfo.path} to ${dest}`, { start: fileInfo.start, end: fileInfo.end });
       await pipeline(response.Body, writeStream);
+      fileInfo.path = dest;
     }
   }
 
@@ -151,20 +155,19 @@ export default class DealPreparationWorker extends BaseService {
       } else {
         const readStream = fs.createReadStream(fileInfo.path, {
           start: fileInfo.start,
-          end: fileInfo.end
+          end: fileInfo.end - 1
         });
         const writeStream = fs.createWriteStream(dest);
         this.logger.debug(`Partial Copy from ${fileInfo.path} to ${dest}`, { start: fileInfo.start, end: fileInfo.end });
         await pipeline(readStream, writeStream);
       }
+      fileInfo.path = dest;
     }
   }
 
-  private async generate (request: GenerationRequest, fileList: FileList): Promise<[stdout: string, stderr: string, statusCode: number | null]> {
+  private async generate (request: GenerationRequest, fileList: FileList, tmpDir: string | undefined): Promise<[stdout: string, stderr: string, statusCode: number | null]> {
     await fs.mkdir(request.outDir, { recursive: true });
-    let tmpDir: string | undefined;
-    if (request.tmpDir) {
-      tmpDir = path.join(request.tmpDir, randomUUID());
+    if (tmpDir) {
       if (request.path.startsWith('s3://')) {
         await this.moveS3FileList(fileList, request.path, tmpDir);
       } else {
@@ -178,10 +181,7 @@ export default class DealPreparationWorker extends BaseService {
       Start: file.start,
       End: file.end
     })));
-    const [stdout, stderr, exitCode] = await DealPreparationWorker.invokeGenerateCar(request.id, input, request.outDir, request.path);
-    if (tmpDir) {
-      await fs.rm(tmpDir, { recursive: true, force: true });
-    }
+    const [stdout, stderr, exitCode] = await DealPreparationWorker.invokeGenerateCar(request.id, input, request.outDir, tmpDir ?? request.path);
     this.logger.debug(`Child process finished.`, { stdout, stderr, exitCode });
     return [stdout, stderr, exitCode];
   }
@@ -242,7 +242,7 @@ export default class DealPreparationWorker extends BaseService {
         await this.scan(newScanningWork);
       } catch (err) {
         if (err instanceof Error) {
-          this.logger.error(`${this.workerId} - Encountered an error.`, { error: err.message });
+          this.logger.error(`${this.workerId} - Encountered an error.`, err);
           await Datastore.ScanningRequestModel.findByIdAndUpdate(newScanningWork.id, { status: 'error', errorMessage: err.message, workerId: null });
           return true;
         }
@@ -270,7 +270,18 @@ export default class DealPreparationWorker extends BaseService {
         generationId: newGenerationWork.id
       }, null, { sort: { index: 1 } })).map(r => r.fileList).flat();
       let timeSpentInMs = performance.now();
-      const result = await this.generate(newGenerationWork, fileList);
+      let tmpDir : string | undefined;
+      if (newGenerationWork.tmpDir) {
+        tmpDir = path.join(newGenerationWork.tmpDir, randomUUID());
+      }
+      let result;
+      try {
+        result = await this.generate(newGenerationWork, fileList, tmpDir);
+      } finally {
+        if (tmpDir) {
+          await fs.rm(tmpDir, { recursive: true });
+        }
+      }
       timeSpentInMs = performance.now() - timeSpentInMs;
 
       // Parse the output and update the database
@@ -285,8 +296,9 @@ export default class DealPreparationWorker extends BaseService {
       const carFile = path.join(newGenerationWork.outDir, output.PieceCid + '.car');
       const carFileStat = await fs.stat(carFile);
       const fileMap = new Map<string, FileInfo>();
+      const parentPath = tmpDir ?? newGenerationWork.path;
       for (const fileInfo of fileList) {
-        fileMap.set(path.relative(newGenerationWork.path, fileInfo.path).split(path.sep).join('/'), fileInfo);
+        fileMap.set(path.relative(parentPath, fileInfo.path).split(path.sep).join('/'), fileInfo);
       }
       const generatedFileList = DealPreparationWorker.handleGeneratedFileList(fileMap, output.CidMap);
       if (!await Datastore.ScanningRequestModel.findById(newGenerationWork.datasetId)) {
@@ -362,7 +374,7 @@ export default class DealPreparationWorker extends BaseService {
     try {
       hasDoneWork = await this.pollWork();
     } catch (error) {
-      this.logger.error(this.workerId, { error });
+      this.logger.error(this.workerId, error);
     }
     if (hasDoneWork) {
       setTimeout(this.startPollWork, this.ImmediatePollInterval);
