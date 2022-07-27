@@ -273,76 +273,80 @@ export default class DealPreparationWorker extends BaseService {
     if (newGenerationWork) {
       this.logger.info(`${this.workerId} - Polled a new generation request.`,
         { id: newGenerationWork.id, datasetName: newGenerationWork.datasetName, index: newGenerationWork.index });
-      const fileList = (await Datastore.InputFileListModel.find({
-        generationId: newGenerationWork.id
-      }))
-        .sort((a, b) => a.index - b.index)
-        .map(r => r.fileList).flat();
-      let timeSpentInMs = performance.now();
       let tmpDir : string | undefined;
-      if (newGenerationWork.tmpDir) {
-        tmpDir = path.join(newGenerationWork.tmpDir, randomUUID());
-      }
-      let result;
       try {
-        result = await this.generate(newGenerationWork, fileList, tmpDir);
+        const fileList = (await Datastore.InputFileListModel.find({
+          generationId: newGenerationWork.id
+        }))
+          .sort((a, b) => a.index - b.index)
+          .map(r => r.fileList).flat();
+        let timeSpentInMs = performance.now();
+        if (newGenerationWork.tmpDir) {
+          tmpDir = path.join(newGenerationWork.tmpDir, randomUUID());
+        }
+        const result = await this.generate(newGenerationWork, fileList, tmpDir);
+        timeSpentInMs = performance.now() - timeSpentInMs;
+
+        // Parse the output and update the database
+        const [stdout, stderr, statusCode, signalCode] = result!;
+        if (statusCode !== 0) {
+          this.logger.error(`${this.workerId} - Encountered an error.`, { stderr, statusCode, signalCode });
+          await Datastore.GenerationRequestModel.findOneAndUpdate({ _id: newGenerationWork.id, status: 'active' }, { status: 'error', errorMessage: stderr, workerId: null }, { projection: { _id: 1 } });
+          return true;
+        }
+
+        const output :GenerateCarOutput = JSON.parse(stdout);
+        const carFile = path.join(newGenerationWork.outDir, output.PieceCid + '.car');
+        const carFileStat = await fs.stat(carFile);
+        const fileMap = new Map<string, FileInfo>();
+        const parentPath = tmpDir ?? newGenerationWork.path;
+        for (const fileInfo of fileList) {
+          fileMap.set(path.relative(parentPath, fileInfo.path).split(path.sep).join('/'), fileInfo);
+        }
+        const generatedFileList = DealPreparationWorker.handleGeneratedFileList(fileMap, output.CidMap);
+        if (!await Datastore.ScanningRequestModel.findById(newGenerationWork.datasetId)) {
+          this.logger.info('Scanning request has been removed. Give up updating the generation request', { datasetId: newGenerationWork.datasetId, datasetName: newGenerationWork.datasetName });
+          return true;
+        }
+        for (let i = 0; i < generatedFileList.length; i += 1000) {
+          await Datastore.OutputFileListModel.updateOne({
+            generationId: newGenerationWork.id,
+            index: i / 1000
+          },
+          {
+            $setOnInsert: {
+              generatedFileList: generatedFileList.slice(i, i + 1000)
+            }
+          },
+          {
+            upsert: true,
+            projection: { _id: 1 }
+          });
+          this.logger.debug('Created new OUTPUT file list for the generation request.', { id: newGenerationWork.id, name: newGenerationWork.datasetName, index: newGenerationWork.index, from: i, to: i + 1000 });
+        }
+        await Datastore.GenerationRequestModel.findByIdAndUpdate(newGenerationWork.id, {
+          status: 'completed',
+          dataCid: output.DataCid,
+          pieceSize: output.PieceSize,
+          pieceCid: output.PieceCid,
+          carSize: carFileStat.size,
+          $unset: { errorMessage: 1 },
+          workerId: null
+        }, {
+          projection: { _id: 1 }
+        });
+        this.logger.info(`${this.workerId} - Finished Generation of dataset.`,
+          { id: newGenerationWork.id, datasetName: newGenerationWork.datasetName, index: newGenerationWork.index, timeSpentInMs: timeSpentInMs });
+      } catch (error) {
+        if (error instanceof Error) {
+          await Datastore.GenerationRequestModel.findOneAndUpdate({ _id: newGenerationWork.id, status: 'active' }, { status: 'error', errorMessage: error.message, workerId: null });
+          this.logger.error(`${this.workerId} - Encountered an error.`, error);
+        }
       } finally {
         if (tmpDir) {
           await fs.rm(tmpDir, { recursive: true });
         }
       }
-      timeSpentInMs = performance.now() - timeSpentInMs;
-
-      // Parse the output and update the database
-      const [stdout, stderr, statusCode, signalCode] = result!;
-      if (statusCode !== 0) {
-        this.logger.error(`${this.workerId} - Encountered an error.`, { stderr, statusCode, signalCode });
-        await Datastore.GenerationRequestModel.findOneAndUpdate({ _id: newGenerationWork.id, status: 'active' }, { status: 'error', errorMessage: stderr, workerId: null }, { projection: { _id: 1 } });
-        return true;
-      }
-
-      const output :GenerateCarOutput = JSON.parse(stdout);
-      const carFile = path.join(newGenerationWork.outDir, output.PieceCid + '.car');
-      const carFileStat = await fs.stat(carFile);
-      const fileMap = new Map<string, FileInfo>();
-      const parentPath = tmpDir ?? newGenerationWork.path;
-      for (const fileInfo of fileList) {
-        fileMap.set(path.relative(parentPath, fileInfo.path).split(path.sep).join('/'), fileInfo);
-      }
-      const generatedFileList = DealPreparationWorker.handleGeneratedFileList(fileMap, output.CidMap);
-      if (!await Datastore.ScanningRequestModel.findById(newGenerationWork.datasetId)) {
-        this.logger.info('Scanning request has been removed. Give up updating the generation request', { datasetId: newGenerationWork.datasetId, datasetName: newGenerationWork.datasetName });
-        return true;
-      }
-      for (let i = 0; i < generatedFileList.length; i += 1000) {
-        await Datastore.OutputFileListModel.updateOne({
-          generationId: newGenerationWork.id,
-          index: i / 1000
-        },
-        {
-          $setOnInsert: {
-            generatedFileList: generatedFileList.slice(i, i + 1000)
-          }
-        },
-        {
-          upsert: true,
-          projection: { _id: 1 }
-        });
-        this.logger.debug('Created new OUTPUT file list for the generation request.', { id: newGenerationWork.id, name: newGenerationWork.datasetName, index: newGenerationWork.index, from: i, to: i + 1000 });
-      }
-      await Datastore.GenerationRequestModel.findByIdAndUpdate(newGenerationWork.id, {
-        status: 'completed',
-        dataCid: output.DataCid,
-        pieceSize: output.PieceSize,
-        pieceCid: output.PieceCid,
-        carSize: carFileStat.size,
-        $unset: { errorMessage: 1 },
-        workerId: null
-      }, {
-        projection: { _id: 1 }
-      });
-      this.logger.info(`${this.workerId} - Finished Generation of dataset.`,
-        { id: newGenerationWork.id, datasetName: newGenerationWork.datasetName, index: newGenerationWork.index, timeSpentInMs: timeSpentInMs });
     }
 
     return newGenerationWork != null;
