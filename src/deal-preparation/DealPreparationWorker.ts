@@ -139,13 +139,13 @@ export default class DealPreparationWorker extends BaseService {
         const dest = path.resolve(tmpDir, rel);
         const destDir = path.dirname(dest);
         await fs.mkdirp(destDir);
+        logger?.debug(`Download from ${fileInfo.path} to ${dest}`, { start: fileInfo.start, end: fileInfo.end });
         const response = await client.send(command);
         const writeStream = fs.createWriteStream(dest);
-        logger?.debug(`Download from ${fileInfo.path} to ${dest}`, { start: fileInfo.start, end: fileInfo.end });
         await pipeline(response.Body, writeStream);
         fileInfo.path = dest;
       } catch (error) {
-        logger?.warn(`Encountered an error when downloading ${fileInfo.path}`, error);
+        logger?.warn(`Encountered an error when downloading ${fileInfo.path} - ${error}`);
         throw error;
       }
     }
