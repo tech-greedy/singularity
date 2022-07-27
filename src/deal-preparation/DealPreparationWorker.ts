@@ -124,25 +124,30 @@ export default class DealPreparationWorker extends BaseService {
     const region = await Scanner.detectS3Region(bucketName);
     const client = new S3Client({ region, signer: new NoopRequestSigner(), retryStrategy: getRetryStrategy() });
     for (const fileInfo of fileList) {
-      const key = fileInfo.path.slice('s3://'.length + bucketName.length + 1);
-      const commandInput : GetObjectCommandInput = {
-        Bucket: bucketName,
-        Key: key
-      };
-      if (fileInfo.start !== undefined && fileInfo.end !== undefined) {
-        commandInput.Range = `bytes=${fileInfo.start}-${fileInfo.end - 1}`;
+      try {
+        const key = fileInfo.path.slice('s3://'.length + bucketName.length + 1);
+        const commandInput : GetObjectCommandInput = {
+          Bucket: bucketName,
+          Key: key
+        };
+        if (fileInfo.start !== undefined && fileInfo.end !== undefined) {
+          commandInput.Range = `bytes=${fileInfo.start}-${fileInfo.end - 1}`;
+        }
+        const command = new GetObjectCommand(commandInput);
+        // For S3 bucket, always use the path that contains the bucketName - TODO override this behavior with a flag
+        const rel = fileInfo.path.slice('s3://'.length);
+        const dest = path.resolve(tmpDir, rel);
+        const destDir = path.dirname(dest);
+        await fs.mkdirp(destDir);
+        const response = await client.send(command);
+        const writeStream = fs.createWriteStream(dest);
+        logger?.debug(`Download from ${fileInfo.path} to ${dest}`, { start: fileInfo.start, end: fileInfo.end });
+        await pipeline(response.Body, writeStream);
+        fileInfo.path = dest;
+      } catch (error) {
+        logger?.warn(`Encountered an error when downloading ${fileInfo.path}`, error);
+        throw error;
       }
-      const command = new GetObjectCommand(commandInput);
-      // For S3 bucket, always use the path that contains the bucketName - TODO override this behavior with a flag
-      const rel = fileInfo.path.slice('s3://'.length);
-      const dest = path.resolve(tmpDir, rel);
-      const destDir = path.dirname(dest);
-      await fs.mkdirp(destDir);
-      const response = await client.send(command);
-      const writeStream = fs.createWriteStream(dest);
-      logger?.debug(`Download from ${fileInfo.path} to ${dest}`, { start: fileInfo.start, end: fileInfo.end });
-      await pipeline(response.Body, writeStream);
-      fileInfo.path = dest;
     }
   }
 
