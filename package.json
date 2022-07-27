@@ -85,7 +85,8 @@
     "picomatch": "^2.3.1",
     "toml": "^3.0.0",
     "winston": "^3.6.0",
-    "xbytes": "^1.7.0"
+    "xbytes": "^1.7.0",
+    "p-all": "^3.0.0"
   },
   "directories": {
     "test": "tests"

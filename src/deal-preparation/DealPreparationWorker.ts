@@ -18,6 +18,8 @@ import { S3Client, GetObjectCommand, GetObjectCommandInput } from '@aws-sdk/clie
 import NoopRequestSigner from './NoopRequestSigner';
 import winston from 'winston';
 import { getRetryStrategy } from '../common/S3RetryStrategy';
+import config from 'config';
+import pAll from 'p-all';
 
 interface IpldNode {
   Name: string,
@@ -118,40 +120,54 @@ export default class DealPreparationWorker extends BaseService {
     this.logger.info(`Finished scanning. Marking scanning to completed. Inserted ${index} generation tasks.`);
   }
 
-  public static async moveS3FileList (fileList: FileList, parentPath: string, tmpDir: string, logger?: winston.Logger): Promise<void> {
+  public static async moveS3FileList (fileList: FileList, parentPath: string, tmpDir: string, logger?: winston.Logger, checkAbortion?: () => PromiseLike<void>)
+    : Promise<void> {
     const s3Path = parentPath.slice('s3://'.length);
     const bucketName = s3Path.split('/')[0];
     const region = await Scanner.detectS3Region(bucketName);
     const client = new S3Client({ region, signer: new NoopRequestSigner(), retryStrategy: getRetryStrategy() });
-    for (const fileInfo of fileList) {
-      try {
-        const key = fileInfo.path.slice('s3://'.length + bucketName.length + 1);
-        const commandInput : GetObjectCommandInput = {
-          Bucket: bucketName,
-          Key: key
+    const concurrency : number = config.has('s3.per_job_concurrency') ? config.get('s3.per_job_concurrency') : 4;
+    const jobs = function * generator () {
+      for (const fileInfo of fileList) {
+        yield async () : Promise<void> => {
+          try {
+            const key = fileInfo.path.slice('s3://'.length + bucketName.length + 1);
+            const commandInput : GetObjectCommandInput = {
+              Bucket: bucketName,
+              Key: key
+            };
+            if (fileInfo.start !== undefined && fileInfo.end !== undefined) {
+              commandInput.Range = `bytes=${fileInfo.start}-${fileInfo.end - 1}`;
+            }
+            const command = new GetObjectCommand(commandInput);
+            // For S3 bucket, always use the path that contains the bucketName
+            const rel = fileInfo.path.slice('s3://'.length);
+            const dest = path.resolve(tmpDir, rel);
+            const destDir = path.dirname(dest);
+            await fs.mkdirp(destDir);
+            logger?.debug(`Download from ${fileInfo.path} to ${dest}`, { start: fileInfo.start, end: fileInfo.end });
+            const response = await client.send(command);
+            const writeStream = fs.createWriteStream(dest);
+            await pipeline(response.Body, writeStream);
+            fileInfo.path = dest;
+          } catch (error) {
+            logger?.warn(`Encountered an error when downloading ${fileInfo.path} - ${error}`);
+            throw error;
+          }
+          if (checkAbortion) {
+            await checkAbortion();
+          }
         };
-        if (fileInfo.start !== undefined && fileInfo.end !== undefined) {
-          commandInput.Range = `bytes=${fileInfo.start}-${fileInfo.end - 1}`;
-        }
-        const command = new GetObjectCommand(commandInput);
-        // For S3 bucket, always use the path that contains the bucketName - TODO override this behavior with a flag
-        const rel = fileInfo.path.slice('s3://'.length);
-        const dest = path.resolve(tmpDir, rel);
-        const destDir = path.dirname(dest);
-        await fs.mkdirp(destDir);
-        logger?.debug(`Download from ${fileInfo.path} to ${dest}`, { start: fileInfo.start, end: fileInfo.end });
-        const response = await client.send(command);
-        const writeStream = fs.createWriteStream(dest);
-        await pipeline(response.Body, writeStream);
-        fileInfo.path = dest;
-      } catch (error) {
-        logger?.warn(`Encountered an error when downloading ${fileInfo.path} - ${error}`);
-        throw error;
       }
-    }
+    };
+    await pAll(jobs(), {
+      stopOnError: true,
+      concurrency
+    });
   }
 
-  public static async moveFileList (fileList: FileList, parentPath: string, tmpDir: string, logger?: winston.Logger): Promise<void> {
+  public static async moveFileList (fileList: FileList, parentPath: string, tmpDir: string, logger?: winston.Logger, checkAbortion?: () => PromiseLike<void>)
+    : Promise<void> {
     for (const fileInfo of fileList) {
       const rel = path.relative(parentPath, fileInfo.path);
       const dest = path.resolve(tmpDir, rel);
@@ -170,6 +186,15 @@ export default class DealPreparationWorker extends BaseService {
         await pipeline(readStream, writeStream);
       }
       fileInfo.path = dest;
+      if (checkAbortion) {
+        await checkAbortion();
+      }
+    }
+  }
+
+  private static async verifyGenerationRequestStatusOrThrow (id: string) : Promise<void> {
+    if ((await Datastore.GenerationRequestModel.findById(id))?.status !== 'active') {
+      throw new Error('The generation request has been paused or removed');
     }
   }
 
@@ -178,12 +203,15 @@ export default class DealPreparationWorker extends BaseService {
     await fs.mkdir(request.outDir, { recursive: true });
     if (tmpDir) {
       if (request.path.startsWith('s3://')) {
-        await DealPreparationWorker.moveS3FileList(fileList, request.path, tmpDir, this.logger);
+        await DealPreparationWorker.moveS3FileList(
+          fileList, request.path, tmpDir, this.logger, () => DealPreparationWorker.verifyGenerationRequestStatusOrThrow(request.id));
       } else {
-        await DealPreparationWorker.moveFileList(fileList, request.path, tmpDir, this.logger);
+        await DealPreparationWorker.moveFileList(
+          fileList, request.path, tmpDir, this.logger, () => DealPreparationWorker.verifyGenerationRequestStatusOrThrow(request.id));
       }
       tmpDir = path.resolve(tmpDir);
     }
+    await DealPreparationWorker.verifyGenerationRequestStatusOrThrow(request.id);
     this.logger.debug(`Spawning generate-car.`, { outPath: request.outDir, parentPath: request.path, tmpDir });
     const input = JSON.stringify(fileList.map(file => ({
       Path: file.path,
