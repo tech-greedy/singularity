@@ -706,7 +706,7 @@ describe('DealPreparationService', () => {
     it('should return error if the dataset name is already taken', async () => {
       let response = await supertest(service['app'])
         .post('/preparation').send({
-          name: 'name',
+          name: 'name2',
           path: '.',
           outDir: '.',
           dealSize: '32GiB'
@@ -714,7 +714,7 @@ describe('DealPreparationService', () => {
       expect(response.status).toEqual(200);
       response = await supertest(service['app'])
         .post('/preparation').send({
-          name: 'name',
+          name: 'name2',
           path: '.',
           outDir: '.',
           dealSize: '32GiB'
