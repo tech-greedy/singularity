@@ -338,8 +338,9 @@ retry.command('scanning').alias('scan').description('Retry an errored data scann
 pause.command('generation').alias('gen').description('Pause an active data generation request')
   .option('--json', 'Output with JSON format')
   .argument('<dataset>', 'The dataset id or name')
-  .action(async (dataset, options) => {
-    const response = await UpdateGenerationState(dataset, undefined, 'pause');
+  .addArgument(new Argument('<generation_id>', 'The id or index for the generation request').argOptional())
+  .action(async (dataset, generation, options) => {
+    const response = await UpdateGenerationState(dataset, generation, 'pause');
     CliUtil.renderResponse(response.data, options.json);
   });
 
