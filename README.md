@@ -80,9 +80,9 @@ This is useful if you know MongoDB, and you're hitting some bottlenecks or issue
    1. change `database.start_local` to false
    2. change `connection.database` to the connection string of your own MongoDb database
 
-## Running modules on different nodes
-TODO
-
+## Running Workers on different node for Deal Preparation
+1. On master server, set `deal_preparation_service.enabled`, `database.start_local` to true and disable all other modules
+2. On worker servers, set `deal_preparation_worker.enabled` to true and disable all other modules. Change `connection.database` and `connection.deal_preparation_service` to the IP address of the master server
 
 # Usage
 ```shell
@@ -287,6 +287,10 @@ Deal Replication and Retrieval only works in Linux/Mac due to dependency restric
 
 ### Error - too many open files
 In case that one CAR contains more files than allowed by OS, you will need to increase the open file limit with `ulimit`, or `LimitNOFILE` if using systemd.
+
+### Error: Reached heap limit Allocation failed - JavaScript heap out of memory
+Depending on the version, NodeJS by default has a max heap memory of 2GB. To increase this limit, i.e. to increase to 4G, set environment variable
+`NODE_OPTIONS="--max-old-space-size=4096"`.
 
 ### Error - open /some/file: remote I/O error
 If you are using network mount such as NFS or Goofys, a temporary network issue may cause the CAR file generation to fail.
