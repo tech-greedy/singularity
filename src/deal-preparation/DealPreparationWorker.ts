@@ -73,13 +73,9 @@ export default class DealPreparationWorker extends BaseService {
       this.logger.info(`Resuming scanning. Start from ${lastFileInfo!.path}, offset: ${lastFileInfo!.end}.`);
       index = lastGeneration.index + 1;
     }
-    for await (const fileList of Scanner.scan(request.path, request.minSize, request.maxSize, lastFileInfo)) {
+    for await (const fileList of Scanner.scan(request.path, request.minSize, request.maxSize, lastFileInfo, this.logger)) {
       if (!await Datastore.ScanningRequestModel.findById(request.id)) {
         this.logger.info('The scanning request has been removed. Scanning stopped.', { id: request.id, name: request.name });
-        return;
-      }
-      if ((await Datastore.ScanningRequestModel.findById(request.id))?.status === 'paused') {
-        this.logger.info(`Scanning request has been paused.`, { id: request.id, name: request.name });
         return;
       }
       const generationRequest = await Datastore.GenerationRequestModel.create({
@@ -113,6 +109,10 @@ export default class DealPreparationWorker extends BaseService {
       }, { projection: { _id: 1 } });
       this.logger.info('Marking generation request to active', { id: request.id, name: request.name, index });
       index++;
+      if ((await Datastore.ScanningRequestModel.findById(request.id))?.status === 'paused') {
+        this.logger.info(`Scanning request has been paused.`, { id: request.id, name: request.name });
+        return;
+      }
     }
     await Datastore.ScanningRequestModel.findByIdAndUpdate(request.id, { status: 'completed', workerId: null });
     this.logger.info(`Finished scanning. Marking scanning to completed. Inserted ${index} generation tasks.`);

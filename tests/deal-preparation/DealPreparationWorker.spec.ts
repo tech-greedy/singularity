@@ -327,6 +327,7 @@ describe('DealPreparationWorker', () => {
       expect(await Datastore.GenerationRequestModel.findById(active.id)).not.toBeNull();
       const requests = await Datastore.GenerationRequestModel.find({}, null, { sort: { index: 1 } });
       expect(requests.length).toEqual(3);
+      expect(requests[requests.length - 1].index).toEqual(2);
       expect((await Datastore.InputFileListModel.findOne({generationId: requests[1].id}))!.fileList).toEqual([jasmine.objectContaining({
         path: path.join('tests', 'test_folder', 'c', '3.txt'),
         size: 9

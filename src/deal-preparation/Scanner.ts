@@ -76,7 +76,7 @@ export default class Scanner {
     }
   }
 
-  public static async * scan (root: string, minSize: number, maxSize: number, last?: FileInfo): AsyncGenerator<FileList> {
+  public static async * scan (root: string, minSize: number, maxSize: number, last?: FileInfo, logger?: winston.Logger): AsyncGenerator<FileList> {
     let currentList: FileList = [];
     let currentSize = 0;
     let entries;
@@ -85,9 +85,9 @@ export default class Scanner {
         entries = Scanner.listS3Path(root, {
           path: last.path,
           size: last.size
-        });
+        }, logger);
       } else {
-        entries = Scanner.listS3Path(root);
+        entries = Scanner.listS3Path(root, undefined, logger);
       }
     } else {
       entries = Scanner.listPath(root, last?.path);
