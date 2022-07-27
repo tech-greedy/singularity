@@ -80,9 +80,9 @@ This is useful if you know MongoDB, and you're hitting some bottlenecks or issue
    1. change `database.start_local` to false
    2. change `connection.database` to the connection string of your own MongoDb database
 
-## Running modules on different nodes
-TODO
-
+## Running Workers on different node for Deal Preparation
+1. On master server, set `deal_preparation_service.enabled`, `database.start_local` to true and disable all other modules
+2. On worker servers, set `deal_preparation_worker.enabled` to true and disable all other modules. Change `connection.database` and `connection.deal_preparation_service` to the IP address of the master server
 
 # Usage
 ```shell
