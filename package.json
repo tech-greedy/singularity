@@ -6,7 +6,7 @@
   "types": "dist/source/start.d.ts",
   "scripts": {
     "build": "tsc && copyfiles \"config/**/*.toml\" dist",
-    "postbuild": "chmod +x dist/src/singularity.js",
+    "postbuild": "chmod +x dist/src/singularity*.js",
     "init": "ts-node src/singularity.ts init",
     "start": "ts-node src/singularity.ts daemon",
     "test": "jasmine-ts --config=./tests/jasmine.json",
