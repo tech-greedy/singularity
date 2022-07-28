@@ -11,5 +11,6 @@ export default interface ScanningRequest {
   workerId?: string,
   status: 'active' | 'completed' | 'error' | 'paused',
   errorMessage?: string,
-  tmpDir?: string
+  tmpDir?: string,
+  scanned: number
 }

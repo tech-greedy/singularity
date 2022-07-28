@@ -268,6 +268,7 @@ export default class DealPreparationService extends BaseService {
       maxSize: found.maxSize,
       outDir: found.outDir,
       scanningStatus: found.status,
+      scanned: found.scanned,
       errorMessage: found.errorMessage,
       generationTotal: await Datastore.GenerationRequestModel.count({ datasetId: found.id }),
       generationActive: await Datastore.GenerationRequestModel.count({ datasetId: found.id, status: 'active' }),
@@ -304,6 +305,7 @@ export default class DealPreparationService extends BaseService {
         maxSize: r.maxSize,
         outDir: r.outDir,
         scanningStatus: r.status,
+        scanned: r.scanned,
         errorMessage: r.errorMessage,
         generationTotal: await Datastore.GenerationRequestModel.count({ datasetId: r.id }),
         generationActive: await Datastore.GenerationRequestModel.count({ datasetId: r.id, status: 'active' }),
@@ -509,6 +511,7 @@ export default class DealPreparationService extends BaseService {
     scanningRequest.status = 'active';
     scanningRequest.outDir = outDir;
     scanningRequest.tmpDir = tmpDir;
+    scanningRequest.scanned = 0;
     try {
       await scanningRequest.save();
     } catch (e: any) {

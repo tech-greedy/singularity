@@ -231,7 +231,8 @@ export default class Datastore {
       },
       status: Schema.Types.String,
       errorMessage: Schema.Types.String,
-      tmpDir: Schema.Types.String
+      tmpDir: Schema.Types.String,
+      scanned: Schema.Types.Number
     }, {
       timestamps: true
     });
