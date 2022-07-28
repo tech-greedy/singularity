@@ -21,10 +21,13 @@ async function stream2buffer (stream: Stream): Promise<Buffer> {
 }
 describe('DealPreparationWorker', () => {
   let worker: DealPreparationWorker;
+  let defaultTimeout: number;
   beforeAll(async () => {
     await Utils.initDatabase();
     worker = new DealPreparationWorker();
     GenerateCar.initialize();
+    defaultTimeout = jasmine.DEFAULT_TIMEOUT_INTERVAL;
+    jasmine.DEFAULT_TIMEOUT_INTERVAL = 15_000;
   });
   beforeEach(async () => {
     await Datastore.ScanningRequestModel.deleteMany();
@@ -39,6 +42,7 @@ describe('DealPreparationWorker', () => {
       }
     }
     await fs.rm('tests/subfolder1', { recursive: true, force: true });
+    jasmine.DEFAULT_TIMEOUT_INTERVAL = defaultTimeout;
   })
   describe('moveFileList', () => {
     it('should move all local files to tmpdir', async () => {
@@ -161,7 +165,11 @@ describe('DealPreparationWorker', () => {
     })
 
     // Unfortunately, this requires root to increase number of open files
-    xit('should generate commp, car files for dataset with > 10000 subfiles', async () => {
+    it('should generate commp, car files for dataset with > 10000 subfiles', async () => {
+      const scanning = await Datastore.ScanningRequestModel.create({
+        name: 'name',
+        status: 'completed'
+      })
       await fs.mkdir('tests/subfolder1/subfolder2', { recursive: true });
       const fileList: FileList = []
       for (let i = 10000; i < 20000; ++i) {
@@ -173,13 +181,12 @@ describe('DealPreparationWorker', () => {
         })
       }
       const created = await Datastore.GenerationRequestModel.create({
-        datasetId: 'id',
+        datasetId: scanning.id,
         datasetName: 'name',
         path: 'tests/subfolder1',
         index: 0,
         status: 'active',
         outDir: '.',
-        tmpDir: './tmpdir'
       });
       await Datastore.InputFileListModel.create({
         generationId: created.id,
@@ -187,6 +194,18 @@ describe('DealPreparationWorker', () => {
         fileList
       })
       await worker['pollWork']();
+      const generation = await Datastore.GenerationRequestModel.findById(created.id);
+      expect(generation).toEqual(jasmine.objectContaining({
+        pieceCid: 'baga6ea4seaqfeodfhw5t6qpmwaisq2bdgkzzslokpauxr3qtfaxlite6l3y5ueq',
+        dataCid: 'bafybeiguxstjbsehe6v6xppz3siy32sijzvi6s53qgqlzvbtvpelrqmyau',
+        carSize: 1088493
+      }));
+      const list = await Datastore.OutputFileListModel.find({
+        generationId: generation!.id
+      });
+      expect(list.length).toEqual(11);
+      expect(list[0].generatedFileList[2].path).toEqual('subfolder2/10000.txt');
+      expect(list[10].generatedFileList[0].path).toEqual('subfolder2/19998.txt');
     })
     it('should generate commp, car files', async () => {
       const scanning = await Datastore.ScanningRequestModel.create({
@@ -301,7 +320,8 @@ describe('DealPreparationWorker', () => {
         maxSize: 16,
         status: 'active',
         outDir: '.',
-        tmpDir: './tmpdir'
+        tmpDir: './tmpdir',
+        scanned: 2
       });
       const active = await Datastore.GenerationRequestModel.create({
         datasetId: scanning.id,
@@ -324,6 +344,7 @@ describe('DealPreparationWorker', () => {
         }],
       });
       await worker['scan'](scanning);
+      expect((await Datastore.ScanningRequestModel.findById(scanning.id))!.scanned).toEqual(5);
       expect(await Datastore.GenerationRequestModel.findById(active.id)).not.toBeNull();
       const requests = await Datastore.GenerationRequestModel.find({}, null, { sort: { index: 1 } });
       expect(requests.length).toEqual(3);
@@ -423,6 +444,7 @@ describe('DealPreparationWorker', () => {
         outDir: '.'
       })
       await worker['scan'](scanning);
+      expect((await Datastore.ScanningRequestModel.findById(scanning.id))!.scanned).toEqual(5000);
       const requests = await Datastore.GenerationRequestModel.find({}, null, { sort: { index: 1 } });
       expect(requests.length).toEqual(1);
       const list = await Datastore.InputFileListModel.find({generationId: requests[0].id}, null, {sort: {index: 1}});
@@ -443,6 +465,7 @@ describe('DealPreparationWorker', () => {
         tmpDir: './tmpdir'
       })
       await worker['scan'](scanning);
+      expect((await Datastore.ScanningRequestModel.findById(scanning.id))!.scanned).toEqual(6);
       const requests = await Datastore.GenerationRequestModel.find({}, null, { sort: { index: 1 } });
       /**
        * a/1.txt -> 3 bytes

@@ -110,6 +110,7 @@ export default class DealPreparationWorker extends BaseService {
         status: 'active'
       }, { projection: { _id: 1 } });
       this.logger.info('Marking generation request to active', { id: request.id, name: request.name, index });
+      await Datastore.ScanningRequestModel.findByIdAndUpdate(request.id, { $inc: { scanned: fileList.length } });
       index++;
       if ((await Datastore.ScanningRequestModel.findById(request.id))?.status === 'paused') {
         this.logger.info(`Scanning request has been paused.`, { id: request.id, name: request.name });

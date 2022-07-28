@@ -17,6 +17,7 @@ export default interface GetPreparationDetailsResponse {
   maxSize: number,
   outDir: string,
   scanningStatus: 'active' | 'error' | 'completed' | 'paused',
+  scanned: number,
   errorMessage?: string,
   generationTotal: number,
   generationActive: number,
