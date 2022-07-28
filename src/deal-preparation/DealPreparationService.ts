@@ -329,12 +329,16 @@ export default class DealPreparationService extends BaseService {
 
     if (purge) {
       for await (const { dataCid, pieceCid } of Datastore.GenerationRequestModel.find({ datasetId: found.id }, { dataCid: 1, pieceCid: 1 })) {
-        const filename1 = path.join(found.outDir, dataCid + '.car');
-        const filename2 = path.join(found.outDir, pieceCid + '.car');
-        this.logger.info(`Removing file.`, { filename1 });
-        await fs.rm(filename1, { force: true });
-        this.logger.info(`Removing file.`, { filename2 });
-        await fs.rm(filename2, { force: true });
+        if (dataCid) {
+          const file = path.join(found.outDir, dataCid + '.car');
+          this.logger.info(`Removing file.`, { file });
+          await fs.rm(file, { force: true });
+        }
+        if (pieceCid) {
+          const file = path.join(found.outDir, pieceCid + '.car');
+          this.logger.info(`Removing file.`, { file });
+          await fs.rm(file, { force: true });
+        }
       }
     }
 
@@ -481,8 +485,13 @@ export default class DealPreparationService extends BaseService {
       maxSize = maxRatio * dealSizeNumber;
     }
     maxSize = Math.round(maxSize);
+    if (path.startsWith('s3://') && !tmpDir) {
+      this.sendError(response, ErrorCode.TMPDIR_MISSING_FOR_S3);
+    }
     try {
-      await fs.access(path, constants.F_OK);
+      if (!path.startsWith('s3://')) {
+        await fs.access(path, constants.F_OK);
+      }
       await fs.access(outDir, constants.F_OK);
       if (tmpDir) {
         await fs.access(tmpDir, constants.F_OK);

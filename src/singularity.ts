@@ -52,22 +52,11 @@ program.command('daemon')
   .action((_options) => {
     (async function () {
       GenerateCar.initialize();
-      if (cluster.isMaster) {
+      if (cluster.isPrimary) {
         let indexService: IndexService;
-        process.on('SIGUSR2', async () => {
-          // Gracefully turn off mongodb memory server
-          if (Datastore['mongoMemoryServer']) {
-            await Datastore['mongoMemoryServer'].stop();
-          }
-          // unlock ipfs repo
-          if (config.get('index_service.enabled') && config.get('ipfs.enabled') && indexService && indexService['ipfsClient']) {
-            await indexService['ipfsClient'].stop();
-          }
-
-          process.kill(process.pid, 'SIGKILL');
-        });
         await Datastore.init(false);
         await Datastore.connect();
+        await Datastore.HealthCheckModel.deleteMany();
         const workers: [Worker, string][] = [];
         let readied = 0;
         cluster.on('message', _ => {
@@ -170,9 +159,13 @@ preparation.command('create').description('Start deal preparation for a local da
   .option('-t, --tmp-dir <tmp_dir>', 'Optional temporary directory. May be useful when it is at least 2x faster than the dataset source, such as when the dataset is on network mount, and the I/O is the bottleneck')
   .addOption(new Option('-m, --min-ratio <min_ratio>', 'Min ratio of deal to sector size, i.e. 0.55').argParser(parseFloat))
   .addOption(new Option('-M, --max-ratio <max_ratio>', 'Max ratio of deal to sector size, i.e. 0.95').argParser(parseFloat))
-  .action(async (name, p, outDir, options) => {
-    if (!await fs.pathExists(p)) {
+  .action(async (name, p: string, outDir, options) => {
+    if (!p.startsWith('s3://') && !await fs.pathExists(p)) {
       logger.error(`Dataset path "${p}" does not exist.`);
+      process.exit(1);
+    }
+    if (p.startsWith('s3://') && !options.tmpDir) {
+      logger.error('tmp_dir needs to specified for S3 dataset');
       process.exit(1);
     }
     await fs.mkdirp(outDir);
@@ -185,7 +178,7 @@ preparation.command('create').description('Start deal preparation for a local da
     try {
       response = await axios.post(`${url}/preparation`, {
         name: name,
-        path: path.resolve(p),
+        path: p.startsWith('s3://') ? p : path.resolve(p),
         dealSize: dealSize,
         outDir: path.resolve(outDir),
         minRatio: options.minRatio,
@@ -345,8 +338,9 @@ retry.command('scanning').alias('scan').description('Retry an errored data scann
 pause.command('generation').alias('gen').description('Pause an active data generation request')
   .option('--json', 'Output with JSON format')
   .argument('<dataset>', 'The dataset id or name')
-  .action(async (dataset, options) => {
-    const response = await UpdateGenerationState(dataset, undefined, 'pause');
+  .addArgument(new Argument('<generation_id>', 'The id or index for the generation request').argOptional())
+  .action(async (dataset, generation, options) => {
+    const response = await UpdateGenerationState(dataset, generation, 'pause');
     CliUtil.renderResponse(response.data, options.json);
   });
 

@@ -3,6 +3,12 @@ console_level = 'info'
 file_level = 'debug'
 file_path = './logs'
 
+[s3]
+# The maximum number of retry count
+max_retry_count = 5
+# The concurrency per generation job
+per_job_concurrency = 4
+
 [connection]
 # Connection string to MongoDB, it can be either a built-in mongodb
 # shipped with this software or a standalone mongodb server
