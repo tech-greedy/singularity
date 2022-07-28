@@ -165,7 +165,7 @@ describe('DealPreparationWorker', () => {
     })
 
     // Unfortunately, this requires root to increase number of open files
-    fit('should generate commp, car files for dataset with > 10000 subfiles', async () => {
+    it('should generate commp, car files for dataset with > 10000 subfiles', async () => {
       const scanning = await Datastore.ScanningRequestModel.create({
         name: 'name',
         status: 'completed'
