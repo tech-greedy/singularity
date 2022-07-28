@@ -155,6 +155,11 @@ Options:
   -M, --max-ratio <max_ratio>  Max ratio of deal to sector size, i.e. 0.95
   -h, --help                   display help for command
 ```
+#### Support for public S3 bucket
+The deal preparation supports public S3 bucket natively. Temporary directory is mandatory when using with S3 bucket. i.e.
+```shell
+singularity prep create -t <tmp_dir> <dataset_name> s3://<bucket_name>/<optional_prefix>/ <out_dir>
+```
 ### Pause/Resume/Retry a request
 For each dataset preparation request, it always starts with scanning request, once enough files can be packed into a single deal, it will create a generation request. In other words, each preparation request is a single scanning request and a bunch of generation requests.
 
