@@ -549,7 +549,7 @@ describe('DealPreparationService', () => {
       });
       await fs.mkdir('./tmp/d715461e-8d42-4a53-9b33-e17ed4247304', { recursive: true });
       await fs.writeFile('./d715461e-8d42-4a53-9b33-e17ed4247304.car', 'something');
-      await service['cleanupIncompleteFiles']();
+      await DealPreparationService.cleanupIncompleteFiles();
       await expectAsync(fs.access('./d715461e-8d42-4a53-9b33-e17ed4247304.car')).toBeRejected();
       await expectAsync(fs.access('./d715461e-8d42-4a53-9b33-e17ed4247304')).toBeRejected();
     })
@@ -559,7 +559,7 @@ describe('DealPreparationService', () => {
         outDir: './non-existing',
         tmpDir: './non-existing',
       });
-      await expectAsync(service['cleanupIncompleteFiles']()).toBeResolved();
+      await expectAsync(DealPreparationService.cleanupIncompleteFiles()).toBeResolved();
     })
   })
   describe('DELETE /preparation/:id', () => {

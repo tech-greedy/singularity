@@ -52,6 +52,9 @@ export default class Scanner {
         console.log(`Scanned ${contents.length} entries from ${contents[0].Key} to ${contents[contents.length - 1].Key}`);
       }
       for (const content of response.Contents!) {
+        if (content.Key!.endsWith('/')) {
+          continue;
+        }
         yield {
           path: `s3://${bucketName}/${content.Key!}`,
           size: content.Size!
