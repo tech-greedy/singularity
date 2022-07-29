@@ -6,6 +6,8 @@ New node software for large-scale clients with PB-scale data onboarding to Filec
 
 # Quick Start
 Looking for standalone Deal Preparation? Try [singularity-prepare](./singularity-prepare.md)
+
+Looking for a complete end to end demonstration? Try [Getting Started Guide](./getting-started.md)
 ## Prerequisite
 ```shell
 # Install nvm (https://github.com/nvm-sh/nvm#install--update-script)
@@ -288,6 +290,15 @@ Worker to scan the dataset, make plan and generate Car file and CIDs
 #### enabled, num_workers
 Whether to enable the worker and how many worker instances. As a rule of thumb, use `min(cpu_cores / 2.5, io_MBps / 50)`
 
+# Performance
+### Resource usage
+Each generation worker consumes negligible RAM, 20-50 MiB/s disk I/O and 100-250% of CPU.
+### Speed
+Each 32GiB deal takes ~10 minutes to be generated on AMD EPYC CPU with NVME drive.
+### Other factors
+1. When dealing with lots of small files, CPU usage increases while generation speed decreases
+2. When using S3 bucket public as the dataset, the Internet Speed may become the bottleneck
+
 # FAQ and common issues
 ### Does it work on Windows
 Only Deal Preparation works and Indexing works on Windows.
@@ -312,3 +323,6 @@ chown -R $(whoami) ~/
 npm config set unsafe-perm true
 npm config set user 0
 ```
+
+# Issues
+Create a [bug report](https://github.com/tech-greedy/singularity/issues/new?labels=bug&template=bug_report.md&title=) or [request a feature](https://github.com/tech-greedy/singularity/issues/new?labels=enhancement&template=feature_request.md&title=)
