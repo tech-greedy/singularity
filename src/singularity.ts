@@ -25,6 +25,8 @@ import * as IpfsCore from 'ipfs-core';
 import DealReplicationService from './replication/DealReplicationService';
 import DealReplicationWorker from './replication/DealReplicationWorker';
 import GenerateCar from './common/GenerateCar';
+import HealthCheck from './common/model/HealthCheck';
+import xbytes from 'xbytes';
 
 const logger = Logger.getLogger(Category.Cli);
 const version = packageJson.version;
@@ -150,6 +152,34 @@ index.command('create')
 const preparation = program.command('preparation')
   .alias('prep')
   .description('Manage deal preparation');
+
+function sleep (ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+preparation.command('monitor').description('Monitor worker status and download speed')
+  .action(async () => {
+    const url: string = config.get('connection.deal_preparation_service');
+    let response!: AxiosResponse;
+    while (true) {
+      try {
+        response = await axios.get(`${url}/monitor`);
+      } catch (error) {
+        CliUtil.renderErrorAndExit(error);
+      }
+
+      const data: HealthCheck[] = response.data;
+      CliUtil.renderResponse(data.map(d => ({
+        downloadSpeed: xbytes(d.downloadSpeed) + '/s',
+        workerId: d.workerId
+      })), false);
+      const total = data.map(d => d.downloadSpeed ?? 0).reduce((a, b) => a + b, 0);
+      console.log('Total Speed: ' + xbytes(total) + '/s');
+      await sleep(5000);
+    }
+  });
 
 preparation.command('create').description('Start deal preparation for a local dataset')
   .argument('<datasetName>', 'A unique name of the dataset')
