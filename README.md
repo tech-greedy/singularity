@@ -193,7 +193,10 @@ $ singularity prep generation-status -h
 ```shell
 $ singularity prep generation-manifest -h
 ```
-
+### Monitor service health and download speed
+```shell
+$ singularity prep monitor
+```
 ## Deal Replication
 Deal replication module supports both lotus-market and boost based storage providers (later on we might deprecate lotus-market support).
 Currently it is required to have both lotus and boost cli binary in order for this module to work. 
