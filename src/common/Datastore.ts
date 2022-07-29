@@ -246,6 +246,7 @@ export default class Datastore {
         index: true,
         unique: true
       },
+      downloadSpeed: Schema.Types.Number,
       updatedAt: {
         type: Schema.Types.Date,
         index: 1,

@@ -20,6 +20,8 @@ import winston from 'winston';
 import { getRetryStrategy } from '../common/S3RetryStrategy';
 import config from 'config';
 import pAll from 'p-all';
+import * as stream from 'stream';
+import { TransformCallback } from 'stream';
 
 interface IpldNode {
   Name: string,
@@ -42,6 +44,8 @@ export interface GenerateCarOutput {
 
 export default class DealPreparationWorker extends BaseService {
   private readonly workerId: string;
+  private static downloaded: number;
+  private static downloadStartTimestamp = 0;
 
   public constructor () {
     super(Category.DealPreparationWorker);
@@ -149,7 +153,19 @@ export default class DealPreparationWorker extends BaseService {
             logger?.debug(`Download from ${fileInfo.path} to ${dest}`, { start: fileInfo.start, end: fileInfo.end });
             const response = await client.send(command);
             const writeStream = fs.createWriteStream(dest);
-            await pipeline(response.Body, writeStream);
+            const transform = new stream.Transform({
+              transform (chunk: any, encoding: BufferEncoding, callback: TransformCallback) {
+                const ts = Date.now();
+                if (ts >= DealPreparationWorker.downloadStartTimestamp + 1000) {
+                  DealPreparationWorker.downloadStartTimestamp = ts - ts % 1000;
+                  DealPreparationWorker.downloaded = 0;
+                }
+                DealPreparationWorker.downloaded += chunk.length;
+                this.push(chunk, encoding);
+                callback();
+              }
+            });
+            await pipeline(response.Body, transform, writeStream);
             fileInfo.path = dest;
           } catch (error) {
             logger?.warn(`Encountered an error when downloading ${fileInfo.path} - ${error}`);
@@ -204,8 +220,12 @@ export default class DealPreparationWorker extends BaseService {
     await fs.mkdir(request.outDir, { recursive: true });
     if (tmpDir) {
       if (request.path.startsWith('s3://')) {
-        await DealPreparationWorker.moveS3FileList(
-          fileList, request.path, tmpDir, this.logger, () => DealPreparationWorker.verifyGenerationRequestStatusOrThrow(request.id));
+        try {
+          await DealPreparationWorker.moveS3FileList(
+            fileList, request.path, tmpDir, this.logger, () => DealPreparationWorker.verifyGenerationRequestStatusOrThrow(request.id));
+        } finally {
+          DealPreparationWorker.downloaded = 0;
+        }
       } else {
         await DealPreparationWorker.moveFileList(
           fileList, request.path, tmpDir, this.logger, () => DealPreparationWorker.verifyGenerationRequestStatusOrThrow(request.id));
@@ -446,7 +466,11 @@ export default class DealPreparationWorker extends BaseService {
       {
         workerId: this.workerId
       },
-      {},
+      {
+        $set: {
+          downloadSpeed: DealPreparationWorker.downloaded
+        }
+      },
       {
         upsert: true
       }

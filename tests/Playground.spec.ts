@@ -4,9 +4,9 @@ import NoopRequestSigner from '../src/deal-preparation/NoopRequestSigner';
 import { pipeline } from 'stream/promises';
 import { performance } from 'perf_hooks';
 
-describe('Playground', () => {
+xdescribe('Playground', () => {
   jasmine.DEFAULT_TIMEOUT_INTERVAL = 100000000;
-  fit('should expect same download speed as wget using nodejs streaming', async () => {
+  it('should expect same download speed as wget using nodejs streaming', async () => {
     const commandInput : GetObjectCommandInput = {
       Bucket: 'msd-for-monai',
       Key: 'Task09_Spleen.tar'

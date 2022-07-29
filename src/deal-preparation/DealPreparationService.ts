@@ -32,6 +32,7 @@ export default class DealPreparationService extends BaseService {
     this.handleGetPreparationRequest = this.handleGetPreparationRequest.bind(this);
     this.handleGetGenerationRequest = this.handleGetGenerationRequest.bind(this);
     this.handleGetGenerationManifestRequest = this.handleGetGenerationManifestRequest.bind(this);
+    this.handleMonitorRequest = this.handleMonitorRequest.bind(this);
     this.startCleanupHealthCheck = this.startCleanupHealthCheck.bind(this);
     if (!this.enabled) {
       this.logger.warn('Service is not enabled. Exit now...');
@@ -55,6 +56,7 @@ export default class DealPreparationService extends BaseService {
     this.app.get('/generation/:id', this.handleGetGenerationRequest);
     this.app.get('/generation-manifest/:dataset/:id', this.handleGetGenerationManifestRequest);
     this.app.get('/generation-manifest/:id', this.handleGetGenerationManifestRequest);
+    this.app.get('/monitor', this.handleMonitorRequest);
   }
 
   public start (): void {
@@ -135,6 +137,14 @@ export default class DealPreparationService extends BaseService {
   private async startCleanupHealthCheck (): Promise<void> {
     await this.cleanupHealthCheck();
     setTimeout(this.startCleanupHealthCheck, 5000);
+  }
+
+  private async handleMonitorRequest (_request: Request, response: Response) {
+    const result = (await Datastore.HealthCheckModel.find()).map(h => ({
+      downloadSpeed: h.downloadSpeed, workerId: h.workerId
+    }));
+
+    response.end(JSON.stringify(result));
   }
 
   private async getGenerationRequest (request: Request, response: Response): Promise<GenerationRequest | undefined> {
