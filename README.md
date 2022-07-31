@@ -299,6 +299,9 @@ Each 32GiB deal takes ~10 minutes to be generated on AMD EPYC CPU with NVME driv
 1. When dealing with lots of small files, CPU usage increases while generation speed decreases
 2. When using S3 bucket public as the dataset, the Internet Speed may become the bottleneck
 
+# Backup
+The repo `~/.singularity` or the folder specified by `SINGULARITY_PATH` contains all state of the service. To backup, simply backup the repo folder.
+
 # FAQ and common issues
 ### Does it work on Windows
 Only Deal Preparation works and Indexing works on Windows.
