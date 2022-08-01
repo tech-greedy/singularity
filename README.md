@@ -1,13 +1,13 @@
 # singularity
-New node software for large-scale clients with PB-scale data onboarding to Filecoin network
+New node software for large-scale clients with PB-scale data onboarding to Filecoin network.
 
 ![build workflow](https://github.com/tech-greedy/singularity/actions/workflows/node.js.yml/badge.svg)
 [![npm version](https://badge.fury.io/js/@techgreedy%2Fsingularity.svg)](https://badge.fury.io/js/@techgreedy%2Fsingularity)
 
 # Quick Start
-Looking for standalone Deal Preparation? Try [singularity-prepare](./singularity-prepare.md)
+Looking for standalone Deal Preparation? Try [singularity-prepare](./singularity-prepare.md).
 
-Looking for a complete end to end demonstration? Try [Getting Started Guide](./getting-started.md)
+Looking for a complete end-to-end demonstration? Try [Getting Started Guide](./getting-started.md).
 ## Prerequisite
 ```shell
 # Install nvm (https://github.com/nvm-sh/nvm#install--update-script)
@@ -43,15 +43,15 @@ Then copy the generated binary to override the existing one from the PATH for yo
 * singularity installed globally `/home/user/.nvm/versions/node/v16.xx.x/lib/node_modules/.bin`
 * singularity cloned locally `./node_modules/.bin`
 
-Note the path may change depending on the nodejs version, if you cannot find folder above, try search for generate-car binary first, i.e. `find ~/.nvm -name 'generate-car'`
+Note that the path may change depending on the nodejs version. If you cannot find the folder above, try searching for the generate-car binary first (i.e., `find ~/.nvm -name 'generate-car'`).
 
 
 # Initialization
-To use the tool as a daemon, it needs to initialize the config and the database. To do so, run
+To use the tool as a daemon, it needs to initialize the config and the database. To do so, run:
 ```shell
 singularity init
 ```
-By default a repository will be initialized at `$HOME_DIR/.singularity`. 
+By default a repository will be initialized at `$HOME_DIR/.singularity`.
 Set the environment variable `SINGULARITY_PATH` to override this behavior.
 ```shell
 # Unix
@@ -65,9 +65,9 @@ Since the tool is modularized, it can be deployed in different ways and have dif
 
 Below are configurations for common scenarios.
 ## Deal Preparation Only
-This is useful if you only need deal preparation but not deal making.
-You can still have deal making enabled, but disabling it will use slightly less system resources.  
-In [default.toml](./config/default.toml) from your repo
+This is useful if you don't need deal-making and only care about deal preparation.
+Disabling deal-making will use slightly less system resources. You can still enable deal-making if needed.
+In [default.toml](./config/default.toml) from your repo:
 1. change `index_service.enabled` to false
 2. change `ipfs.enabled` to false
 3. change `http_hosting_service.enabled` to false
@@ -75,12 +75,12 @@ In [default.toml](./config/default.toml) from your repo
 4. change `deal_replication_service.enabled` to false
 4. change `deal_replication_worker.enabled` to false
 
-## Use External MongoDb database
-This is useful if you know MongoDB, and you're hitting some bottlenecks or issues from the built-in MongoDb.
-1. Setup your own MongoDb instance
+## Use External MongoDB database
+This is useful if you know MongoDB, and you're hitting some bottlenecks or issues from the built-in MongoDB.
+1. Setup your own MongoDB instance
 2. In [default.toml](./config/default.toml) from your repo
    1. change `database.start_local` to false
-   2. change `connection.database` to the connection string of your own MongoDb database
+   2. change `connection.database` to the connection string of your own MongoDB database
 
 ## Running Workers on different node for Deal Preparation
 1. On master server, set `deal_preparation_service.enabled`, `database.start_local` to true and disable all other modules
@@ -112,7 +112,7 @@ $ export SINGULARITY_PATH=/the/path/to/the/repo
 $ singularity daemon
 ```
 ## Deal Preparation
-Deal preparation contains two parts
+Deal preparation contains two parts:
 * Scanning Request - an initial effort to scan the directory and make plans of how to assign different files and folders to different chunks
 * Generation Request - subsequent works to generate the car file and compute the commP
 ```shell
@@ -165,14 +165,14 @@ singularity prep create -t <tmp_dir> <dataset_name> s3://<bucket_name>/<optional
 ### Pause/Resume/Retry a request
 For each dataset preparation request, it always starts with scanning request, once enough files can be packed into a single deal, it will create a generation request. In other words, each preparation request is a single scanning request and a bunch of generation requests.
 
-You can pause/resume/retry the scanning request or generation requests. 
+You can pause/resume/retry the scanning request or generation requests.
 ```shell
 $ singularity prep pause -h
 $ singularity prep resume -h
 $ singularity prep retry -h
 ```
 ### Remove a request
-The whole data preparation requests can be removed from database. All generated CAR files can also be deleted by specifying `--purge` option.
+The whole data preparation requests can be removed from the database. All generated CAR files can also be deleted by specifying `--purge` option.
 ```shell
 $ singularity prep remove -h
 ```
@@ -201,20 +201,20 @@ $ singularity prep monitor
 ```
 ## Deal Replication
 Deal replication module supports both lotus-market and boost based storage providers (later on we might deprecate lotus-market support).
-Currently it is required to have both lotus and boost cli binary in order for this module to work. 
+Currently it is required to have both lotus and boost cli binary in order for this module to work.
 
 ### Configuration
 Look for `default.toml` in the initialized repo, verify in the [deal_replication_worker] section, both binary can be accessed.
 If you need to specify environment variable like FULLNODE_API_INFO, it can also be specified there.
 
 ### Setup Lotus Lite node
-In order to make deals, we recommend setting up a [lite node](https://lotus.filecoin.io/lotus/install/lotus-lite/) to use with the tool. 
+In order to make deals, we recommend setting up a [lite node](https://lotus.filecoin.io/lotus/install/lotus-lite/) to use with the tool.
 
 Once you have the lite node setup, you can import your wallet key for the verified client address.
 
 ### Deal making
 ```shell
-$ singularity repl start -h                                                                 
+$ singularity repl start -h
 Usage: singularity replication start [options] <datasetid> <storage-providers> <client> [# of replica]
 
 Start deal replication for a prepared local dataset
@@ -248,47 +248,47 @@ $ singularity repl start -m 10 -c "1 * * * *" CommonCrawl f01234,f05678 f15djc5a
 ```
 
 ## Configuration
-Look for `default.toml` in the initialized repo
+Look for `default.toml` in the initialized repo.
 
 ### [connection]
 #### database
-This sets the MongoDb connection string. The default value corresponds to the built-in MongoDb server shipped with this software.
-If you choose to use a standalone MongoDb service, set the connection string here.
+This sets the MongoDB connection string. The default value corresponds to the built-in MongoDB server shipped with this software.
+If you choose to use a standalone MongoDB service, set the connection string here.
 #### deal_preparation_service
 Sets the API endpoint of deal preparation service.
 
 ### [database]
 #### start_local
-The software is shipping with a built-in MongoDb server. For small to medium-sized dataset, this should be sufficient.
+The software is shipping with a built-in MongoDB server. For small to medium-sized dataset, this should be sufficient.
 
-For users who're onboarding large scale datasets, we recommend running your own MongoDb service which fits into your infrastructure by setting this value to `false`.
-To connect to a standalone MongoDb service, set the value of connection string [here](#database).
+For users who're onboarding large scale datasets, we recommend running your own MongoDB service which fits into your infrastructure by setting this value to `false`.
+To connect to a standalone MongoDB service, set the value of connection string [here](#database).
 
 Not that the MongoDB server may consume as much as 80% of usable memory.
 #### local_path, local_bind, local_port
-The path of the database files the built-in MongoDb will be using, as well as the IP and port to bind the service to.
+The path of the database files the built-in MongoDB will be using, as well as the IP and port to bind the service to.
 
 ### [deal_preparation_service]
-Service to manage preparation requests
+Service to manage preparation requests.
 
 #### enabled, bind, port
-Whether to enable the service and which IP and port to bind the service to
+Whether to enable the service and which IP and port to bind the service to.
 
 #### enable_cleanup
 If the service crashes or is interrupted, there may be incomplete CAR files generated. Enabling this can clean them up.
 
 #### minDealSizeRatio, maxDealSizeRatio
-The default min/max ratio of CAR file size divided by the target deal size. The dataset splitting is performed with below logic
+The default min/max ratio of CAR file size divided by the target deal size. The dataset splitting is performed following the logic below:
 1. Perform a Glob pattern match and get all files in sorted order
 2. Iterate through all the files and keep accumulating file sizes into a chunk
 3. Once the size of a chunk is between min and max ratio, pack this chunk to a CAR file and start with a new chunk
 4. If the size of the file is too large to fit into a chunk, split the file to hit the min ration
 
 ### [deal_preparation_worker]
-Worker to scan the dataset, make plan and generate Car file and CIDs
+Worker to scan the dataset, make plan and generate Car file and CIDs.
 
 #### enabled, num_workers
-Whether to enable the worker and how many worker instances. As a rule of thumb, use `min(cpu_cores / 2.5, io_MBps / 50)`
+Whether to enable the worker and how many worker instances. As a rule of thumb, use `min(cpu_cores / 2.5, io_MBps / 50)`.
 
 # Performance
 ### Resource usage
@@ -305,7 +305,7 @@ The repo `~/.singularity` or the folder specified by `SINGULARITY_PATH` contains
 # FAQ and common issues
 ### Does it work on Windows
 Only Deal Preparation works and Indexing works on Windows.
-Deal Replication and Retrieval only works in Linux/Mac due to dependency restrictions. 
+Deal Replication and Retrieval only works in Linux/Mac due to dependency restrictions.
 
 ### Error - too many open files
 In case that one CAR contains more files than allowed by OS, you will need to increase the open file limit with `ulimit`, or `LimitNOFILE` if using systemd.
@@ -320,7 +320,7 @@ If the error rate is less than 10%, you may assume they are transient and can be
 If the error is consistent, you will need to dig into the root cause of what have gone wrong. It could be incorrectly configured permission or DNS resolver, etc. You can find more details in `/var/log/syslog`.
 
 ### Installation failed when using root
-Avoid using root, or try the fix below
+Avoid using root, or try the fix below.
 ```shell
 chown -R $(whoami) ~/
 npm config set unsafe-perm true
@@ -328,4 +328,4 @@ npm config set user 0
 ```
 
 # Issues
-Create a [bug report](https://github.com/tech-greedy/singularity/issues/new?labels=bug&template=bug_report.md&title=) or [request a feature](https://github.com/tech-greedy/singularity/issues/new?labels=enhancement&template=feature_request.md&title=)
+Create a [bug report](https://github.com/tech-greedy/singularity/issues/new?labels=bug&template=bug_report.md&title=) or [request a feature](https://github.com/tech-greedy/singularity/issues/new?labels=enhancement&template=feature_request.md&title=).
