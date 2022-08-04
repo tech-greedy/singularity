@@ -40,20 +40,13 @@ export default class DealReplicationWorker extends BaseService {
 
   private readonly PollInterval = 5000;
 
-  private readonly ImmediatePollInterval = 1;
-
   private async startPollWork (): Promise<void> {
-    let hasDoneWork = false;
     try {
-      hasDoneWork = await this.pollWork();
+      await this.pollWork();
     } catch (err) {
       this.logger.error('Pool work error', err);
     }
-    if (hasDoneWork) {
-      setTimeout(this.startPollWork, this.ImmediatePollInterval);
-    } else {
-      setTimeout(this.startPollWork, this.PollInterval);
-    }
+    setTimeout(this.startPollWork, this.PollInterval);
   }
 
   private async pollWork (): Promise<boolean> {
@@ -109,7 +102,7 @@ export default class DealReplicationWorker extends BaseService {
             })]);
         } else {
           this.logger.debug(`No cron, execute immediately`);
-          await this.replicate(newReplicationWork);
+          this.replicate(newReplicationWork); // no await so that this can return quickly, enabling parallel polling
         }
       } catch (err) {
         if (err instanceof Error) {
@@ -238,6 +231,15 @@ export default class DealReplicationWorker extends BaseService {
     }
   }
 
+  private stopCronIfExist (id: string): void {
+    if (this.cronRefArray.has(id)) {
+      const [schedule, taskRef] = this.cronRefArray.get(id)!;
+      taskRef.stop();
+      this.cronRefArray.delete(id);
+      this.logger.debug(`Stopped cron (${schedule}) of ${id}`);
+    }
+  }
+
   private async checkAndMarkCompletion (request2Check: ReplicationRequest, carCount: number): Promise<boolean> {
     const maxNumberOfDeals = request2Check.cronSchedule ? request2Check.cronMaxDeals : request2Check.maxNumberOfDeals;
     const numberOfSPs = (await DealReplicationWorker.generateProvidersList(request2Check.storageProviders)).length;
@@ -266,12 +268,7 @@ export default class DealReplicationWorker extends BaseService {
         status: 'completed',
         workerId: null
       });
-      if (request2Check.cronSchedule && this.cronRefArray.has(request2Check.id)) {
-        const [schedule, taskRef] = this.cronRefArray.get(request2Check.id)!;
-        taskRef.stop();
-        this.cronRefArray.delete(request2Check.id);
-        this.logger.debug(`Stopped cron (${schedule}) of ${request2Check.id}`);
-      }
+      this.stopCronIfExist(request2Check.id);
       return true;
     } else {
       this.logger.debug(`Not yet complete`);
@@ -290,6 +287,7 @@ export default class DealReplicationWorker extends BaseService {
     let breakOuter = false; // set this to true will terminate all concurrent deal making thread
     const makeDealAll = providers.map(async (provider) => {
       if (breakOuter) {
+        this.stopCronIfExist(replicationRequest.id);
         return;
       }
       let useLotus = true;
@@ -398,7 +396,10 @@ export default class DealReplicationWorker extends BaseService {
             this.logger.info(cmdOut.stdout);
             if (useLotus) {
               if (cmdOut.stdout.startsWith('baf')) {
-                dealCid = cmdOut.stdout;
+                dealCid = cmdOut.stdout.trim(); // remove trailing line break
+                // If there was a retry, these values could be in error state, need reset
+                errorMsg = '';
+                state = 'proposed';
                 break; // success, break from while loop
               } else {
                 errorMsg = cmdOut.stdout + cmdOut.stderr;
@@ -408,6 +409,9 @@ export default class DealReplicationWorker extends BaseService {
               const match = boostResultUUIDMatcher.exec(cmdOut.stdout);
               if (match != null && match.length > 1) {
                 dealCid = match[1];
+                // If there was a retry, these values could be in error state, need reset
+                errorMsg = '';
+                state = 'proposed';
                 break; // success, break from while loop
               } else {
                 errorMsg = cmdOut.stdout + cmdOut.stderr;

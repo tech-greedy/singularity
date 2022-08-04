@@ -258,9 +258,15 @@ export default class DealReplicationService extends BaseService {
       const replicationRequest = await Datastore.ReplicationRequestModel.findById(id);
       if (replicationRequest) {
         const deals = await Datastore.DealStateModel.find({
-          replicationRequestId: id
+          replicationRequestId: id,
+          state: { $nin: ['slashed', 'error', 'expired', 'proposal_expired'] }
         });
         this.logger.info(`Found ${deals.length} deals from replication request ${id}`);
+        let urlPrefix = replicationRequest.urlPrefix;
+        if (!urlPrefix.endsWith('/')) {
+          urlPrefix += '/';
+        }
+
         if (deals.length > 0) {
           const csvRow = [];
           for (let i = 0; i < deals.length; i++) {
@@ -271,7 +277,7 @@ export default class DealReplicationService extends BaseService {
               filename: `${deal.pieceCid}.car`,
               piece_cid: deal.pieceCid,
               start_epoch: deal.startEpoch,
-              full_url: `${replicationRequest.urlPrefix}/${deal.pieceCid}.car`
+              full_url: `${urlPrefix}/${deal.pieceCid}.car`
             });
           }
           const csv = new ObjectsToCsv(csvRow);
