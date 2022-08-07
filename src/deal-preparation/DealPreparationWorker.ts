@@ -234,12 +234,20 @@ export default class DealPreparationWorker extends BaseService {
     }
     await DealPreparationWorker.verifyGenerationRequestStatusOrThrow(request.id);
     this.logger.debug(`Spawning generate-car.`, { outPath: request.outDir, parentPath: request.path, tmpDir });
-    const input = JSON.stringify(fileList.map(file => ({
-      Path: file.path,
-      Size: file.size,
-      Start: file.start,
-      End: file.end
-    })));
+    let input: string;
+    if (tmpDir) {
+      input = JSON.stringify(fileList.map(file => ({
+        Path: file.path,
+        Size: file.end !== undefined ? file.end - file.start! : file.size
+      })));
+    } else {
+      input = JSON.stringify(fileList.map(file => ({
+        Path: file.path,
+        Size: file.size,
+        Start: file.start,
+        End: file.end
+      })));
+    }
     const [stdout, stderr, exitCode, signalCode] = await DealPreparationWorker.invokeGenerateCar(request.id, input, request.outDir, tmpDir ?? request.path);
     this.logger.debug(`Child process finished.`, { stdout, stderr, exitCode, signalCode });
     return [stdout, stderr, exitCode, signalCode];
