@@ -70,6 +70,9 @@ program.command('daemon')
           }
         });
         if (config.get('deal_preparation_service.enabled')) {
+          if (config.get('deal_preparation_service.enable_cleanup')) {
+            await DealPreparationService.cleanupIncompleteFiles();
+          }
           workers.push([cluster.fork(), 'deal_preparation_service']);
         }
         if (config.get('deal_preparation_worker.enabled')) {

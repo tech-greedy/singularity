@@ -312,3 +312,11 @@ chown -R $(whoami) ~/
 npm config set unsafe-perm true
 npm config set user 0
 ```
+
+### Error: Instance Exited before being ready and without throwing an error!
+Something wrong while starting MongoDB. Check what has gone wrong
+```shell
+MONGOMS_DEBUG=1 singularity daemon
+```
+If the error shows `libcrypto.so.1.1` cannot be found. Try [this solution](https://stackoverflow.com/a/72633324).
+
