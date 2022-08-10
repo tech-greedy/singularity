@@ -21,7 +21,7 @@ export default class DealTrackingService extends BaseService {
 
   private async startDealTracking (): Promise<void> {
     await this.dealTracking();
-    setTimeout(this.startDealTracking, 600_000);
+    setTimeout(this.startDealTracking, 3_600_000);
   }
 
   private async dealTracking (): Promise<void> {

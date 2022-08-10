@@ -7,12 +7,13 @@ import Logger, { Category } from '../common/Logger';
 import CreateReplicationRequest from './CreateReplicationRequest';
 import ErrorCode from './ErrorCode';
 import GetReplicationDetailsResponse from './GetReplicationDetailsResponse';
-import { GetReplicationsResponse } from './GetReplicationsResponse';
+import { GetReplicationsResponse, GetReplicationsResponseItem } from './GetReplicationsResponse';
 import UpdateReplicationRequest from './UpdateReplicationRequest';
 import { ObjectId } from 'mongodb';
 import ObjectsToCsv from 'objects-to-csv';
 import GenerateCSVRequest from './GenerateCSVRequest';
 import path from 'path';
+import DealReplicationWorker from './DealReplicationWorker';
 
 export default class DealReplicationService extends BaseService {
 
@@ -81,17 +82,31 @@ export default class DealReplicationService extends BaseService {
         status: found.status,
         cronSchedule: found.cronSchedule,
         cronMaxDeals: found.cronMaxDeals,
-        cronMaxPendingDeals: found.cronMaxPendingDeals
+        cronMaxPendingDeals: found.cronMaxPendingDeals,
+        fileListPath: found.fileListPath,
+        notes: found.notes
       };
+      const count = request.query['count'];
+      if (count === 'true') {
+        result.dealsTotal = await Datastore.DealStateModel.count({ replicationRequestId: found.id });
+        result.dealsProposed = await Datastore.DealStateModel.count({ replicationRequestId: found.id, state: 'proposed' });
+        result.dealsPublished = await Datastore.DealStateModel.count({ replicationRequestId: found.id, state: 'published' });
+        result.dealsActive = await Datastore.DealStateModel.count({ replicationRequestId: found.id, state: 'active' });
+        result.dealsProposalExpired = await Datastore.DealStateModel.count({ replicationRequestId: found.id, state: 'proposal_expired' });
+        result.dealsExpired = await Datastore.DealStateModel.count({ replicationRequestId: found.id, state: 'expired' });
+        result.dealsSlashed = await Datastore.DealStateModel.count({ replicationRequestId: found.id, state: 'slashed' });
+        result.dealsError = await Datastore.DealStateModel.count({ replicationRequestId: found.id, state: 'error' });
+      }
       response.end(JSON.stringify(result));
     }
 
-    private async handleListReplicationRequests (_request: Request, response: Response) {
+    private async handleListReplicationRequests (request: Request, response: Response) {
+      const count = request.query['count'];
       this.logger.info('Received request to list all replication requests.');
       const replicationRequests = await Datastore.ReplicationRequestModel.find();
       const result: GetReplicationsResponse = [];
       for (const r of replicationRequests) {
-        result.push({
+        const obj: GetReplicationsResponseItem = {
           id: r.id,
           datasetId: r.datasetId,
           replica: r.maxReplicas,
@@ -99,13 +114,19 @@ export default class DealReplicationService extends BaseService {
           client: r.client,
           maxNumberOfDeals: r.maxNumberOfDeals,
           status: r.status,
-          errorMessage: r.errorMessage,
-          replicationTotal: await Datastore.ReplicationRequestModel.count({ datasetId: r.id }),
-          replicationActive: await Datastore.ReplicationRequestModel.count({ datasetId: r.id, status: 'active' }),
-          replicationPaused: await Datastore.ReplicationRequestModel.count({ datasetId: r.id, status: 'paused' }),
-          replicationCompleted: await Datastore.ReplicationRequestModel.count({ datasetId: r.id, status: 'completed' }),
-          replicationError: await Datastore.ReplicationRequestModel.count({ datasetId: r.id, status: 'error' })
-        });
+          errorMessage: r.errorMessage
+        };
+        if (count === 'true') {
+          obj.dealsTotal = await Datastore.DealStateModel.count({ replicationRequestId: r.id });
+          obj.dealsProposed = await Datastore.DealStateModel.count({ replicationRequestId: r.id, state: 'proposed' });
+          obj.dealsPublished = await Datastore.DealStateModel.count({ replicationRequestId: r.id, state: 'published' });
+          obj.dealsActive = await Datastore.DealStateModel.count({ replicationRequestId: r.id, state: 'active' });
+          obj.dealsProposalExpired = await Datastore.DealStateModel.count({ replicationRequestId: r.id, state: 'proposal_expired' });
+          obj.dealsExpired = await Datastore.DealStateModel.count({ replicationRequestId: r.id, state: 'expired' });
+          obj.dealsSlashed = await Datastore.DealStateModel.count({ replicationRequestId: r.id, state: 'slashed' });
+          obj.dealsError = await Datastore.DealStateModel.count({ replicationRequestId: r.id, state: 'error' });
+        }
+        result.push(obj);
       }
       response.end(JSON.stringify(result));
     }
@@ -192,7 +213,9 @@ export default class DealReplicationService extends BaseService {
         maxNumberOfDeals,
         cronSchedule,
         cronMaxDeals,
-        cronMaxPendingDeals
+        cronMaxPendingDeals,
+        fileListPath,
+        notes
       } = <CreateReplicationRequest>request.body;
       this.logger.info(`Received request to replicate dataset "${datasetId}" from client "${client}.`);
       let realDatasetId = datasetId;
@@ -229,6 +252,8 @@ export default class DealReplicationService extends BaseService {
       replicationRequest.cronSchedule = cronSchedule;
       replicationRequest.cronMaxDeals = cronMaxDeals;
       replicationRequest.cronMaxPendingDeals = cronMaxPendingDeals;
+      replicationRequest.fileListPath = fileListPath;
+      replicationRequest.notes = notes;
       try {
         await replicationRequest.save();
         // Create a deal tracking request if not exist
@@ -257,34 +282,39 @@ export default class DealReplicationService extends BaseService {
       const { outDir } = <GenerateCSVRequest>request.body;
       const replicationRequest = await Datastore.ReplicationRequestModel.findById(id);
       if (replicationRequest) {
-        const deals = await Datastore.DealStateModel.find({
-          replicationRequestId: id,
-          state: { $nin: ['slashed', 'error', 'expired', 'proposal_expired'] }
-        });
-        this.logger.info(`Found ${deals.length} deals from replication request ${id}`);
-        let urlPrefix = replicationRequest.urlPrefix;
-        if (!urlPrefix.endsWith('/')) {
-          urlPrefix += '/';
-        }
-
-        if (deals.length > 0) {
-          const csvRow = [];
-          for (let i = 0; i < deals.length; i++) {
-            const deal = deals[i];
-            csvRow.push({
-              miner_id: deal.provider,
-              deal_cid: deal.dealCid,
-              filename: `${deal.pieceCid}.car`,
-              piece_cid: deal.pieceCid,
-              start_epoch: deal.startEpoch,
-              full_url: `${urlPrefix}/${deal.pieceCid}.car`
-            });
+        const providers = await DealReplicationWorker.generateProvidersList(replicationRequest.storageProviders);
+        providers.forEach(async provider => {
+          const deals = await Datastore.DealStateModel.find({
+            replicationRequestId: id,
+            provider: provider,
+            state: { $nin: ['slashed', 'error', 'expired', 'proposal_expired'] }
+          });
+          this.logger.info(`Found ${deals.length} deals from replication request ${id}`);
+          let urlPrefix = replicationRequest.urlPrefix;
+          if (!urlPrefix.endsWith('/')) {
+            urlPrefix += '/';
           }
-          const csv = new ObjectsToCsv(csvRow);
-          const filename = `${outDir}${path.sep}${deals[0].provider}_${id}.csv`;
-          await csv.toDisk(filename);
-          response.end(`CSV saved to ${filename}`);
-        }
+
+          if (deals.length > 0) {
+            const csvRow = [];
+            for (let i = 0; i < deals.length; i++) {
+              const deal = deals[i];
+              csvRow.push({
+                miner_id: deal.provider,
+                deal_cid: deal.dealCid,
+                filename: `${deal.pieceCid}.car`,
+                piece_cid: deal.pieceCid,
+                start_epoch: deal.startEpoch,
+                full_url: `${urlPrefix}${deal.pieceCid}.car`
+              });
+            }
+            const csv = new ObjectsToCsv(csvRow);
+            const filename = `${outDir}${path.sep}${provider}_${id}.csv`;
+            await csv.toDisk(filename);
+            response.end(`CSV saved to ${filename}`);
+          }
+        });
+
       } else {
         this.logger.error(`Could not find replication request ${id}`);
       }

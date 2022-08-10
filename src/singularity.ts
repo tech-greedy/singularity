@@ -427,6 +427,8 @@ replication.command('start')
   .option('-c, --cron-schedule <cronschedule>', 'Optional cron to send deals at interval. Use double quote to wrap the format containing spaces.')
   .option('-x, --cron-max-deals <cronmaxdeals>', 'When cron schedule specified, limit the total number of deals across entire cron, per SP.')
   .option('-xp, --cron-max-pending-deals <cronmaxpendingdeals>', 'When cron schedule specified, limit the total number of pending deals determined by dealtracking service, per SP.')
+  .option('-l, --file-list-path <filelistpath>', 'Absolute path to a txt file that will limit to replicate only from the list. Must be visible by deal replication worker.')
+  .option('-n, --notes <notes>', 'Any notes or tag want to store along the replication request, for tracking purpose.')
   .action(async (datasetid, storageProviders, client, replica, options) => {
     let response!: AxiosResponse;
     try {
@@ -454,7 +456,9 @@ replication.command('start')
         maxNumberOfDeals: options.maxDeals,
         cronSchedule: options.cronSchedule ? options.cronSchedule : undefined,
         cronMaxDeals: options.cronMaxDeals ? options.cronMaxDeals : undefined,
-        cronMaxPendingDeals: options.cronMaxPendingDeals ? options.cronMaxPendingDeals : undefined
+        cronMaxPendingDeals: options.cronMaxPendingDeals ? options.cronMaxPendingDeals : undefined,
+        fileListPath: options.fileListPath ? options.fileListPath : undefined,
+        notes: options.notes ? options.notes : undefined
       });
     } catch (error) {
       CliUtil.renderErrorAndExit(error);
@@ -466,11 +470,12 @@ replication.command('start')
 replication.command('status')
   .description('Check the status of a deal replication request')
   .argument('<id>', 'A unique id of the dataset')
+  .option('-c, --count <count>', 'Whether to count deal states (performance impacting). true|false.', 'false')
   .action(async (id, options) => {
     let response!: AxiosResponse;
     try {
       const url: string = config.get('connection.deal_replication_service');
-      response = await axios.get(`${url}/replication/${id}`);
+      response = await axios.get(`${url}/replication/${id}?count=${options.count}`);
     } catch (error) {
       CliUtil.renderErrorAndExit(error);
     }
@@ -480,11 +485,12 @@ replication.command('status')
 
 replication.command('list')
   .description('List all deal replication requests')
+  .option('-c, --count <count>', 'Whether to count deal states (performance impacting). true|false.', 'false')
   .action(async (options) => {
     let response!: AxiosResponse;
     try {
       const url: string = config.get('connection.deal_replication_service');
-      response = await axios.get(`${url}/replications`);
+      response = await axios.get(`${url}/replications?count=${options.count}`);
     } catch (error) {
       CliUtil.renderErrorAndExit(error);
     }
@@ -556,7 +562,7 @@ replication.command('csv').description('Write a deal replication result as csv.'
     let response!: AxiosResponse;
     try {
       const url: string = config.get('connection.deal_replication_service');
-      response = await axios.post(`${url}/replication/${id}/csv`, { outDir });
+      response = await axios.post(`${url}/replication/${id}/csv`, { outDir: path.resolve(outDir) });
     } catch (error) {
       CliUtil.renderErrorAndExit(error);
     }
