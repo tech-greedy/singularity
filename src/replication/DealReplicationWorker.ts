@@ -228,27 +228,30 @@ export default class DealReplicationWorker extends BaseService {
   }
 
   private async checkAndMarkCompletion (request2Check: ReplicationRequest, carCount: number): Promise<boolean> {
-    const maxNumberOfDeals = request2Check.cronSchedule ? request2Check.cronMaxDeals : request2Check.maxNumberOfDeals;
-    const numberOfSPs = (await DealReplicationWorker.generateProvidersList(request2Check.storageProviders)).length;
-    const actualDealsCount = await Datastore.DealStateModel.count({
-      replicationRequestId: request2Check.id,
-      state: {
-        $nin: [
-          'slashed', 'error', 'expired', 'proposal_expired'
-        ]
-      }
-    });
-    this.logger.debug(`checkAndMarkCompletion ${request2Check.id} max: ${maxNumberOfDeals} actual: ${actualDealsCount}`);
     let isComplete = false;
-    if (maxNumberOfDeals != null && maxNumberOfDeals > 0 && actualDealsCount >= (maxNumberOfDeals! * numberOfSPs)) {
-      this.logger.debug(`Actual deals over limit`);
-      isComplete = true;
-    } else if (actualDealsCount >= (carCount * Math.min(numberOfSPs, request2Check.maxReplicas))) {
-      this.logger.debug(`Actual deals under limit but no more cars available`);
-      isComplete = true;
+    const numberOfSPs = (await DealReplicationWorker.generateProvidersList(request2Check.storageProviders)).length;
+    if (numberOfSPs === 1 && !request2Check.cronSchedule) {
+      isComplete = true; // one SP and non-cron, perform quick check
+    } else {
+      const maxNumberOfDeals = request2Check.cronSchedule ? request2Check.cronMaxDeals : request2Check.maxNumberOfDeals;
+      const actualDealsCount = await Datastore.DealStateModel.count({
+        replicationRequestId: request2Check.id,
+        state: {
+          $nin: [
+            'slashed', 'error', 'expired', 'proposal_expired'
+          ]
+        }
+      });
+      this.logger.debug(`checkAndMarkCompletion ${request2Check.id} max: ${maxNumberOfDeals} actual: ${actualDealsCount}`);
+      if (maxNumberOfDeals != null && maxNumberOfDeals > 0 && actualDealsCount >= (maxNumberOfDeals! * numberOfSPs)) {
+        this.logger.debug(`Actual deals over limit`);
+        isComplete = true;
+      } else if (actualDealsCount >= (carCount * Math.min(numberOfSPs, request2Check.maxReplicas))) {
+        this.logger.debug(`Actual deals under limit but no more cars available`);
+        isComplete = true;
+      }
     }
     if (isComplete) {
-      this.logger.debug(`Mark as complete`);
       await Datastore.ReplicationRequestModel.findOneAndUpdate({
         _id: request2Check.id
       }, {
@@ -256,6 +259,7 @@ export default class DealReplicationWorker extends BaseService {
         workerId: null
       });
       this.stopCronIfExist(request2Check.id);
+      this.logger.info(`Mark as complete. To print CSV: singularity repl csv ${request2Check.id} /tmp`);
       return true;
     } else {
       this.logger.debug(`Not yet complete`);
@@ -273,6 +277,14 @@ export default class DealReplicationWorker extends BaseService {
     const boostResultUUIDMatcher = /deal uuid: (\S+)/;
     try {
       const providers = await DealReplicationWorker.generateProvidersList(replicationRequest.storageProviders);
+      // Find cars that are finished generation
+      const cars = await Datastore.GenerationRequestModel.find({
+        datasetId: replicationRequest.datasetId,
+        status: 'completed'
+      })
+        .sort({
+          pieceCid: 1
+        });
       const makeDealAll = providers.map(async (provider) => {
         if (breakOuter) {
           this.stopCronIfExist(replicationRequest.id);
@@ -282,15 +294,8 @@ export default class DealReplicationWorker extends BaseService {
         try {
           useLotus = await this.isUsingLotus(provider);
         } catch (error) {
-          this.logger.error(`SP ${provider} unknown output from libp2p. Give up on this SP.`, error);
-          return;
+          this.logger.error(`SP ${provider} unknown output from libp2p. Assume lotus.`, error);
         }
-
-        // Find cars that are finished generation
-        const cars = await Datastore.GenerationRequestModel.find({
-          datasetId: replicationRequest.datasetId,
-          status: 'completed'
-        });
 
         let dealsMadePerSP = 0;
         let retryTimeout = config.get<number>('deal_replication_worker.min_retry_wait_ms'); // 30s, 60s, 120s ...
@@ -439,12 +444,11 @@ export default class DealReplicationWorker extends BaseService {
             errorMessage: errorMsg
           });
         }
-        // cron schedule could change from outside
-        this.logger.debug(`Finished all files in the dataset. Checking completion.`);
-        const reRead = await Datastore.ReplicationRequestModel.findById(replicationRequest.id);
-        await this.checkAndMarkCompletion(reRead!, cars.length);
       });
       await Promise.all(makeDealAll);
+      this.logger.debug(`Finished all files in the dataset. Checking completion.`);
+      const reRead = await Datastore.ReplicationRequestModel.findById(replicationRequest.id);
+      await this.checkAndMarkCompletion(reRead!, cars.length);
     } catch (err) {
       this.stopCronIfExist(replicationRequest.id);
       if (err instanceof Error) {

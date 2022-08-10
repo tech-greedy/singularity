@@ -14,5 +14,13 @@ export default interface GetReplicationDetailsResponse {
     status: 'active' | 'paused' | 'completed' | 'error',
     cronSchedule?: string,
     cronMaxDeals?: number,
-    cronMaxPendingDeals?: number
+    cronMaxPendingDeals?: number,
+    dealsTotal?: number,
+    dealsProposed?: number,
+    dealsPublished?: number,
+    dealsActive?: number,
+    dealsProposalExpired?: number,
+    dealsExpired?: number,
+    dealsSlashed?: number,
+    dealsError?: number
   }

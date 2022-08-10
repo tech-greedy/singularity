@@ -7,7 +7,7 @@ import Logger, { Category } from '../common/Logger';
 import CreateReplicationRequest from './CreateReplicationRequest';
 import ErrorCode from './ErrorCode';
 import GetReplicationDetailsResponse from './GetReplicationDetailsResponse';
-import { GetReplicationsResponse } from './GetReplicationsResponse';
+import { GetReplicationsResponse, GetReplicationsResponseItem } from './GetReplicationsResponse';
 import UpdateReplicationRequest from './UpdateReplicationRequest';
 import { ObjectId } from 'mongodb';
 import ObjectsToCsv from 'objects-to-csv';
@@ -83,15 +83,27 @@ export default class DealReplicationService extends BaseService {
         cronMaxDeals: found.cronMaxDeals,
         cronMaxPendingDeals: found.cronMaxPendingDeals
       };
+      const count = request.query['count'];
+      if (count === 'true') {
+        result.dealsTotal = await Datastore.DealStateModel.count({ datasetId: found.id });
+        result.dealsProposed = await Datastore.DealStateModel.count({ datasetId: found.id, status: 'proposed' });
+        result.dealsPublished = await Datastore.DealStateModel.count({ datasetId: found.id, status: 'published' });
+        result.dealsActive = await Datastore.DealStateModel.count({ datasetId: found.id, status: 'active' });
+        result.dealsProposalExpired = await Datastore.DealStateModel.count({ datasetId: found.id, status: 'proposal_expired' });
+        result.dealsExpired = await Datastore.DealStateModel.count({ datasetId: found.id, status: 'expired' });
+        result.dealsSlashed = await Datastore.DealStateModel.count({ datasetId: found.id, status: 'slashed' });
+        result.dealsError = await Datastore.DealStateModel.count({ datasetId: found.id, status: 'error' });
+      }
       response.end(JSON.stringify(result));
     }
 
-    private async handleListReplicationRequests (_request: Request, response: Response) {
+    private async handleListReplicationRequests (request: Request, response: Response) {
+      const count = request.query['count'];
       this.logger.info('Received request to list all replication requests.');
       const replicationRequests = await Datastore.ReplicationRequestModel.find();
       const result: GetReplicationsResponse = [];
       for (const r of replicationRequests) {
-        result.push({
+        const obj: GetReplicationsResponseItem = {
           id: r.id,
           datasetId: r.datasetId,
           replica: r.maxReplicas,
@@ -99,13 +111,19 @@ export default class DealReplicationService extends BaseService {
           client: r.client,
           maxNumberOfDeals: r.maxNumberOfDeals,
           status: r.status,
-          errorMessage: r.errorMessage,
-          replicationTotal: await Datastore.ReplicationRequestModel.count({ datasetId: r.id }),
-          replicationActive: await Datastore.ReplicationRequestModel.count({ datasetId: r.id, status: 'active' }),
-          replicationPaused: await Datastore.ReplicationRequestModel.count({ datasetId: r.id, status: 'paused' }),
-          replicationCompleted: await Datastore.ReplicationRequestModel.count({ datasetId: r.id, status: 'completed' }),
-          replicationError: await Datastore.ReplicationRequestModel.count({ datasetId: r.id, status: 'error' })
-        });
+          errorMessage: r.errorMessage
+        };
+        if (count === 'true') {
+          obj.dealsTotal = await Datastore.DealStateModel.count({ datasetId: r.id });
+          obj.dealsProposed = await Datastore.DealStateModel.count({ datasetId: r.id, status: 'proposed' });
+          obj.dealsPublished = await Datastore.DealStateModel.count({ datasetId: r.id, status: 'published' });
+          obj.dealsActive = await Datastore.DealStateModel.count({ datasetId: r.id, status: 'active' });
+          obj.dealsProposalExpired = await Datastore.DealStateModel.count({ datasetId: r.id, status: 'proposal_expired' });
+          obj.dealsExpired = await Datastore.DealStateModel.count({ datasetId: r.id, status: 'expired' });
+          obj.dealsSlashed = await Datastore.DealStateModel.count({ datasetId: r.id, status: 'slashed' });
+          obj.dealsError = await Datastore.DealStateModel.count({ datasetId: r.id, status: 'error' });
+        }
+        result.push(obj);
       }
       response.end(JSON.stringify(result));
     }
@@ -277,7 +295,7 @@ export default class DealReplicationService extends BaseService {
               filename: `${deal.pieceCid}.car`,
               piece_cid: deal.pieceCid,
               start_epoch: deal.startEpoch,
-              full_url: `${urlPrefix}/${deal.pieceCid}.car`
+              full_url: `${urlPrefix}${deal.pieceCid}.car`
             });
           }
           const csv = new ObjectsToCsv(csvRow);

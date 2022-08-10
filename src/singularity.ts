@@ -466,11 +466,12 @@ replication.command('start')
 replication.command('status')
   .description('Check the status of a deal replication request')
   .argument('<id>', 'A unique id of the dataset')
+  .option('-c, --count <count>', 'Whether to count deal states (performance impacting). true|false.', 'false')
   .action(async (id, options) => {
     let response!: AxiosResponse;
     try {
       const url: string = config.get('connection.deal_replication_service');
-      response = await axios.get(`${url}/replication/${id}`);
+      response = await axios.get(`${url}/replication/${id}?count=${options.count}`);
     } catch (error) {
       CliUtil.renderErrorAndExit(error);
     }
@@ -480,11 +481,12 @@ replication.command('status')
 
 replication.command('list')
   .description('List all deal replication requests')
+  .option('-c, --count <count>', 'Whether to count deal states (performance impacting). true|false.', 'false')
   .action(async (options) => {
     let response!: AxiosResponse;
     try {
       const url: string = config.get('connection.deal_replication_service');
-      response = await axios.get(`${url}/replications`);
+      response = await axios.get(`${url}/replications?count=${options.count}`);
     } catch (error) {
       CliUtil.renderErrorAndExit(error);
     }
