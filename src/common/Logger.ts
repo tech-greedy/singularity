@@ -31,6 +31,7 @@ const loggerFormat = (category: string, colorize: boolean) => {
   }
   return winston.format.combine(...formats);
 };
+
 function getTransports (category : Category): Transport[] {
   const transports = [];
   transports.push(new winston.transports.Console({

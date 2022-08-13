@@ -4,8 +4,7 @@ file_level = 'debug'
 file_path = './logs'
 
 [s3]
-# The maximum number of retry count
-max_retry_count = 5
+max_retry_count = 5 # The maximum number of retry count
 # The concurrency per generation job
 per_job_concurrency = 4
 
