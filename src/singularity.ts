@@ -11,12 +11,10 @@ import Datastore from './common/Datastore';
 import DealPreparationService from './deal-preparation/DealPreparationService';
 import DealPreparationWorker from './deal-preparation/DealPreparationWorker';
 import axios, { AxiosResponse } from 'axios';
-import config from 'config';
 import CliUtil from './cli-util';
 import IndexService from './index/IndexService';
-import HttpHostingService from './hosting/HttpHostingService';
 import DealTrackingService from './deal-tracking/DealTrackingService';
-import GetPreparationDetailsResponse from './deal-preparation/GetPreparationDetailsResponse';
+import GetPreparationDetailsResponse from './deal-preparation/model/GetPreparationDetailsResponse';
 import fs from 'fs-extra';
 import Logger, { Category } from './common/Logger';
 import { Worker } from 'cluster';
@@ -27,32 +25,26 @@ import DealReplicationWorker from './replication/DealReplicationWorker';
 import GenerateCar from './common/GenerateCar';
 import HealthCheck from './common/model/HealthCheck';
 import xbytes from 'xbytes';
+import config, { getConfigDir } from './common/Config';
 
-const logger = Logger.getLogger(Category.Cli);
+const logger = Logger.getLogger(Category.Default);
 const version = packageJson.version;
 const program = new Command();
 program.name('singularity')
   .version(version)
   .description('A tool for large-scale clients with PB-scale data onboarding to Filecoin network\nVisit https://github.com/tech-greedy/singularity for more details');
 
-program.command('init')
-  .description('Initialize the configuration directory in SINGULARITY_PATH\nIf unset, it will be initialized at HOME_DIR/.singularity')
-  .action(async () => {
-    const configDir = config.util.getEnv('NODE_CONFIG_DIR');
-    await fs.mkdirp(configDir);
-    if (!await fs.pathExists(path.join(configDir, 'default.toml'))) {
-      logger.info(`Initializing at ${configDir} ...`);
-      await fs.copyFile(path.join(__dirname, '../config/default.toml'), path.join(configDir, 'default.toml'));
-      logger.info(`Please check ${path.join(configDir, 'default.toml')}`);
-    } else {
-      logger.warn(`${configDir} already has the repo.`);
-    }
-  });
-
 program.command('daemon')
   .description('Start a daemon process for deal preparation and deal making')
   .action((_options) => {
     (async function () {
+      const configDir = getConfigDir();
+      await fs.mkdirp(configDir);
+      if (!await fs.pathExists(path.join(configDir, 'default.toml'))) {
+        logger.info(`Initializing at ${configDir} ...`);
+        await fs.copyFile(path.join(__dirname, '../config/default.toml'), path.join(configDir, 'default.toml'));
+        logger.info(`Please check ${path.join(configDir, 'default.toml')}`);
+      }
       GenerateCar.initialize();
       if (cluster.isPrimary) {
         let indexService: IndexService;
@@ -69,7 +61,7 @@ program.command('daemon')
             }
           }
         });
-        if (config.get('deal_preparation_service.enabled')) {
+        if (config.deal_preparation_service?.enabled ?? true) {
           if (config.get('deal_preparation_service.enable_cleanup')) {
             await DealPreparationService.cleanupIncompleteFiles();
           }
@@ -87,9 +79,6 @@ program.command('daemon')
             indexService['ipfsClient'] = await IpfsCore.create();
           }
           indexService.start();
-        }
-        if (config.get('http_hosting_service.enabled')) {
-          workers.push([cluster.fork(), 'http_hosting_service']);
         }
         if (config.get('deal_tracking_service.enabled')) {
           workers.push([cluster.fork(), 'deal_tracking_service']);
@@ -109,9 +98,6 @@ program.command('daemon')
               break;
             case 'deal_preparation_worker':
               new DealPreparationWorker().start();
-              break;
-            case 'http_hosting_service':
-              new HttpHostingService().start();
               break;
             case 'deal_tracking_service':
               new DealTrackingService().start();

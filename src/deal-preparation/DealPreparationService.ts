@@ -1,5 +1,4 @@
 import bodyParser from 'body-parser';
-import config from 'config';
 import express, { Express, Request, Response } from 'express';
 import { constants } from 'fs';
 import fs from 'fs/promises';
@@ -8,15 +7,16 @@ import xbytes from 'xbytes';
 import BaseService from '../common/BaseService';
 import Datastore from '../common/Datastore';
 import Logger, { Category } from '../common/Logger';
-import CreatePreparationRequest from './CreatePreparationRequest';
-import DeletePreparationRequest from './DeletePreparationRequest';
-import ErrorCode from './ErrorCode';
-import GetPreparationDetailsResponse from './GetPreparationDetailsResponse';
-import { GetPreparationsResponse } from './GetPreparationsResponse';
-import UpdatePreparationRequest from './UpdatePreparationRequest';
+import CreatePreparationRequest from './model/CreatePreparationRequest';
+import DeletePreparationRequest from './model/DeletePreparationRequest';
+import ErrorCode from './model/ErrorCode';
+import GetPreparationDetailsResponse from './model/GetPreparationDetailsResponse';
+import { GetPreparationsResponse } from './model/GetPreparationsResponse';
+import UpdatePreparationRequest from './model/UpdatePreparationRequest';
 import { ObjectId } from 'mongodb';
 import GenerationRequest from '../common/model/GenerationRequest';
 import { GeneratedFileList } from '../common/model/OutputFileList';
+import config from '../common/Config';
 
 export default class DealPreparationService extends BaseService {
   static AllowedDealSizes: number[] = DealPreparationService.initAllowedDealSizes();
@@ -60,8 +60,8 @@ export default class DealPreparationService extends BaseService {
   }
 
   public start (): void {
-    const bind = config.get<string>('deal_preparation_service.bind');
-    const port = config.get<number>('deal_preparation_service.port');
+    const bind = config.deal_preparation_service?.bind ?? '0.0.0.0';
+    const port = config.deal_preparation_service?.port ?? 7001;
     this.startCleanupHealthCheck();
     this.app!.listen(port, bind, () => {
       this.logger.info(`Service started listening at http://${bind}:${port}`);
@@ -484,12 +484,12 @@ export default class DealPreparationService extends BaseService {
       return;
     }
 
-    let minSize = Math.floor(dealSizeNumber * config.get<number>('deal_preparation_service.minDealSizeRatio'));
+    let minSize = Math.floor(dealSizeNumber * (config.deal_preparation_service?.minDealSizeRatio ?? 0.55));
     if (minRatio) {
       minSize = minRatio * dealSizeNumber;
     }
     minSize = Math.round(minSize);
-    let maxSize = Math.floor(dealSizeNumber * config.get<number>('deal_preparation_service.maxDealSizeRatio'));
+    let maxSize = Math.floor(dealSizeNumber * (config.deal_preparation_service.maxDealSizeRatio ?? 0.95));
     if (maxRatio) {
       maxSize = maxRatio * dealSizeNumber;
     }

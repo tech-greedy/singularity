@@ -1,6 +1,6 @@
-import config from 'config';
 import winston from 'winston';
 import Logger, { Category } from './Logger';
+import config from './Config';
 
 export default abstract class BaseService {
   protected logger: winston.Logger;
@@ -8,7 +8,7 @@ export default abstract class BaseService {
 
   protected constructor (category: Category) {
     this.logger = Logger.getLogger(category);
-    this.enabled = config.get(`${category}.enabled`);
+    this.enabled = config[category]?.enabled ?? true;
   }
 
   public abstract start (): void;

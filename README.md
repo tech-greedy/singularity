@@ -68,7 +68,6 @@ You can still have deal making enabled, but disabling it will use slightly less 
 In [default.toml](./config/default.toml) from your repo
 1. change `index_service.enabled` to false
 2. change `ipfs.enabled` to false
-3. change `http_hosting_service.enabled` to false
 4. change `deal_tracking_service.enabled` to false
 4. change `deal_replication_service.enabled` to false
 4. change `deal_replication_worker.enabled` to false

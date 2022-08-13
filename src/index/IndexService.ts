@@ -1,5 +1,4 @@
 import bodyParser from 'body-parser';
-import config from 'config';
 import express, { Express, Request, Response } from 'express';
 import BaseService from '../common/BaseService';
 import Logger, { Category } from '../common/Logger';
@@ -10,6 +9,7 @@ import { create } from 'ipfs-client';
 import { CID, IPFS } from 'ipfs-core';
 import { DirNode, FileNode } from './FsDag';
 import path from 'path';
+import config from '../common/Config';
 
 export default class IndexService extends BaseService {
   private app: Express = express();
@@ -31,7 +31,7 @@ export default class IndexService extends BaseService {
     });
     this.app.get('/create/:id', this.createIndexRequest);
     this.ipfsClient = create({
-      http: config.get('index_service.ipfs_http')
+      http: config.index_service?.ipfs_http ?? 'http://localhost:5001'
     });
   }
 
@@ -131,8 +131,8 @@ export default class IndexService extends BaseService {
   }
 
   public start (): void {
-    const bind = config.get<string>('index_service.bind');
-    const port = config.get<number>('index_service.port');
+    const bind = config.index_service?.bind ?? '0.0.0.0';
+    const port = config.index_service?.port ?? 7003;
     this.app!.listen(port, bind, () => {
       this.logger.info(`Index Service started listening at http://${bind}:${port}`);
     });

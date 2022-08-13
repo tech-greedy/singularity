@@ -1,18 +1,18 @@
 import bodyParser from 'body-parser';
-import config from 'config';
 import express, { Express, Request, Response } from 'express';
 import BaseService from '../common/BaseService';
 import Datastore from '../common/Datastore';
 import Logger, { Category } from '../common/Logger';
-import CreateReplicationRequest from './CreateReplicationRequest';
-import ErrorCode from './ErrorCode';
-import GetReplicationDetailsResponse from './GetReplicationDetailsResponse';
-import { GetReplicationsResponse } from './GetReplicationsResponse';
-import UpdateReplicationRequest from './UpdateReplicationRequest';
+import CreateReplicationRequest from './model/CreateReplicationRequest';
+import ErrorCode from './model/ErrorCode';
+import GetReplicationDetailsResponse from './model/GetReplicationDetailsResponse';
+import { GetReplicationsResponse } from './model/GetReplicationsResponse';
+import UpdateReplicationRequest from './model/UpdateReplicationRequest';
 import { ObjectId } from 'mongodb';
 import ObjectsToCsv from 'objects-to-csv';
-import GenerateCSVRequest from './GenerateCSVRequest';
+import GenerateCSVRequest from './model/GenerateCSVRequest';
 import path from 'path';
+import config from '../common/Config';
 
 export default class DealReplicationService extends BaseService {
 
@@ -46,8 +46,8 @@ export default class DealReplicationService extends BaseService {
 
     public start (): void {
       this.startCleanupHealthCheck();
-      const bind = config.get<string>('deal_replication_service.bind');
-      const port = config.get<number>('deal_replication_service.port');
+      const bind = config.deal_replication_service?.bind ?? '0.0.0.0';
+      const port = config.deal_replication_service?.port ?? 7004;
         this.app!.listen(port, bind, () => {
           this.logger.info(`Deal Replication Service started listening at http://${bind}:${port}`);
         });

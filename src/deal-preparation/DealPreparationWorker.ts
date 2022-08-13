@@ -18,10 +18,10 @@ import { S3Client, GetObjectCommand, GetObjectCommandInput } from '@aws-sdk/clie
 import NoopRequestSigner from './NoopRequestSigner';
 import winston from 'winston';
 import { getRetryStrategy } from '../common/S3RetryStrategy';
-import config from 'config';
 import pAll from 'p-all';
 import * as stream from 'stream';
 import { TransformCallback } from 'stream';
+import config from '../common/Config';
 
 interface IpldNode {
   Name: string,
@@ -131,7 +131,7 @@ export default class DealPreparationWorker extends BaseService {
     const bucketName = s3Path.split('/')[0];
     const region = await Scanner.detectS3Region(bucketName);
     const client = new S3Client({ region, signer: new NoopRequestSigner(), retryStrategy: getRetryStrategy() });
-    const concurrency : number = config.has('s3.per_job_concurrency') ? config.get('s3.per_job_concurrency') : 4;
+    const concurrency : number = config.s3?.per_job_concurrency ?? 4;
     const jobs = function * generator () {
       for (const fileInfo of fileList) {
         yield async () : Promise<void> => {
