@@ -86,13 +86,13 @@ export default class DealReplicationService extends BaseService {
       const count = request.query['count'];
       if (count === 'true') {
         result.dealsTotal = await Datastore.DealStateModel.count({ replicationRequestId: found.id });
-        result.dealsProposed = await Datastore.DealStateModel.count({ replicationRequestId: found.id, status: 'proposed' });
-        result.dealsPublished = await Datastore.DealStateModel.count({ replicationRequestId: found.id, status: 'published' });
-        result.dealsActive = await Datastore.DealStateModel.count({ replicationRequestId: found.id, status: 'active' });
-        result.dealsProposalExpired = await Datastore.DealStateModel.count({ replicationRequestId: found.id, status: 'proposal_expired' });
-        result.dealsExpired = await Datastore.DealStateModel.count({ replicationRequestId: found.id, status: 'expired' });
-        result.dealsSlashed = await Datastore.DealStateModel.count({ replicationRequestId: found.id, status: 'slashed' });
-        result.dealsError = await Datastore.DealStateModel.count({ replicationRequestId: found.id, status: 'error' });
+        result.dealsProposed = await Datastore.DealStateModel.count({ replicationRequestId: found.id, state: 'proposed' });
+        result.dealsPublished = await Datastore.DealStateModel.count({ replicationRequestId: found.id, state: 'published' });
+        result.dealsActive = await Datastore.DealStateModel.count({ replicationRequestId: found.id, state: 'active' });
+        result.dealsProposalExpired = await Datastore.DealStateModel.count({ replicationRequestId: found.id, state: 'proposal_expired' });
+        result.dealsExpired = await Datastore.DealStateModel.count({ replicationRequestId: found.id, state: 'expired' });
+        result.dealsSlashed = await Datastore.DealStateModel.count({ replicationRequestId: found.id, state: 'slashed' });
+        result.dealsError = await Datastore.DealStateModel.count({ replicationRequestId: found.id, state: 'error' });
       }
       response.end(JSON.stringify(result));
     }
@@ -115,13 +115,13 @@ export default class DealReplicationService extends BaseService {
         };
         if (count === 'true') {
           obj.dealsTotal = await Datastore.DealStateModel.count({ replicationRequestId: r.id });
-          obj.dealsProposed = await Datastore.DealStateModel.count({ replicationRequestId: r.id, status: 'proposed' });
-          obj.dealsPublished = await Datastore.DealStateModel.count({ replicationRequestId: r.id, status: 'published' });
-          obj.dealsActive = await Datastore.DealStateModel.count({ replicationRequestId: r.id, status: 'active' });
-          obj.dealsProposalExpired = await Datastore.DealStateModel.count({ replicationRequestId: r.id, status: 'proposal_expired' });
-          obj.dealsExpired = await Datastore.DealStateModel.count({ replicationRequestId: r.id, status: 'expired' });
-          obj.dealsSlashed = await Datastore.DealStateModel.count({ replicationRequestId: r.id, status: 'slashed' });
-          obj.dealsError = await Datastore.DealStateModel.count({ replicationRequestId: r.id, status: 'error' });
+          obj.dealsProposed = await Datastore.DealStateModel.count({ replicationRequestId: r.id, state: 'proposed' });
+          obj.dealsPublished = await Datastore.DealStateModel.count({ replicationRequestId: r.id, state: 'published' });
+          obj.dealsActive = await Datastore.DealStateModel.count({ replicationRequestId: r.id, state: 'active' });
+          obj.dealsProposalExpired = await Datastore.DealStateModel.count({ replicationRequestId: r.id, state: 'proposal_expired' });
+          obj.dealsExpired = await Datastore.DealStateModel.count({ replicationRequestId: r.id, state: 'expired' });
+          obj.dealsSlashed = await Datastore.DealStateModel.count({ replicationRequestId: r.id, state: 'slashed' });
+          obj.dealsError = await Datastore.DealStateModel.count({ replicationRequestId: r.id, state: 'error' });
         }
         result.push(obj);
       }
