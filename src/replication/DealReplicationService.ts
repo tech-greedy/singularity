@@ -85,14 +85,14 @@ export default class DealReplicationService extends BaseService {
       };
       const count = request.query['count'];
       if (count === 'true') {
-        result.dealsTotal = await Datastore.DealStateModel.count({ datasetId: found.id });
-        result.dealsProposed = await Datastore.DealStateModel.count({ datasetId: found.id, status: 'proposed' });
-        result.dealsPublished = await Datastore.DealStateModel.count({ datasetId: found.id, status: 'published' });
-        result.dealsActive = await Datastore.DealStateModel.count({ datasetId: found.id, status: 'active' });
-        result.dealsProposalExpired = await Datastore.DealStateModel.count({ datasetId: found.id, status: 'proposal_expired' });
-        result.dealsExpired = await Datastore.DealStateModel.count({ datasetId: found.id, status: 'expired' });
-        result.dealsSlashed = await Datastore.DealStateModel.count({ datasetId: found.id, status: 'slashed' });
-        result.dealsError = await Datastore.DealStateModel.count({ datasetId: found.id, status: 'error' });
+        result.dealsTotal = await Datastore.DealStateModel.count({ replicationRequestId: found.id });
+        result.dealsProposed = await Datastore.DealStateModel.count({ replicationRequestId: found.id, status: 'proposed' });
+        result.dealsPublished = await Datastore.DealStateModel.count({ replicationRequestId: found.id, status: 'published' });
+        result.dealsActive = await Datastore.DealStateModel.count({ replicationRequestId: found.id, status: 'active' });
+        result.dealsProposalExpired = await Datastore.DealStateModel.count({ replicationRequestId: found.id, status: 'proposal_expired' });
+        result.dealsExpired = await Datastore.DealStateModel.count({ replicationRequestId: found.id, status: 'expired' });
+        result.dealsSlashed = await Datastore.DealStateModel.count({ replicationRequestId: found.id, status: 'slashed' });
+        result.dealsError = await Datastore.DealStateModel.count({ replicationRequestId: found.id, status: 'error' });
       }
       response.end(JSON.stringify(result));
     }
@@ -114,14 +114,14 @@ export default class DealReplicationService extends BaseService {
           errorMessage: r.errorMessage
         };
         if (count === 'true') {
-          obj.dealsTotal = await Datastore.DealStateModel.count({ datasetId: r.id });
-          obj.dealsProposed = await Datastore.DealStateModel.count({ datasetId: r.id, status: 'proposed' });
-          obj.dealsPublished = await Datastore.DealStateModel.count({ datasetId: r.id, status: 'published' });
-          obj.dealsActive = await Datastore.DealStateModel.count({ datasetId: r.id, status: 'active' });
-          obj.dealsProposalExpired = await Datastore.DealStateModel.count({ datasetId: r.id, status: 'proposal_expired' });
-          obj.dealsExpired = await Datastore.DealStateModel.count({ datasetId: r.id, status: 'expired' });
-          obj.dealsSlashed = await Datastore.DealStateModel.count({ datasetId: r.id, status: 'slashed' });
-          obj.dealsError = await Datastore.DealStateModel.count({ datasetId: r.id, status: 'error' });
+          obj.dealsTotal = await Datastore.DealStateModel.count({ replicationRequestId: r.id });
+          obj.dealsProposed = await Datastore.DealStateModel.count({ replicationRequestId: r.id, status: 'proposed' });
+          obj.dealsPublished = await Datastore.DealStateModel.count({ replicationRequestId: r.id, status: 'published' });
+          obj.dealsActive = await Datastore.DealStateModel.count({ replicationRequestId: r.id, status: 'active' });
+          obj.dealsProposalExpired = await Datastore.DealStateModel.count({ replicationRequestId: r.id, status: 'proposal_expired' });
+          obj.dealsExpired = await Datastore.DealStateModel.count({ replicationRequestId: r.id, status: 'expired' });
+          obj.dealsSlashed = await Datastore.DealStateModel.count({ replicationRequestId: r.id, status: 'slashed' });
+          obj.dealsError = await Datastore.DealStateModel.count({ replicationRequestId: r.id, status: 'error' });
         }
         result.push(obj);
       }
