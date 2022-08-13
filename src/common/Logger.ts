@@ -2,6 +2,7 @@ import expressWinston from 'express-winston';
 import winston from 'winston';
 import path from 'path';
 import config, { getConfigDir } from './Config';
+import * as Transport from 'winston-transport';
 
 export enum Category {
   Default = 'default',
@@ -30,22 +31,26 @@ const loggerFormat = (category: string, colorize: boolean) => {
   }
   return winston.format.combine(...formats);
 };
-Object.values(Category).forEach(category => {
+function getTransports (category : Category): Transport[] {
   const transports = [];
   transports.push(new winston.transports.Console({
-    level: config.logging?.console_level ?? 'info',
+    level: config.get('logging.console_level'),
     format: loggerFormat(category, true)
   }));
-  if (config.logging?.file_path) {
+  if (config.get('logging.file_path')) {
     transports.push(new winston.transports.File({
-      level: config.logging.file_level ?? 'info',
+      level: config.get('logging.file_level'),
       dirname: path.resolve(getConfigDir(), config.get('logging.file_path')),
       filename: `${category}.log`,
       format: loggerFormat(category, false)
     }));
   }
+  return transports;
+}
+
+Object.values(Category).forEach(category => {
   container.add(category, {
-    transports
+    transports: getTransports(category)
   });
 });
 
@@ -55,21 +60,8 @@ export default class Logger {
   }
 
   public static getExpressLogger (category: Category) {
-    const transports = [];
-    transports.push(new winston.transports.Console({
-      level: config.logging?.console_level ?? 'info',
-      format: loggerFormat(category, true)
-    }));
-    if (config.logging?.file_path) {
-      transports.push(new winston.transports.File({
-        level: config.logging?.file_level ?? 'info',
-        dirname: path.resolve(getConfigDir(), config.get('logging.file_path')),
-        filename: `${category}.log`,
-        format: loggerFormat(category, false)
-      }));
-    }
     return expressWinston.logger({
-      transports,
+      transports: getTransports(category),
       meta: true,
       msg: 'HTTP {{req.method}} {{req.url}}',
       expressFormat: true,

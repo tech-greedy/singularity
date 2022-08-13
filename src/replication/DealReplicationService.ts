@@ -46,8 +46,8 @@ export default class DealReplicationService extends BaseService {
 
     public start (): void {
       this.startCleanupHealthCheck();
-      const bind = config.deal_replication_service?.bind ?? '0.0.0.0';
-      const port = config.deal_replication_service?.port ?? 7004;
+      const bind = config.get<string>('deal_replication_service.bind');
+      const port = config.get<number>('deal_replication_service.port');
         this.app!.listen(port, bind, () => {
           this.logger.info(`Deal Replication Service started listening at http://${bind}:${port}`);
         });

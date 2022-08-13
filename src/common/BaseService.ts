@@ -8,7 +8,7 @@ export default abstract class BaseService {
 
   protected constructor (category: Category) {
     this.logger = Logger.getLogger(category);
-    this.enabled = config[category]?.enabled ?? true;
+    this.enabled = config.get(`${category}.enabled`);
   }
 
   public abstract start (): void;

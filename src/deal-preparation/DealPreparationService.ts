@@ -60,8 +60,8 @@ export default class DealPreparationService extends BaseService {
   }
 
   public start (): void {
-    const bind = config.deal_preparation_service?.bind ?? '0.0.0.0';
-    const port = config.deal_preparation_service?.port ?? 7001;
+    const bind = config.get<string>('deal_preparation_service.bind');
+    const port = config.get<number>('deal_preparation_service.port');
     this.startCleanupHealthCheck();
     this.app!.listen(port, bind, () => {
       this.logger.info(`Service started listening at http://${bind}:${port}`);
@@ -484,12 +484,12 @@ export default class DealPreparationService extends BaseService {
       return;
     }
 
-    let minSize = Math.floor(dealSizeNumber * (config.deal_preparation_service?.minDealSizeRatio ?? 0.55));
+    let minSize = Math.floor(dealSizeNumber * config.get<number>('deal_preparation_service.minDealSizeRatio'));
     if (minRatio) {
       minSize = minRatio * dealSizeNumber;
     }
     minSize = Math.round(minSize);
-    let maxSize = Math.floor(dealSizeNumber * (config.deal_preparation_service.maxDealSizeRatio ?? 0.95));
+    let maxSize = Math.floor(dealSizeNumber * config.get<number>('deal_preparation_service.maxDealSizeRatio'));
     if (maxRatio) {
       maxSize = maxRatio * dealSizeNumber;
     }

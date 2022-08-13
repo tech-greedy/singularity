@@ -25,8 +25,8 @@ export default class DealReplicationWorker extends BaseService {
     this.workerId = randomUUID();
     this.startHealthCheck = this.startHealthCheck.bind(this);
     this.startPollWork = this.startPollWork.bind(this);
-    this.lotusCMD = config.deal_replication_worker?.lotus_cli_cmd ?? 'lotus';
-    this.boostCMD = config.deal_replication_worker?.boost_cli_cmd ?? 'boost';
+    this.lotusCMD = config.get('deal_replication_worker.lotus_cli_cmd');
+    this.boostCMD = config.get('deal_replication_worker.boost_cli_cmd');
   }
 
   public start (): void {
@@ -293,7 +293,7 @@ export default class DealReplicationWorker extends BaseService {
         });
 
         let dealsMadePerSP = 0;
-        let retryTimeout = config.deal_replication_worker?.min_retry_wait_ms ?? 30000; // 30s, 60s, 120s ...
+        let retryTimeout = config.get<number>('deal_replication_worker.min_retry_wait_ms'); // 30s, 60s, 120s ...
         for (let j = 0; j < cars.length; j++) {
           const carFile = cars[j];
 
@@ -415,10 +415,10 @@ export default class DealReplicationWorker extends BaseService {
             await new Promise(resolve => setTimeout(resolve, retryTimeout));
             retryTimeout *= 2; // expoential back off
             retryCount++;
-          } while (retryCount < config.deal_replication_worker.max_retry_count ?? 3);
+          } while (retryCount < config.get<number>('deal_replication_worker.max_retry_count'));
           if (state === 'proposed') {
             dealsMadePerSP++;
-            if (retryTimeout > config.deal_replication_worker.min_retry_wait_ms ?? 30000) {
+            if (retryTimeout > config.get<number>('deal_replication_worker.min_retry_wait_ms')) {
               retryTimeout /= 2; // expoential back "on"
             }
           }

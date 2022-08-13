@@ -25,10 +25,22 @@ import DealReplicationWorker from './replication/DealReplicationWorker';
 import GenerateCar from './common/GenerateCar';
 import HealthCheck from './common/model/HealthCheck';
 import xbytes from 'xbytes';
-import config, { getConfigDir } from './common/Config';
+import config, { ConfigInitializer, getConfigDir } from './common/Config';
 
 const logger = Logger.getLogger(Category.Default);
 const version = packageJson.version;
+
+async function initializeConfig (copyDefaultConfig: boolean): Promise<void> {
+  const configDir = getConfigDir();
+  if (!await fs.pathExists(path.join(configDir, 'default.toml')) && copyDefaultConfig) {
+    logger.info(`Initializing at ${configDir} ...`);
+    await fs.mkdirp(configDir);
+    await fs.copyFile(path.join(__dirname, '../config/default.toml'), path.join(configDir, 'default.toml'));
+    logger.info(`Please check ${path.join(configDir, 'default.toml')}`);
+  }
+  await ConfigInitializer.initialize();
+}
+
 const program = new Command();
 program.name('singularity')
   .version(version)
@@ -38,13 +50,7 @@ program.command('daemon')
   .description('Start a daemon process for deal preparation and deal making')
   .action((_options) => {
     (async function () {
-      const configDir = getConfigDir();
-      await fs.mkdirp(configDir);
-      if (!await fs.pathExists(path.join(configDir, 'default.toml'))) {
-        logger.info(`Initializing at ${configDir} ...`);
-        await fs.copyFile(path.join(__dirname, '../config/default.toml'), path.join(configDir, 'default.toml'));
-        logger.info(`Please check ${path.join(configDir, 'default.toml')}`);
-      }
+      await initializeConfig(true);
       GenerateCar.initialize();
       if (cluster.isPrimary) {
         let indexService: IndexService;
@@ -119,6 +125,7 @@ const index = program.command('index').description('Manage the dataset index whi
 index.command('create')
   .argument('<id_or_name>', 'The dataset id or name')
   .action(async (id) => {
+    await initializeConfig(false);
     const url: string = config.get('connection.index_service');
     let response!: AxiosResponse;
     try {
@@ -150,6 +157,7 @@ function sleep (ms: number): Promise<void> {
 
 preparation.command('monitor').description('Monitor worker status and download speed')
   .action(async () => {
+    await initializeConfig(false);
     const url: string = config.get('connection.deal_preparation_service');
     let response!: AxiosResponse;
     while (true) {
@@ -179,6 +187,7 @@ preparation.command('create').description('Start deal preparation for a local da
   .addOption(new Option('-m, --min-ratio <min_ratio>', 'Min ratio of deal to sector size, i.e. 0.55').argParser(parseFloat))
   .addOption(new Option('-M, --max-ratio <max_ratio>', 'Max ratio of deal to sector size, i.e. 0.95').argParser(parseFloat))
   .action(async (name, p: string, outDir, options) => {
+    await initializeConfig(false);
     if (!p.startsWith('s3://') && !await fs.pathExists(p)) {
       logger.error(`Dataset path "${p}" does not exist.`);
       process.exit(1);
@@ -215,6 +224,7 @@ preparation.command('status').description('Check the status of a deal preparatio
   .option('--json', 'Output with JSON format')
   .argument('<dataset>', 'The dataset id or name')
   .action(async (id, options) => {
+    await initializeConfig(false);
     const url: string = config.get('connection.deal_preparation_service');
     let response!: AxiosResponse;
     try {
@@ -238,6 +248,7 @@ preparation.command('status').description('Check the status of a deal preparatio
 preparation.command('list').description('List all deal preparation requests')
   .option('--json', 'Output with JSON format')
   .action(async (options) => {
+    await initializeConfig(false);
     const url: string = config.get('connection.deal_preparation_service');
     let response!: AxiosResponse;
     try {
@@ -255,6 +266,7 @@ preparation.command('generation-manifest').description('Get the Slingshot v3.x m
   .option('--name-override <name_override>', 'Override the dataset name in the output JSON. This is the slug name in Slingshot V3.')
   .argument('<generationId>', 'A unique id or index of the generation request')
   .action(async (id, options) => {
+    await initializeConfig(false);
     const url: string = config.get('connection.deal_preparation_service');
     let response! : AxiosResponse;
     try {
@@ -278,6 +290,7 @@ preparation.command('generation-status').description('Check the status of a sing
   .option('--dataset <dataset>', 'The dataset id or name, required if looking for generation request using index')
   .argument('<generationId>', 'A unique id or index of the generation request')
   .action(async (id, options) => {
+    await initializeConfig(false);
     const url: string = config.get('connection.deal_preparation_service');
     let response!: AxiosResponse;
     try {
@@ -334,6 +347,7 @@ pause.command('scanning').alias('scan').description('Pause an active data scanni
   .option('--json', 'Output with JSON format')
   .argument('<dataset>', 'The dataset id or name')
   .action(async (id, options) => {
+    await initializeConfig(false);
     const response = await UpdateScanningState(id, 'pause');
     CliUtil.renderResponse(response.data, options.json);
   });
@@ -342,6 +356,7 @@ resume.command('scanning').alias('scan').description('Resume a paused data scann
   .option('--json', 'Output with JSON format')
   .argument('<dataset>', 'The dataset id or name')
   .action(async (id, options) => {
+    await initializeConfig(false);
     const response = await UpdateScanningState(id, 'resume');
     CliUtil.renderResponse(response.data, options.json);
   });
@@ -350,6 +365,7 @@ retry.command('scanning').alias('scan').description('Retry an errored data scann
   .option('--json', 'Output with JSON format')
   .argument('<dataset>', 'The dataset id or name')
   .action(async (id, options) => {
+    await initializeConfig(false);
     const response = await UpdateScanningState(id, 'retry');
     CliUtil.renderResponse(response.data, options.json);
   });
@@ -359,6 +375,7 @@ pause.command('generation').alias('gen').description('Pause an active data gener
   .argument('<dataset>', 'The dataset id or name')
   .addArgument(new Argument('<generation_id>', 'The id or index for the generation request').argOptional())
   .action(async (dataset, generation, options) => {
+    await initializeConfig(false);
     const response = await UpdateGenerationState(dataset, generation, 'pause');
     CliUtil.renderResponse(response.data, options.json);
   });
@@ -368,6 +385,7 @@ resume.command('generation').alias('gen').description('Resume a paused data gene
   .argument('<dataset>', 'The dataset id or name')
   .addArgument(new Argument('<generation_id>', 'The id or index for the generation request').argOptional())
   .action(async (dataset, generation, options) => {
+    await initializeConfig(false);
     const response = await UpdateGenerationState(dataset, generation, 'resume');
     CliUtil.renderResponse(response.data, options.json);
   });
@@ -377,6 +395,7 @@ retry.command('generation').alias('gen').description('Retry an errored data gene
   .argument('<dataset>', 'The dataset id or name')
   .addArgument(new Argument('<generation_id>', 'The id or index for the generation request').argOptional())
   .action(async (dataset, generation, options) => {
+    await initializeConfig(false);
     const response = await UpdateGenerationState(dataset, generation, 'retry');
     CliUtil.renderResponse(response.data, options.json);
   });
@@ -385,6 +404,7 @@ preparation.command('remove').description('Remove all records from database for 
   .option('--purge', 'Whether to also purge the car files')
   .argument('<dataset>', 'The dataset id or name')
   .action(async (id, options) => {
+    await initializeConfig(false);
     const url: string = config.get('connection.deal_preparation_service');
     try {
       await axios.delete(`${url}/preparation/${id}`, { data: { purge: options.purge } });
@@ -414,6 +434,7 @@ replication.command('start')
   .option('-x, --cron-max-deals <cronmaxdeals>', 'When cron schedule specified, limit the total number of deals across entire cron, per SP.')
   .option('-xp, --cron-max-pending-deals <cronmaxpendingdeals>', 'When cron schedule specified, limit the total number of pending deals determined by dealtracking service, per SP.')
   .action(async (datasetid, storageProviders, client, replica, options) => {
+    await initializeConfig(false);
     let response!: AxiosResponse;
     try {
       console.log(datasetid, storageProviders, client, replica, options);
@@ -453,6 +474,7 @@ replication.command('status')
   .description('Check the status of a deal replication request')
   .argument('<id>', 'A unique id of the dataset')
   .action(async (id, options) => {
+    await initializeConfig(false);
     let response!: AxiosResponse;
     try {
       const url: string = config.get('connection.deal_replication_service');
@@ -467,6 +489,7 @@ replication.command('status')
 replication.command('list')
   .description('List all deal replication requests')
   .action(async (options) => {
+    await initializeConfig(false);
     let response!: AxiosResponse;
     try {
       const url: string = config.get('connection.deal_replication_service');
@@ -485,6 +508,7 @@ replication.command('schedule')
   .argument('<cronMaxDeals>', 'Updated max number of deals across entire cron schedule, per SP. Specify 0 for unlimited.')
   .argument('<cronMaxPendingDeals>', 'Updated max number of pending deals across entire cron schedule, per SP. Specify 0 for unlimited.')
   .action(async (id, schedule, cronMaxDeals, cronMaxPendingDeals, options) => {
+    await initializeConfig(false);
     if (!cron.validate(schedule)) {
       CliUtil.renderErrorAndExit(`Invalid cron schedule format ${schedule}. Try https://crontab.guru/ for a sample.`);
     }
@@ -507,6 +531,7 @@ replication.command('pause').description('Pause an active deal replication reque
   .option('--json', 'Output with JSON format')
   .argument('<id>', 'Existing ID of deal replication request.')
   .action(async (id, options) => {
+    await initializeConfig(false);
     let response!: AxiosResponse;
     try {
       const url: string = config.get('connection.deal_replication_service');
@@ -523,6 +548,7 @@ replication.command('resume').description('Resume a paused deal replication requ
   .option('--json', 'Output with JSON format')
   .argument('<id>', 'Existing ID of deal replication request.')
   .action(async (id, options) => {
+    await initializeConfig(false);
     let response!: AxiosResponse;
     try {
       const url: string = config.get('connection.deal_replication_service');
@@ -539,6 +565,7 @@ replication.command('csv').description('Write a deal replication result as csv.'
   .argument('<id>', 'Existing ID of deal replication request.')
   .argument('<outDir>', 'The output Directory to save the CSV file.')
   .action(async (id, outDir) => {
+    await initializeConfig(false);
     let response!: AxiosResponse;
     try {
       const url: string = config.get('connection.deal_replication_service');

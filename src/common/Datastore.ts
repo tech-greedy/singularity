@@ -258,18 +258,11 @@ export default class Datastore {
     Datastore.HealthCheckModel = mongoose.model<HealthCheck>('HealthCheck', healthCheckSchema);
   }
 
-  private static readonly defaultDatabaseBind = '0.0.0.0';
-
-  private static readonly defaultDatabasePort = 37000;
-
   public static async init (inMemory: boolean): Promise<void> {
-    if (config.database?.start_local) {
-      const localPath = config.database?.local_path ? path.resolve(getConfigDir(), config.database?.local_path) : undefined;
-      await Datastore.setupLocalMongoDb(
-        config.database?.local_bind ?? this.defaultDatabaseBind,
-        config.database?.local_port ?? this.defaultDatabasePort,
-        inMemory ? undefined : localPath);
-    }
+    await Datastore.setupLocalMongoDb(
+      config.get('database.local_bind'),
+      config.get('database.local_port'),
+      inMemory ? undefined : path.resolve(getConfigDir(), config.get<string>('database.local_path')));
   }
 
   public static async connect (): Promise<void> {

@@ -31,7 +31,7 @@ export default class IndexService extends BaseService {
     });
     this.app.get('/create/:id', this.createIndexRequest);
     this.ipfsClient = create({
-      http: config.index_service?.ipfs_http ?? 'http://localhost:5001'
+      http: config.get('index_service.ipfs_http')
     });
   }
 
@@ -131,8 +131,8 @@ export default class IndexService extends BaseService {
   }
 
   public start (): void {
-    const bind = config.index_service?.bind ?? '0.0.0.0';
-    const port = config.index_service?.port ?? 7003;
+    const bind = config.get<string>('index_service.bind');
+    const port = config.get<number>('index_service.port');
     this.app!.listen(port, bind, () => {
       this.logger.info(`Index Service started listening at http://${bind}:${port}`);
     });

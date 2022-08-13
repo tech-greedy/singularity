@@ -53,6 +53,9 @@ export class ConfigInitializer {
       config.get = (key: string) => {
         let value: any = config;
         for (const k of key.split('.')) {
+          if (value[k] === undefined) {
+            throw new Error(`Config key ${key} not found`);
+          }
           value = value[k];
         }
         return value;

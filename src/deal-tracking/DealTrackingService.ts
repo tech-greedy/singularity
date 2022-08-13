@@ -38,7 +38,7 @@ export default class DealTrackingService extends BaseService {
       try {
         await this.updateDealFromLotus(client);
         // only clean up expired deals when updateDealFromLotus update success
-        if (config.deal_replication_worker?.enabled ?? true) {
+        if (config.get('deal_replication_worker.enabled')) {
           await this.markExpired(client);
         }
       } catch (error) {
@@ -226,8 +226,8 @@ export default class DealTrackingService extends BaseService {
 
   private async updateDealFromLotus (client: string): Promise<void> {
     this.logger.debug('Start update deal state from lotus.', { client });
-    const api = config.deal_tracking_service?.lotus_api ?? 'https://api.node.glif.io/rpc/v0';
-    const token = config.deal_tracking_service?.lotus_token ?? '';
+    const api = config.get<string>('deal_tracking_service.lotus_api');
+    const token = config.get<string>('deal_tracking_service.lotus_token');
     for await (const dealState of Datastore.DealStateModel.find({
       client,
       state: 'published'
