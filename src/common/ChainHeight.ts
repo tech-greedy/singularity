@@ -1,4 +1,4 @@
-const genesisTimestamp = 1648598400;
+const genesisTimestamp = 1598306400;
 
 export function DateToHeight (date: Date) : number {
   const timestamp = date.getTime() / 1000;

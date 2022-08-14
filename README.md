@@ -43,21 +43,6 @@ Then copy the generated binary to override the existing one from the PATH for yo
 
 Note the path may change depending on the nodejs version, if you cannot find folder above, try search for generate-car binary first, i.e. `find ~/.nvm -name 'generate-car'`
 
-
-# Initialization
-To use the tool as a daemon, it needs to initialize the config and the database. To do so, run
-```shell
-singularity init
-```
-By default a repository will be initialized at `$HOME_DIR/.singularity`. 
-Set the environment variable `SINGULARITY_PATH` to override this behavior.
-```shell
-# Unix
-export SINGULARITY_PATH=/the/path/to/the/repo
-# Windows
-set SINGULARITY_PATH=/the/path/to/the/repo
-```
-
 # Configuration Choices
 Since the tool is modularized, it can be deployed in different ways and have different components enabled or disabled.
 
@@ -68,7 +53,6 @@ You can still have deal making enabled, but disabling it will use slightly less 
 In [default.toml](./config/default.toml) from your repo
 1. change `index_service.enabled` to false
 2. change `ipfs.enabled` to false
-3. change `http_hosting_service.enabled` to false
 4. change `deal_tracking_service.enabled` to false
 4. change `deal_replication_service.enabled` to false
 4. change `deal_replication_worker.enabled` to false
@@ -97,8 +81,6 @@ Options:
   -h, --help        display help for command
 
 Commands:
-  init              Initialize the configuration directory in SINGULARITY_PATH
-                    If unset, it will be initialized at HOME_DIR/.singularity
   daemon            Start a daemon process for deal preparation and deal making
   index             Manage the dataset index which will help map the dataset path to actual piece
   preparation|prep  Manage deal preparation
@@ -246,7 +228,7 @@ $ singularity repl start -m 10 -c "1 * * * *" CommonCrawl f01234,f05678 f15djc5a
 ```
 
 ## Configuration
-Look for `default.toml` in the initialized repo
+Look for `default.toml` in the initialized repo.
 
 ### [connection]
 #### database

@@ -1,5 +1,4 @@
 import bodyParser from 'body-parser';
-import config from 'config';
 import express, { Express, Request, Response } from 'express';
 import { constants } from 'fs';
 import fs from 'fs/promises';
@@ -8,15 +7,16 @@ import xbytes from 'xbytes';
 import BaseService from '../common/BaseService';
 import Datastore from '../common/Datastore';
 import Logger, { Category } from '../common/Logger';
-import CreatePreparationRequest from './CreatePreparationRequest';
-import DeletePreparationRequest from './DeletePreparationRequest';
-import ErrorCode from './ErrorCode';
-import GetPreparationDetailsResponse from './GetPreparationDetailsResponse';
-import { GetPreparationsResponse } from './GetPreparationsResponse';
-import UpdatePreparationRequest from './UpdatePreparationRequest';
+import CreatePreparationRequest from './model/CreatePreparationRequest';
+import DeletePreparationRequest from './model/DeletePreparationRequest';
+import ErrorCode from './model/ErrorCode';
+import GetPreparationDetailsResponse from './model/GetPreparationDetailsResponse';
+import { GetPreparationsResponse } from './model/GetPreparationsResponse';
+import UpdatePreparationRequest from './model/UpdatePreparationRequest';
 import { ObjectId } from 'mongodb';
 import GenerationRequest from '../common/model/GenerationRequest';
 import { GeneratedFileList } from '../common/model/OutputFileList';
+import config from '../common/Config';
 
 export default class DealPreparationService extends BaseService {
   static AllowedDealSizes: number[] = DealPreparationService.initAllowedDealSizes();

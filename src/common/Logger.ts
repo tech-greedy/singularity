@@ -1,15 +1,15 @@
 import expressWinston from 'express-winston';
 import winston from 'winston';
-import config from 'config';
 import path from 'path';
+import config, { getConfigDir } from './Config';
+import * as Transport from 'winston-transport';
 
 export enum Category {
-  Cli = 'cli',
+  Default = 'default',
   DealPreparationService = 'deal_preparation_service',
   Database = 'database',
   DealPreparationWorker = 'deal_preparation_worker',
   IndexService = 'index_service',
-  HttpHostingService = 'http_hosting_service',
   DealTrackingService = 'deal_tracking_service',
   DealReplicationService = 'deal_replication_service',
   DealReplicationWorker = 'deal_replication_worker',
@@ -31,22 +31,27 @@ const loggerFormat = (category: string, colorize: boolean) => {
   }
   return winston.format.combine(...formats);
 };
-Object.values(Category).forEach(category => {
+
+function getTransports (category : Category): Transport[] {
   const transports = [];
   transports.push(new winston.transports.Console({
-    level: config.has('logging.console_level') ? config.get('logging.console_level') : 'info',
+    level: config.getOrDefault('logging.console_level', 'info'),
     format: loggerFormat(category, true)
   }));
-  if (config.has('logging.file_level') && config.has('logging.file_path')) {
+  if (config.has('logging.file_path')) {
     transports.push(new winston.transports.File({
       level: config.get('logging.file_level'),
-      dirname: path.resolve(process.env.NODE_CONFIG_DIR!, config.get('logging.file_path')),
+      dirname: path.resolve(getConfigDir(), config.get('logging.file_path')),
       filename: `${category}.log`,
       format: loggerFormat(category, false)
     }));
   }
+  return transports;
+}
+
+Object.values(Category).forEach(category => {
   container.add(category, {
-    transports
+    transports: getTransports(category)
   });
 });
 
@@ -56,21 +61,8 @@ export default class Logger {
   }
 
   public static getExpressLogger (category: Category) {
-    const transports = [];
-    transports.push(new winston.transports.Console({
-      level: config.has('logging.console_level') ? config.get('logging.console_level') : 'info',
-      format: loggerFormat(category, true)
-    }));
-    if (config.has('logging.file_level') && config.has('logging.file_path')) {
-      transports.push(new winston.transports.File({
-        level: config.get('logging.file_level'),
-        dirname: path.resolve(process.env.NODE_CONFIG_DIR!, config.get('logging.file_path')),
-        filename: `${category}.log`,
-        format: loggerFormat(category, false)
-      }));
-    }
     return expressWinston.logger({
-      transports,
+      transports: getTransports(category),
       meta: true,
       msg: 'HTTP {{req.method}} {{req.url}}',
       expressFormat: true,

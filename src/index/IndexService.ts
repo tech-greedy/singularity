@@ -1,5 +1,4 @@
 import bodyParser from 'body-parser';
-import config from 'config';
 import express, { Express, Request, Response } from 'express';
 import BaseService from '../common/BaseService';
 import Logger, { Category } from '../common/Logger';
@@ -10,6 +9,7 @@ import { create } from 'ipfs-client';
 import { CID, IPFS } from 'ipfs-core';
 import { DirNode, FileNode } from './FsDag';
 import path from 'path';
+import config from '../common/Config';
 
 export default class IndexService extends BaseService {
   private app: Express = express();

@@ -4,11 +4,11 @@ import BaseService from '../common/BaseService';
 import Datastore from '../common/Datastore';
 import { Category } from '../common/Logger';
 import ReplicationRequest from '../common/model/ReplicationRequest';
-import config from 'config';
 import axios from 'axios';
 import { create, all, Unit } from 'mathjs';
 import GenerationRequest from '../common/model/GenerationRequest';
 import cron, { ScheduledTask } from 'node-cron';
+import config from '../common/Config';
 const mathconfig = {};
 const math = create(all, mathconfig);
 const exec: any = require('await-exec');// no TS support

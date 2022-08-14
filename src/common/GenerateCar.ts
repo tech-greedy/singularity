@@ -1,9 +1,11 @@
 import path from 'path';
 import fs from 'fs-extra';
+import Logger, { Category } from './Logger';
 
 export default class GenerateCar {
   public static path?: string;
   public static initialize () {
+    const logger = Logger.getLogger(Category.Default);
     if (!GenerateCar.path) {
       let dir = path.dirname(require.main!.filename);
       for (let i = 0; i < 10; ++i) {
@@ -12,6 +14,7 @@ export default class GenerateCar {
         const p3 = path.join(dir, '.bin', 'generate-car');
         const p4 = path.join(dir, 'bin', 'generate-car');
         for (const p of [p1, p2, p3, p4]) {
+          logger.debug(`Checking ${p} for generate-car binary`);
           if (fs.existsSync(p)) {
             GenerateCar.path = p;
             break;
@@ -29,6 +32,7 @@ export default class GenerateCar {
       if (!GenerateCar.path) {
         throw new Error('Cannot find generate-car, please report this as a bug');
       }
+      logger.info(`Found generate-car at ${GenerateCar.path}`);
     }
   }
 }
