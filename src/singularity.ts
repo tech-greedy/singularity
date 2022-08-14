@@ -67,7 +67,7 @@ program.command('daemon')
             }
           }
         });
-        if (config.deal_preparation_service?.enabled ?? true) {
+        if (config.get('deal_preparation_service.enabled')) {
           if (config.get('deal_preparation_service.enable_cleanup')) {
             await DealPreparationService.cleanupIncompleteFiles();
           }

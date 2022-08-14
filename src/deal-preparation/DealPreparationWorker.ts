@@ -131,7 +131,7 @@ export default class DealPreparationWorker extends BaseService {
     const bucketName = s3Path.split('/')[0];
     const region = await Scanner.detectS3Region(bucketName);
     const client = new S3Client({ region, signer: new NoopRequestSigner(), retryStrategy: getRetryStrategy() });
-    const concurrency : number = config.get('s3.per_job_concurrency');
+    const concurrency : number = config.getOrDefault('s3.per_job_concurrency', 4);
     const jobs = function * generator () {
       for (const fileInfo of fileList) {
         yield async () : Promise<void> => {

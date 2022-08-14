@@ -259,10 +259,12 @@ export default class Datastore {
   }
 
   public static async init (inMemory: boolean): Promise<void> {
-    await Datastore.setupLocalMongoDb(
-      config.get('database.local_bind'),
-      config.get('database.local_port'),
-      inMemory ? undefined : path.resolve(getConfigDir(), config.get<string>('database.local_path')));
+    if (config.get('database.start_local')) {
+      await Datastore.setupLocalMongoDb(
+        config.get('database.local_bind'),
+        config.get('database.local_port'),
+        inMemory ? undefined : path.resolve(getConfigDir(), config.get<string>('database.local_path')));
+    }
   }
 
   public static async connect (): Promise<void> {

@@ -2,6 +2,7 @@ import toml from '@iarna/toml';
 import path from 'path';
 import { homedir } from 'os';
 import fs from 'fs-extra';
+import { FSWatcher } from 'fs';
 
 interface Config {
   [key: string]: any;
@@ -50,17 +51,18 @@ export function getConfigDir (): string {
 
 export class ConfigInitializer {
   private static initialized = false;
+  public static fsWatcher: FSWatcher;
   public static initialize (): void {
     if (ConfigInitializer.initialized) {
       return;
     }
     const configDir = getConfigDir();
-    const configPath = path.join(configDir, 'config.toml');
+    const configPath = path.join(configDir, 'default.toml');
     let fileString: string;
     if (fs.pathExistsSync(configPath)) {
       fileString = fs.readFileSync(configPath, 'utf8');
       ConfigInitializer.updateValues(fileString);
-      fs.watch(configPath, async (eventType: string, _filename: string) => {
+      ConfigInitializer.fsWatcher = fs.watch(configPath, async (eventType: string, _filename: string) => {
         switch (eventType) {
           case 'change':
             console.log('Config file changed, reloading...');

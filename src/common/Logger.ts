@@ -35,10 +35,10 @@ const loggerFormat = (category: string, colorize: boolean) => {
 function getTransports (category : Category): Transport[] {
   const transports = [];
   transports.push(new winston.transports.Console({
-    level: config.get('logging.console_level'),
+    level: config.getOrDefault('logging.console_level', 'info'),
     format: loggerFormat(category, true)
   }));
-  if (config.get('logging.file_path')) {
+  if (config.has('logging.file_path')) {
     transports.push(new winston.transports.File({
       level: config.get('logging.file_level'),
       dirname: path.resolve(getConfigDir(), config.get('logging.file_path')),
