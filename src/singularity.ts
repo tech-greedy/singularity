@@ -30,7 +30,7 @@ import config, { ConfigInitializer, getConfigDir } from './common/Config';
 const logger = Logger.getLogger(Category.Default);
 const version = packageJson.version;
 
-async function initializeConfig (copyDefaultConfig: boolean): Promise<void> {
+async function initializeConfig (copyDefaultConfig: boolean, watchFile = false): Promise<void> {
   const configDir = getConfigDir();
   if (!await fs.pathExists(path.join(configDir, 'default.toml')) && copyDefaultConfig) {
     logger.info(`Initializing at ${configDir} ...`);
@@ -38,7 +38,10 @@ async function initializeConfig (copyDefaultConfig: boolean): Promise<void> {
     await fs.copyFile(path.join(__dirname, '../config/default.toml'), path.join(configDir, 'default.toml'));
     logger.info(`Please check ${path.join(configDir, 'default.toml')}`);
   }
-  await ConfigInitializer.initialize();
+  ConfigInitializer.initialize();
+  if (watchFile) {
+    ConfigInitializer.watchFile();
+  }
 }
 
 const program = new Command();
@@ -50,7 +53,7 @@ program.command('daemon')
   .description('Start a daemon process for deal preparation and deal making')
   .action((_options) => {
     (async function () {
-      await initializeConfig(true);
+      await initializeConfig(true, true);
       GenerateCar.initialize();
       if (cluster.isPrimary) {
         let indexService: IndexService;

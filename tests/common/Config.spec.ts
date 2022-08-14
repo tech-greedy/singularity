@@ -40,11 +40,11 @@ describe('Config', () => {
     describe('initialize', () => {
       beforeEach(() => {
         ConfigInitializer['initialized'] = false;
-        ConfigInitializer.fsWatcher?.close();
+        ConfigInitializer.unwatchFile();
       })
       afterEach(() => {
         ConfigInitializer['initialized'] = false;
-        ConfigInitializer.fsWatcher?.close();
+        ConfigInitializer.unwatchFile();
         delete process.env.SINGULARITY_PATH;
       })
       it ('should initialize the config with default values', () => {
@@ -56,6 +56,7 @@ describe('Config', () => {
         fs.writeFileSync('/tmp/default.toml', "[logging]\n" +
           "console_level = 'error'");
         ConfigInitializer.initialize();
+        ConfigInitializer.watchFile();
         expect(config.logging.console_level).toEqual('error');
         fs.writeFileSync('/tmp/default.toml', "[logging]\n" +
           "console_level = 'error2'");

@@ -51,17 +51,19 @@ export function getConfigDir (): string {
 
 export class ConfigInitializer {
   private static initialized = false;
-  public static fsWatcher: FSWatcher;
-  public static initialize (): void {
-    if (ConfigInitializer.initialized) {
+  private static fsWatcher: FSWatcher;
+
+  public static unwatchFile (): void {
+    ConfigInitializer.fsWatcher?.close();
+  }
+
+  public static watchFile (): void {
+    if (ConfigInitializer.fsWatcher) {
       return;
     }
     const configDir = getConfigDir();
     const configPath = path.join(configDir, 'default.toml');
-    let fileString: string;
     if (fs.pathExistsSync(configPath)) {
-      fileString = fs.readFileSync(configPath, 'utf8');
-      ConfigInitializer.updateValues(fileString);
       ConfigInitializer.fsWatcher = fs.watch(configPath, async (eventType: string, _filename: string) => {
         switch (eventType) {
           case 'change':
@@ -72,6 +74,19 @@ export class ConfigInitializer {
             console.error('Config file may have been renamed or deleted.');
         }
       });
+    }
+  }
+
+  public static initialize (): void {
+    if (ConfigInitializer.initialized) {
+      return;
+    }
+    const configDir = getConfigDir();
+    const configPath = path.join(configDir, 'default.toml');
+    let fileString: string;
+    if (fs.pathExistsSync(configPath)) {
+      fileString = fs.readFileSync(configPath, 'utf8');
+      ConfigInitializer.updateValues(fileString);
     } else {
       fileString = fs.readFileSync(path.join(__dirname, '..', '..', 'config', 'default.toml'), 'utf8');
       ConfigInitializer.updateValues(fileString);
