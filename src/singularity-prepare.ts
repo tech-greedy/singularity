@@ -6,7 +6,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import xbytes from 'xbytes';
 import DealPreparationService from './deal-preparation/DealPreparationService';
-import Scanner from './deal-preparation/Scanner';
+import Scanner from './deal-preparation/scanner/Scanner';
 import DealPreparationWorker, { GenerateCarOutput } from './deal-preparation/DealPreparationWorker';
 import { FileInfo } from './common/model/InputFileList';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment

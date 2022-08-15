@@ -12,7 +12,9 @@
     "test": "jasmine-ts --config=./tests/jasmine.json",
     "coverage": "nyc jasmine-ts --config=./tests/jasmine.json",
     "lint": "eslint --ext ts --fix src/",
-    "lint:nofix": "eslint --ext ts src/"
+    "lint:nofix": "eslint --ext ts src/",
+    "markdownlint": "markdownlint-cli2-fix *.md",
+    "markdownlint:nofix": "markdownlint-cli2 *.md"
   },
   "repository": {
     "type": "git",
@@ -49,10 +51,12 @@
     "eslint-plugin-prefer-arrow": "^1.2.3",
     "eslint-plugin-promise": "^5.0.0",
     "eslint-plugin-standard": "^5.0.0",
+    "husky": "^8.0.1",
     "jasmine": "^3.99.0",
     "jasmine-reporters": "^2.5.0",
     "jasmine-spec-reporter": "^7.0.0",
     "jasmine-ts": "^0.4.0",
+    "markdownlint-cli2": "^0.5.1",
     "nyc": "^15.1.0",
     "supertest": "^6.2.2",
     "ts-node": "^10.7.0",
@@ -111,7 +115,7 @@
       "src/**"
     ],
     "exclude": [
-      "src/deal-preparation/rrdir.js"
+      "src/deal-preparation/scanner/rrdir.js"
     ],
     "reporter": [
       "text",

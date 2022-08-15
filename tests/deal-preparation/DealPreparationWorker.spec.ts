@@ -2,7 +2,7 @@ import path from 'path';
 import Utils from '../Utils';
 import Datastore from '../../src/common/Datastore';
 import DealPreparationWorker from '../../src/deal-preparation/DealPreparationWorker';
-import Scanner from '../../src/deal-preparation/Scanner';
+import Scanner from '../../src/deal-preparation/scanner/Scanner';
 import fs from 'fs-extra';
 import { FileList } from '../../src/common/model/InputFileList';
 import { Stream } from 'stream';

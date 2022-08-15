@@ -1,5 +1,6 @@
 import config, { ConfigInitializer } from '../../src/common/Config';
 import fs from 'fs-extra';
+import { sleep } from '../../src/common/Util';
 describe('Config', () => {
   describe('config', () => {
     describe('get', () => {
@@ -51,19 +52,30 @@ describe('Config', () => {
         ConfigInitializer.initialize();
         expect(config.logging.console_level).toEqual('info');
       })
-      it('should initialize using the config defined in environment variable', (done) => {
+      it('should initialize using the config defined in environment variable and watch file change', async () => {
+        process.env.SINGULARITY_PATH = '/tmp';
+        fs.writeFileSync('/tmp/default.toml', "[logging]\n" +
+          "console_level = 'error'");
+        ConfigInitializer.initialize();
+        ConfigInitializer.watchFile();
+        ConfigInitializer.watchFile();
+        expect(config.logging.console_level).toEqual('error');
+        fs.writeFileSync('/tmp/default.toml', "[logging]\n" +
+          "console_level = 'error2'");
+        await sleep(100);
+        expect(config.logging.console_level).toEqual('error2');
+      })
+      it('should initialize using the config defined in environment variable and skip file rename', async () => {
         process.env.SINGULARITY_PATH = '/tmp';
         fs.writeFileSync('/tmp/default.toml', "[logging]\n" +
           "console_level = 'error'");
         ConfigInitializer.initialize();
         ConfigInitializer.watchFile();
         expect(config.logging.console_level).toEqual('error');
-        fs.writeFileSync('/tmp/default.toml', "[logging]\n" +
-          "console_level = 'error2'");
-        setTimeout(() => {
-            expect(config.logging.console_level).toEqual('error2');
-            done();
-        }, 100);
+        // Rename does nothing
+        fs.moveSync('/tmp/default.toml', '/tmp/default2.toml', { overwrite: true});
+        await sleep(100);
+        expect(config.logging.console_level).toEqual('error');
       })
     });
   });
