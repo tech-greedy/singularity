@@ -1,11 +1,11 @@
-import { FileInfo, FileList } from '../common/model/InputFileList';
+import { FileInfo, FileList } from '../../common/model/InputFileList';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import { rrdir } from './rrdir';
 import { S3Client, ListObjectsV2Command, ListObjectsV2CommandOutput } from '@aws-sdk/client-s3';
 import axios from 'axios';
-import NoopRequestSigner from './NoopRequestSigner';
-import { getRetryStrategy } from '../common/S3RetryStrategy';
+import NoopRequestSigner from '../../common/s3/NoopRequestSigner';
+import { getRetryStrategy } from '../../common/s3/S3RetryStrategy';
 import winston from 'winston';
 
 interface Entry {

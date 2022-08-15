@@ -6,7 +6,7 @@ import { spawnSync } from 'child_process';
 import fs, { ReadStream, WriteStream } from 'fs';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
-import { rrdirSync } from '../deal-preparation/rrdir';
+import { rrdirSync } from '../deal-preparation/scanner/rrdir';
 
 export interface FileStat {
   type: 'file' | 'dir',

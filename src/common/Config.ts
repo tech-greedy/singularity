@@ -67,8 +67,10 @@ export class ConfigInitializer {
       ConfigInitializer.fsWatcher = fs.watch(configPath, async (eventType: string, _filename: string) => {
         switch (eventType) {
           case 'change':
-            console.log('Config file changed, reloading...');
-            ConfigInitializer.updateValues(await fs.readFile(configPath, 'utf8'));
+            if (await fs.pathExists(configPath)) {
+              console.log('Config file changed, reloading...');
+              ConfigInitializer.updateValues(await fs.readFile(configPath, 'utf8'));
+            }
             break;
           default:
             console.error('Config file may have been renamed or deleted.');
