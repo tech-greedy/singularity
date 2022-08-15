@@ -115,7 +115,7 @@
       "src/**"
     ],
     "exclude": [
-      "src/deal-preparation/rrdir.js"
+      "src/deal-preparation/scanner/rrdir.js"
     ],
     "reporter": [
       "text",
