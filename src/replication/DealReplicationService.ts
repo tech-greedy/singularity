@@ -13,6 +13,7 @@ import { ObjectId } from 'mongodb';
 import ObjectsToCsv from 'objects-to-csv';
 import GenerateCSVRequest from './GenerateCSVRequest';
 import path from 'path';
+import DealReplicationWorker from './DealReplicationWorker';
 
 export default class DealReplicationService extends BaseService {
 
@@ -275,34 +276,39 @@ export default class DealReplicationService extends BaseService {
       const { outDir } = <GenerateCSVRequest>request.body;
       const replicationRequest = await Datastore.ReplicationRequestModel.findById(id);
       if (replicationRequest) {
-        const deals = await Datastore.DealStateModel.find({
-          replicationRequestId: id,
-          state: { $nin: ['slashed', 'error', 'expired', 'proposal_expired'] }
-        });
-        this.logger.info(`Found ${deals.length} deals from replication request ${id}`);
-        let urlPrefix = replicationRequest.urlPrefix;
-        if (!urlPrefix.endsWith('/')) {
-          urlPrefix += '/';
-        }
-
-        if (deals.length > 0) {
-          const csvRow = [];
-          for (let i = 0; i < deals.length; i++) {
-            const deal = deals[i];
-            csvRow.push({
-              miner_id: deal.provider,
-              deal_cid: deal.dealCid,
-              filename: `${deal.pieceCid}.car`,
-              piece_cid: deal.pieceCid,
-              start_epoch: deal.startEpoch,
-              full_url: `${urlPrefix}${deal.pieceCid}.car`
-            });
+        const providers = await DealReplicationWorker.generateProvidersList(replicationRequest.storageProviders);
+        providers.forEach(async provider => {
+          const deals = await Datastore.DealStateModel.find({
+            replicationRequestId: id,
+            provider: provider,
+            state: { $nin: ['slashed', 'error', 'expired', 'proposal_expired'] }
+          });
+          this.logger.info(`Found ${deals.length} deals from replication request ${id}`);
+          let urlPrefix = replicationRequest.urlPrefix;
+          if (!urlPrefix.endsWith('/')) {
+            urlPrefix += '/';
           }
-          const csv = new ObjectsToCsv(csvRow);
-          const filename = `${outDir}${path.sep}${deals[0].provider}_${id}.csv`;
-          await csv.toDisk(filename);
-          response.end(`CSV saved to ${filename}`);
-        }
+
+          if (deals.length > 0) {
+            const csvRow = [];
+            for (let i = 0; i < deals.length; i++) {
+              const deal = deals[i];
+              csvRow.push({
+                miner_id: deal.provider,
+                deal_cid: deal.dealCid,
+                filename: `${deal.pieceCid}.car`,
+                piece_cid: deal.pieceCid,
+                start_epoch: deal.startEpoch,
+                full_url: `${urlPrefix}${deal.pieceCid}.car`
+              });
+            }
+            const csv = new ObjectsToCsv(csvRow);
+            const filename = `${outDir}${path.sep}${provider}_${id}.csv`;
+            await csv.toDisk(filename);
+            response.end(`CSV saved to ${filename}`);
+          }
+        });
+
       } else {
         this.logger.error(`Could not find replication request ${id}`);
       }

@@ -115,7 +115,7 @@ export default class DealReplicationWorker extends BaseService {
    * @param storageProviders
    * @returns
    */
-  private static async generateProvidersList (storageProviders: string): Promise<Array<string>> {
+  public static async generateProvidersList (storageProviders: string): Promise<Array<string>> {
     return storageProviders.split(',');
   }
 
