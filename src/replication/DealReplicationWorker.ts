@@ -230,8 +230,8 @@ export default class DealReplicationWorker extends BaseService {
   private async checkAndMarkCompletion (request2Check: ReplicationRequest, carCount: number): Promise<boolean> {
     let isComplete = false;
     const numberOfSPs = (await DealReplicationWorker.generateProvidersList(request2Check.storageProviders)).length;
-    if (numberOfSPs === 1 && !request2Check.cronSchedule) {
-      isComplete = true; // one SP and non-cron, perform quick check
+    if (!request2Check.cronSchedule) {
+      isComplete = true; // Non-cron, perform quick check
     } else {
       const maxNumberOfDeals = request2Check.cronSchedule ? request2Check.cronMaxDeals : request2Check.maxNumberOfDeals;
       const actualDealsCount = await Datastore.DealStateModel.count({
@@ -298,6 +298,21 @@ export default class DealReplicationWorker extends BaseService {
         }
 
         let dealsMadePerSP = 0;
+        // in the event of daemon restart while actively sending, need to query how many have been made
+        if (!replicationRequest.cronSchedule) {
+          dealsMadePerSP = await Datastore.DealStateModel.count({
+            replicationRequestId: replicationRequest.id,
+            provider: provider,
+            state: {
+              $in: [
+                'proposed', 'published', 'active'
+              ]
+            }
+          });
+          if (dealsMadePerSP > 0) {
+            this.logger.warn(`${provider} already been dealt with ${dealsMadePerSP} deals.`);
+          }
+        }
         let retryTimeout = config.get<number>('deal_replication_worker.min_retry_wait_ms'); // 30s, 60s, 120s ...
         for (let j = 0; j < cars.length; j++) {
           const carFile = cars[j];
@@ -321,7 +336,7 @@ export default class DealReplicationWorker extends BaseService {
               provider: provider,
               state: {
                 $in: [
-                  'proposed', 'published'
+                  'proposed', 'published', 'active'
                 ]
               }
             });
@@ -336,9 +351,8 @@ export default class DealReplicationWorker extends BaseService {
           // check if reached max deals needed to be sent
           if (existingRec.maxNumberOfDeals > 0 && dealsMadePerSP >= existingRec.maxNumberOfDeals) {
             this.logger.warn(`This SP ${provider} has made max deals planned (${existingRec.maxNumberOfDeals}) by the request ${existingRec.id}.`);
-            const shouldStopAll = await this.checkAndMarkCompletion(existingRec, cars.length);
-            if (shouldStopAll) {
-              breakOuter = true;
+            if (existingRec.cronSchedule) {
+              breakOuter = await this.checkAndMarkCompletion(existingRec, cars.length);
             }
             return;
           }
@@ -386,7 +400,7 @@ export default class DealReplicationWorker extends BaseService {
           do {
             try {
               const cmdOut = await exec(dealCmd);
-              this.logger.info(cmdOut.stdout);
+              this.logger.info(`Dealt ${carFile.pieceCid} with ${provider} (#${dealsMadePerSP}), output: ${cmdOut.stdout}`);
               if (useLotus) {
                 if (cmdOut.stdout.startsWith('baf')) {
                   dealCid = cmdOut.stdout.trim(); // remove trailing line break
