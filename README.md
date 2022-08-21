@@ -62,6 +62,24 @@ Note that the path may change depending on the nodejs version.
 If you cannot find the folder above, try searching for the generate-car
 binary first (i.e.m `find ~/.nvm -name 'generate-car'`).
 
+## Initialization (Optional)
+
+To use the tool as a daemon, it needs to initialize the config and the database. To do so, run
+
+```shell
+singularity init
+```
+
+By default, a repository will be initialized at `$HOME_DIR/.singularity`.
+Set the environment variable `SINGULARITY_PATH` to override this behavior.
+
+```shell
+# Unix
+export SINGULARITY_PATH=/the/path/to/the/repo
+# Windows
+set SINGULARITY_PATH=/the/path/to/the/repo
+```
+
 ## Topology Choices
 
 Since the tool is modularized, it can be deployed in different ways and have different components enabled or disabled.
@@ -110,6 +128,8 @@ Options:
   -h, --help        display help for command
 
 Commands:
+  init              Initialize the configuration directory in SINGULARITY_PATH
+                    If unset, it will be initialized at HOME_DIR/.singularity
   daemon            Start a daemon process for deal preparation and deal making
   index             Manage the dataset index which will help map the dataset path to actual piece
   preparation|prep  Manage deal preparation
