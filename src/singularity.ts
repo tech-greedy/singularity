@@ -49,6 +49,12 @@ program.name('singularity')
   .version(version)
   .description('A tool for large-scale clients with PB-scale data onboarding to Filecoin network\nVisit https://github.com/tech-greedy/singularity for more details');
 
+program.command('init')
+  .description('Initialize the configuration directory in SINGULARITY_PATH\nIf unset, it will be initialized at HOME_DIR/.singularity')
+  .action(async () => {
+    await initializeConfig(true, false);
+  });
+
 program.command('daemon')
   .description('Start a daemon process for deal preparation and deal making')
   .action((_options) => {
