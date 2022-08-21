@@ -137,7 +137,7 @@ you need to make sure the singularity daemon uses the same environment variable.
 ### Make deals to storage providers
 
 Since we are doing this for the first time, we'd like to only start with a few deals to test the flow.
-The below command sends out 10 deals from 'MyData' dataset to storage provider 'f01111'. 
+The below command sends out 10 deals from 'MyData' dataset to storage provider 'f01111'.
 The client address is the wallet address that you'd like to propose deals from.
 
 ```shell
