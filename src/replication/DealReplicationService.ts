@@ -1,18 +1,18 @@
 import bodyParser from 'body-parser';
-import config from 'config';
 import express, { Express, Request, Response } from 'express';
 import BaseService from '../common/BaseService';
 import Datastore from '../common/Datastore';
 import Logger, { Category } from '../common/Logger';
-import CreateReplicationRequest from './CreateReplicationRequest';
-import ErrorCode from './ErrorCode';
-import GetReplicationDetailsResponse from './GetReplicationDetailsResponse';
-import { GetReplicationsResponse } from './GetReplicationsResponse';
-import UpdateReplicationRequest from './UpdateReplicationRequest';
+import CreateReplicationRequest from './model/CreateReplicationRequest';
+import ErrorCode from './model/ErrorCode';
+import GetReplicationDetailsResponse from './model/GetReplicationDetailsResponse';
+import { GetReplicationsResponse } from './model/GetReplicationsResponse';
+import UpdateReplicationRequest from './model/UpdateReplicationRequest';
 import { ObjectId } from 'mongodb';
 import ObjectsToCsv from 'objects-to-csv';
-import GenerateCSVRequest from './GenerateCSVRequest';
+import GenerateCSVRequest from './model/GenerateCSVRequest';
 import path from 'path';
+import config from '../common/Config';
 
 export default class DealReplicationService extends BaseService {
 
@@ -258,9 +258,15 @@ export default class DealReplicationService extends BaseService {
       const replicationRequest = await Datastore.ReplicationRequestModel.findById(id);
       if (replicationRequest) {
         const deals = await Datastore.DealStateModel.find({
-          replicationRequestId: id
+          replicationRequestId: id,
+          state: { $nin: ['slashed', 'error', 'expired', 'proposal_expired'] }
         });
         this.logger.info(`Found ${deals.length} deals from replication request ${id}`);
+        let urlPrefix = replicationRequest.urlPrefix;
+        if (!urlPrefix.endsWith('/')) {
+          urlPrefix += '/';
+        }
+
         if (deals.length > 0) {
           const csvRow = [];
           for (let i = 0; i < deals.length; i++) {
@@ -271,7 +277,7 @@ export default class DealReplicationService extends BaseService {
               filename: `${deal.pieceCid}.car`,
               piece_cid: deal.pieceCid,
               start_epoch: deal.startEpoch,
-              full_url: `${replicationRequest.urlPrefix}/${deal.pieceCid}.car`
+              full_url: `${urlPrefix}/${deal.pieceCid}.car`
             });
           }
           const csv = new ObjectsToCsv(csvRow);

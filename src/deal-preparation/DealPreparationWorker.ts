@@ -6,7 +6,7 @@ import Datastore from '../common/Datastore';
 import { Category } from '../common/Logger';
 import GenerationRequest from '../common/model/GenerationRequest';
 import ScanningRequest from '../common/model/ScanningRequest';
-import Scanner from './Scanner';
+import Scanner from './scanner/Scanner';
 import fs from 'fs-extra';
 import path from 'path';
 import { performance } from 'perf_hooks';
@@ -15,13 +15,13 @@ import { FileInfo, FileList } from '../common/model/InputFileList';
 import GenerateCar from '../common/GenerateCar';
 import { pipeline } from 'stream/promises';
 import { S3Client, GetObjectCommand, GetObjectCommandInput } from '@aws-sdk/client-s3';
-import NoopRequestSigner from './NoopRequestSigner';
+import NoopRequestSigner from '../common/s3/NoopRequestSigner';
 import winston from 'winston';
-import { getRetryStrategy } from '../common/S3RetryStrategy';
-import config from 'config';
+import { getRetryStrategy } from '../common/s3/S3RetryStrategy';
 import pAll from 'p-all';
 import * as stream from 'stream';
 import { TransformCallback } from 'stream';
+import config from '../common/Config';
 
 interface IpldNode {
   Name: string,
@@ -131,7 +131,7 @@ export default class DealPreparationWorker extends BaseService {
     const bucketName = s3Path.split('/')[0];
     const region = await Scanner.detectS3Region(bucketName);
     const client = new S3Client({ region, signer: new NoopRequestSigner(), retryStrategy: getRetryStrategy() });
-    const concurrency : number = config.has('s3.per_job_concurrency') ? config.get('s3.per_job_concurrency') : 4;
+    const concurrency : number = config.getOrDefault('s3.per_job_concurrency', 4);
     const jobs = function * generator () {
       for (const fileInfo of fileList) {
         yield async () : Promise<void> => {
@@ -234,12 +234,20 @@ export default class DealPreparationWorker extends BaseService {
     }
     await DealPreparationWorker.verifyGenerationRequestStatusOrThrow(request.id);
     this.logger.debug(`Spawning generate-car.`, { outPath: request.outDir, parentPath: request.path, tmpDir });
-    const input = JSON.stringify(fileList.map(file => ({
-      Path: file.path,
-      Size: file.size,
-      Start: file.start,
-      End: file.end
-    })));
+    let input: string;
+    if (tmpDir) {
+      input = JSON.stringify(fileList.map(file => ({
+        Path: file.path,
+        Size: file.end !== undefined ? file.end - file.start! : file.size
+      })));
+    } else {
+      input = JSON.stringify(fileList.map(file => ({
+        Path: file.path,
+        Size: file.size,
+        Start: file.start,
+        End: file.end
+      })));
+    }
     const [stdout, stderr, exitCode, signalCode] = await DealPreparationWorker.invokeGenerateCar(request.id, input, request.outDir, tmpDir ?? request.path);
     this.logger.debug(`Child process finished.`, { stdout, stderr, exitCode, signalCode });
     return [stdout, stderr, exitCode, signalCode];

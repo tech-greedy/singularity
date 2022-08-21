@@ -4,11 +4,11 @@ import BaseService from '../common/BaseService';
 import Datastore from '../common/Datastore';
 import { Category } from '../common/Logger';
 import ReplicationRequest from '../common/model/ReplicationRequest';
-import config from 'config';
 import axios from 'axios';
 import { create, all, Unit } from 'mathjs';
 import GenerationRequest from '../common/model/GenerationRequest';
 import cron, { ScheduledTask } from 'node-cron';
+import config from '../common/Config';
 const mathconfig = {};
 const math = create(all, mathconfig);
 const exec: any = require('await-exec');// no TS support
@@ -40,20 +40,13 @@ export default class DealReplicationWorker extends BaseService {
 
   private readonly PollInterval = 5000;
 
-  private readonly ImmediatePollInterval = 1;
-
   private async startPollWork (): Promise<void> {
-    let hasDoneWork = false;
     try {
-      hasDoneWork = await this.pollWork();
+      await this.pollWork();
     } catch (err) {
       this.logger.error('Pool work error', err);
     }
-    if (hasDoneWork) {
-      setTimeout(this.startPollWork, this.ImmediatePollInterval);
-    } else {
-      setTimeout(this.startPollWork, this.PollInterval);
-    }
+    setTimeout(this.startPollWork, this.PollInterval);
   }
 
   private async pollWork (): Promise<boolean> {
@@ -98,30 +91,17 @@ export default class DealReplicationWorker extends BaseService {
     });
     if (newReplicationWork) {
       this.logger.info(`${this.workerId} - Received a new request - id ${newReplicationWork.id} dataset: ${newReplicationWork.datasetId}`);
-      try {
-        if (newReplicationWork.cronSchedule) {
-          this.logger.debug(`Schedule and start cron (${newReplicationWork.cronSchedule})`);
-          this.cronRefArray.set(newReplicationWork.id, [
-            newReplicationWork.cronSchedule,
-            cron.schedule(newReplicationWork.cronSchedule, async () => {
-              this.logger.debug(`Cron triggered (${newReplicationWork.cronSchedule}) - id ${newReplicationWork.id}`);
-              await this.replicate(newReplicationWork);
-            })]);
-        } else {
-          this.logger.debug(`No cron, execute immediately`);
-          await this.replicate(newReplicationWork);
-        }
-      } catch (err) {
-        if (err instanceof Error) {
-          this.logger.error(`${this.workerId} - Encountered an error - ${err.message}`);
-          await Datastore.ReplicationRequestModel.findByIdAndUpdate(newReplicationWork.id, {
-            status: 'error',
-            workerId: null,
-            errorMessage: err.message
-          });
-          return true;
-        }
-        throw err;
+      if (newReplicationWork.cronSchedule) {
+        this.logger.debug(`Schedule and start cron (${newReplicationWork.cronSchedule})`);
+        this.cronRefArray.set(newReplicationWork.id, [
+          newReplicationWork.cronSchedule,
+          cron.schedule(newReplicationWork.cronSchedule, async () => {
+            this.logger.debug(`Cron triggered (${newReplicationWork.cronSchedule}) - id ${newReplicationWork.id}`);
+            await this.replicate(newReplicationWork);
+          })]);
+      } else {
+        this.logger.debug(`No cron, execute immediately`);
+        this.replicate(newReplicationWork); // no await so that this can return quickly, enabling parallel polling
       }
     }
 
@@ -238,6 +218,15 @@ export default class DealReplicationWorker extends BaseService {
     }
   }
 
+  private stopCronIfExist (id: string): void {
+    if (this.cronRefArray.has(id)) {
+      const [schedule, taskRef] = this.cronRefArray.get(id)!;
+      taskRef.stop();
+      this.cronRefArray.delete(id);
+      this.logger.debug(`Stopped cron (${schedule}) of ${id}`);
+    }
+  }
+
   private async checkAndMarkCompletion (request2Check: ReplicationRequest, carCount: number): Promise<boolean> {
     const maxNumberOfDeals = request2Check.cronSchedule ? request2Check.cronMaxDeals : request2Check.maxNumberOfDeals;
     const numberOfSPs = (await DealReplicationWorker.generateProvidersList(request2Check.storageProviders)).length;
@@ -266,12 +255,7 @@ export default class DealReplicationWorker extends BaseService {
         status: 'completed',
         workerId: null
       });
-      if (request2Check.cronSchedule && this.cronRefArray.has(request2Check.id)) {
-        const [schedule, taskRef] = this.cronRefArray.get(request2Check.id)!;
-        taskRef.stop();
-        this.cronRefArray.delete(request2Check.id);
-        this.logger.debug(`Stopped cron (${schedule}) of ${request2Check.id}`);
-      }
+      this.stopCronIfExist(request2Check.id);
       return true;
     } else {
       this.logger.debug(`Not yet complete`);
@@ -285,174 +269,193 @@ export default class DealReplicationWorker extends BaseService {
    */
   private async replicate (replicationRequest: ReplicationRequest): Promise<void> {
     this.logger.debug(`Start replication ${replicationRequest.id}`);
-    const providers = await DealReplicationWorker.generateProvidersList(replicationRequest.storageProviders);
-    const boostResultUUIDMatcher = /deal uuid: (\S+)/;
     let breakOuter = false; // set this to true will terminate all concurrent deal making thread
-    const makeDealAll = providers.map(async (provider) => {
-      if (breakOuter) {
-        return;
-      }
-      let useLotus = true;
-      try {
-        useLotus = await this.isUsingLotus(provider);
-      } catch (error) {
-        this.logger.error(`SP ${provider} unknown output from libp2p. Give up on this SP.`, error);
-        return;
-      }
-
-      // Find cars that are finished generation
-      const cars = await Datastore.GenerationRequestModel.find({
-        datasetId: replicationRequest.datasetId,
-        status: 'completed'
-      });
-
-      let dealsMadePerSP = 0;
-      let retryTimeout = config.get<number>('deal_replication_worker.min_retry_wait_ms'); // 30s, 60s, 120s ...
-      for (let j = 0; j < cars.length; j++) {
-        const carFile = cars[j];
-
-        // check if the replication request has been paused
-        const existingRec = await Datastore.ReplicationRequestModel.findById(replicationRequest.id);
-        if (!existingRec) {
-          this.logger.error(`This replication request ${replicationRequest.id} no longer exist.`);
-          breakOuter = true;
+    const boostResultUUIDMatcher = /deal uuid: (\S+)/;
+    try {
+      const providers = await DealReplicationWorker.generateProvidersList(replicationRequest.storageProviders);
+      const makeDealAll = providers.map(async (provider) => {
+        if (breakOuter) {
+          this.stopCronIfExist(replicationRequest.id);
           return;
         }
-        if (existingRec.status !== 'active') {
-          this.logger.warn(`This replication request ${existingRec.id} has become non-active: ${existingRec.status}.`);
-          breakOuter = true;
-          return;
-        }
-
-        // check if reached max pending deal during a cron
-        if (config.get('deal_tracking_service.enabled') && existingRec.cronSchedule && existingRec.cronMaxPendingDeals && existingRec.cronMaxPendingDeals > 0) {
-          const pendingDeals = await Datastore.DealStateModel.count({
-            provider: provider,
-            state: {
-              $in: [
-                'proposed', 'published'
-              ]
-            }
-          });
-          if (pendingDeals >= existingRec.cronMaxPendingDeals) {
-            this.logger.warn(`This SP ${provider} has reached max pending deals allowed (${existingRec.cronMaxPendingDeals}) by request ${existingRec.id}.`);
-            return;
-          } else {
-            this.logger.debug(`This SP ${provider} has ${pendingDeals} / ${existingRec.cronMaxPendingDeals} pending deals.`);
-          }
-        }
-
-        // check if reached max deals needed to be sent
-        if (existingRec.maxNumberOfDeals > 0 && dealsMadePerSP >= existingRec.maxNumberOfDeals) {
-          this.logger.warn(`This SP ${provider} has made max deals planned (${existingRec.maxNumberOfDeals}) by the request ${existingRec.id}.`);
-          const shouldStopAll = await this.checkAndMarkCompletion(existingRec, cars.length);
-          if (shouldStopAll) {
-            breakOuter = true;
-          }
-          return;
-        }
-
-        // check if the car has already dealt or have enough replica
-        const existingDeals = await Datastore.DealStateModel.find({
-          pieceCid: carFile.pieceCid,
-          state: { $nin: ['slashed', 'error', 'expired', 'proposal_expired'] }
-        });
-        let alreadyDealt = false;
-        for (let k = 0; k < existingDeals.length; k++) {
-          const deal = existingDeals[k];
-          if (deal.provider === provider) {
-            this.logger.debug(`This pieceCID ${carFile.pieceCid} has already been dealt with ${provider}. ` +
-              `Deal CID ${deal.dealCid}. Moving on to next file.`);
-            alreadyDealt = true;
-          }
-        }
-        if (alreadyDealt) {
-          continue; // go to next file
-        }
-        if (existingDeals.length >= existingRec.maxReplicas) {
-          this.logger.warn(`This pieceCID ${carFile.pieceCid} has reached enough ` +
-            `replica (${existingRec.maxReplicas}) planned by the request ${existingRec.id}.`);
-          continue; // go to next file
-        }
-
-        const startDelay = replicationRequest.startDelay ? replicationRequest.startDelay : 20160;
-        const currentHeight = await DealReplicationWorker.getCurrentChainHeight(this.lotusCMD);
-        const startEpoch = startDelay + currentHeight;
-        this.logger.debug(`Calculated start epoch startDelay: ${startDelay} + currentHeight: ${currentHeight} = ${startEpoch}`);
-        let dealCmd = '';
+        let useLotus = true;
         try {
-          dealCmd = await this.createDealCmd(useLotus, provider, replicationRequest, carFile, startEpoch);
+          useLotus = await this.isUsingLotus(provider);
         } catch (error) {
-          this.logger.error(`Deal CMD generation failed`, error);
+          this.logger.error(`SP ${provider} unknown output from libp2p. Give up on this SP.`, error);
           return;
         }
 
-        this.logger.debug(dealCmd);
-        let dealCid = 'unknown';
-        let errorMsg = '';
-        let state = 'proposed';
-        let retryCount = 0;
-        do {
-          try {
-            const cmdOut = await exec(dealCmd);
-            this.logger.info(cmdOut.stdout);
-            if (useLotus) {
-              if (cmdOut.stdout.startsWith('baf')) {
-                dealCid = cmdOut.stdout;
-                break; // success, break from while loop
-              } else {
-                errorMsg = cmdOut.stdout + cmdOut.stderr;
-                state = 'error';
-              }
-            } else {
-              const match = boostResultUUIDMatcher.exec(cmdOut.stdout);
-              if (match != null && match.length > 1) {
-                dealCid = match[1];
-                break; // success, break from while loop
-              } else {
-                errorMsg = cmdOut.stdout + cmdOut.stderr;
-                state = 'error';
-              }
-            }
-          } catch (error) {
-            this.logger.error('Deal making failed', error);
-            errorMsg = '' + error;
-            state = 'error';
-          }
-          this.logger.info(`Waiting ${retryTimeout} ms to retry`);
-          await new Promise(resolve => setTimeout(resolve, retryTimeout));
-          retryTimeout *= 2; // expoential back off
-          retryCount++;
-        } while (retryCount < config.get<number>('deal_replication_worker.max_retry_count'));
-        if (state === 'proposed') {
-          dealsMadePerSP++;
-          if (retryTimeout > config.get<number>('deal_replication_worker.min_retry_wait_ms')) {
-            retryTimeout /= 2; // expoential back "on"
-          }
-        }
-        await Datastore.DealStateModel.create({
-          client: replicationRequest.client,
-          provider: provider,
-          dealCid: dealCid,
-          dataCid: carFile.dataCid,
-          pieceCid: carFile.pieceCid,
-          startEpoch: startEpoch,
-          expiration: startEpoch + replicationRequest.duration,
-          duration: replicationRequest.duration,
-          price: replicationRequest.maxPrice, // unit is Fil per epoch per GB
-          verified: replicationRequest.isVerfied,
-          state: state,
-          replicationRequestId: replicationRequest.id,
+        // Find cars that are finished generation
+        const cars = await Datastore.GenerationRequestModel.find({
           datasetId: replicationRequest.datasetId,
-          errorMessage: errorMsg
+          status: 'completed'
+        });
+
+        let dealsMadePerSP = 0;
+        let retryTimeout = config.get<number>('deal_replication_worker.min_retry_wait_ms'); // 30s, 60s, 120s ...
+        for (let j = 0; j < cars.length; j++) {
+          const carFile = cars[j];
+
+          // check if the replication request has been paused
+          const existingRec = await Datastore.ReplicationRequestModel.findById(replicationRequest.id);
+          if (!existingRec) {
+            this.logger.error(`This replication request ${replicationRequest.id} no longer exist.`);
+            breakOuter = true;
+            return;
+          }
+          if (existingRec.status !== 'active') {
+            this.logger.warn(`This replication request ${existingRec.id} has become non-active: ${existingRec.status}.`);
+            breakOuter = true;
+            return;
+          }
+
+          // check if reached max pending deal during a cron
+          if (config.get('deal_tracking_service.enabled') && existingRec.cronSchedule && existingRec.cronMaxPendingDeals && existingRec.cronMaxPendingDeals > 0) {
+            const pendingDeals = await Datastore.DealStateModel.count({
+              provider: provider,
+              state: {
+                $in: [
+                  'proposed', 'published'
+                ]
+              }
+            });
+            if (pendingDeals >= existingRec.cronMaxPendingDeals) {
+              this.logger.warn(`This SP ${provider} has reached max pending deals allowed (${existingRec.cronMaxPendingDeals}) by request ${existingRec.id}.`);
+              return;
+            } else {
+              this.logger.debug(`This SP ${provider} has ${pendingDeals} / ${existingRec.cronMaxPendingDeals} pending deals.`);
+            }
+          }
+
+          // check if reached max deals needed to be sent
+          if (existingRec.maxNumberOfDeals > 0 && dealsMadePerSP >= existingRec.maxNumberOfDeals) {
+            this.logger.warn(`This SP ${provider} has made max deals planned (${existingRec.maxNumberOfDeals}) by the request ${existingRec.id}.`);
+            const shouldStopAll = await this.checkAndMarkCompletion(existingRec, cars.length);
+            if (shouldStopAll) {
+              breakOuter = true;
+            }
+            return;
+          }
+
+          // check if the car has already dealt or have enough replica
+          const existingDeals = await Datastore.DealStateModel.find({
+            pieceCid: carFile.pieceCid,
+            state: { $nin: ['slashed', 'error', 'expired', 'proposal_expired'] }
+          });
+          let alreadyDealt = false;
+          for (let k = 0; k < existingDeals.length; k++) {
+            const deal = existingDeals[k];
+            if (deal.provider === provider) {
+              this.logger.debug(`This pieceCID ${carFile.pieceCid} has already been dealt with ${provider}. ` +
+                `Deal CID ${deal.dealCid}. Moving on to next file.`);
+              alreadyDealt = true;
+            }
+          }
+          if (alreadyDealt) {
+            continue; // go to next file
+          }
+          if (existingDeals.length >= existingRec.maxReplicas) {
+            this.logger.warn(`This pieceCID ${carFile.pieceCid} has reached enough ` +
+              `replica (${existingRec.maxReplicas}) planned by the request ${existingRec.id}.`);
+            continue; // go to next file
+          }
+
+          const startDelay = replicationRequest.startDelay ? replicationRequest.startDelay : 20160;
+          const currentHeight = await DealReplicationWorker.getCurrentChainHeight(this.lotusCMD);
+          const startEpoch = startDelay + currentHeight;
+          this.logger.debug(`Calculated start epoch startDelay: ${startDelay} + currentHeight: ${currentHeight} = ${startEpoch}`);
+          let dealCmd = '';
+          try {
+            dealCmd = await this.createDealCmd(useLotus, provider, replicationRequest, carFile, startEpoch);
+          } catch (error) {
+            this.logger.error(`Deal CMD generation failed`, error);
+            return;
+          }
+
+          this.logger.debug(dealCmd);
+          let dealCid = 'unknown';
+          let errorMsg = '';
+          let state = 'proposed';
+          let retryCount = 0;
+          do {
+            try {
+              const cmdOut = await exec(dealCmd);
+              this.logger.info(cmdOut.stdout);
+              if (useLotus) {
+                if (cmdOut.stdout.startsWith('baf')) {
+                  dealCid = cmdOut.stdout.trim(); // remove trailing line break
+                  // If there was a retry, these values could be in error state, need reset
+                  errorMsg = '';
+                  state = 'proposed';
+                  break; // success, break from while loop
+                } else {
+                  errorMsg = cmdOut.stdout + cmdOut.stderr;
+                  state = 'error';
+                }
+              } else {
+                const match = boostResultUUIDMatcher.exec(cmdOut.stdout);
+                if (match != null && match.length > 1) {
+                  dealCid = match[1];
+                  // If there was a retry, these values could be in error state, need reset
+                  errorMsg = '';
+                  state = 'proposed';
+                  break; // success, break from while loop
+                } else {
+                  errorMsg = cmdOut.stdout + cmdOut.stderr;
+                  state = 'error';
+                }
+              }
+            } catch (error) {
+              this.logger.error('Deal making failed', error);
+              errorMsg = '' + error;
+              state = 'error';
+            }
+            this.logger.info(`Waiting ${retryTimeout} ms to retry`);
+            await new Promise(resolve => setTimeout(resolve, retryTimeout));
+            retryTimeout *= 2; // expoential back off
+            retryCount++;
+          } while (retryCount < config.get<number>('deal_replication_worker.max_retry_count'));
+          if (state === 'proposed') {
+            dealsMadePerSP++;
+            if (retryTimeout > config.get<number>('deal_replication_worker.min_retry_wait_ms')) {
+              retryTimeout /= 2; // expoential back "on"
+            }
+          }
+          await Datastore.DealStateModel.create({
+            client: replicationRequest.client,
+            provider: provider,
+            dealCid: dealCid,
+            dataCid: carFile.dataCid,
+            pieceCid: carFile.pieceCid,
+            startEpoch: startEpoch,
+            expiration: startEpoch + replicationRequest.duration,
+            duration: replicationRequest.duration,
+            price: replicationRequest.maxPrice, // unit is Fil per epoch per GB
+            verified: replicationRequest.isVerfied,
+            state: state,
+            replicationRequestId: replicationRequest.id,
+            datasetId: replicationRequest.datasetId,
+            errorMessage: errorMsg
+          });
+        }
+        // cron schedule could change from outside
+        this.logger.debug(`Finished all files in the dataset. Checking completion.`);
+        const reRead = await Datastore.ReplicationRequestModel.findById(replicationRequest.id);
+        await this.checkAndMarkCompletion(reRead!, cars.length);
+      });
+      await Promise.all(makeDealAll);
+    } catch (err) {
+      this.stopCronIfExist(replicationRequest.id);
+      if (err instanceof Error) {
+        this.logger.error(`${this.workerId} - Encountered an error - ${err.message}`);
+        await Datastore.ReplicationRequestModel.findByIdAndUpdate(replicationRequest.id, {
+          status: 'error',
+          workerId: null,
+          errorMessage: err.message
         });
       }
-      // cron schedule could change from outside
-      this.logger.debug(`Finished all files in the dataset. Checking completion.`);
-      const reRead = await Datastore.ReplicationRequestModel.findById(replicationRequest.id);
-      await this.checkAndMarkCompletion(reRead!, cars.length);
-    });
-    await Promise.all(makeDealAll);
+    }
   }
 
   private async startHealthCheck (): Promise<void> {

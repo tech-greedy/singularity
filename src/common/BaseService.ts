@@ -1,6 +1,6 @@
-import config from 'config';
 import winston from 'winston';
 import Logger, { Category } from './Logger';
+import config from './Config';
 
 export default abstract class BaseService {
   protected logger: winston.Logger;

@@ -1,5 +1,4 @@
 import bodyParser from 'body-parser';
-import config from 'config';
 import express, { Express, Request, Response } from 'express';
 import { constants } from 'fs';
 import fs from 'fs/promises';
@@ -8,15 +7,16 @@ import xbytes from 'xbytes';
 import BaseService from '../common/BaseService';
 import Datastore from '../common/Datastore';
 import Logger, { Category } from '../common/Logger';
-import CreatePreparationRequest from './CreatePreparationRequest';
-import DeletePreparationRequest from './DeletePreparationRequest';
-import ErrorCode from './ErrorCode';
-import GetPreparationDetailsResponse from './GetPreparationDetailsResponse';
-import { GetPreparationsResponse } from './GetPreparationsResponse';
-import UpdatePreparationRequest from './UpdatePreparationRequest';
+import CreatePreparationRequest from './model/CreatePreparationRequest';
+import DeletePreparationRequest from './model/DeletePreparationRequest';
+import ErrorCode from './model/ErrorCode';
+import GetPreparationDetailsResponse from './model/GetPreparationDetailsResponse';
+import { GetPreparationsResponse } from './model/GetPreparationsResponse';
+import UpdatePreparationRequest from './model/UpdatePreparationRequest';
 import { ObjectId } from 'mongodb';
 import GenerationRequest from '../common/model/GenerationRequest';
 import { GeneratedFileList } from '../common/model/OutputFileList';
+import config from '../common/Config';
 
 export default class DealPreparationService extends BaseService {
   static AllowedDealSizes: number[] = DealPreparationService.initAllowedDealSizes();
@@ -63,33 +63,30 @@ export default class DealPreparationService extends BaseService {
     const bind = config.get<string>('deal_preparation_service.bind');
     const port = config.get<number>('deal_preparation_service.port');
     this.startCleanupHealthCheck();
-    if (config.get('deal_preparation_service.enable_cleanup')) {
-      this.cleanupIncompleteFiles();
-    }
     this.app!.listen(port, bind, () => {
       this.logger.info(`Service started listening at http://${bind}:${port}`);
     });
   }
 
-  private async cleanupIncompleteFiles () : Promise<void> {
+  public static async cleanupIncompleteFiles () : Promise<void> {
     let dirs = (await Datastore.ScanningRequestModel.find()).map(r => r.outDir);
     dirs = [...new Set(dirs)];
     for (const dir of dirs) {
       try {
         await fs.access(dir, constants.F_OK);
       } catch (e) {
-        this.logger.warn(`${dir} cannot be removed during cleanup.`, { error: e });
+        console.warn(`${dir} cannot be removed during cleanup.`, { error: e });
         continue;
       }
       for (const file of await fs.readdir(dir)) {
         const regex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\.car$/;
         if (regex.test(file)) {
           const fullPath = path.join(dir, file);
-          this.logger.info(`Removing temporary file ${fullPath}`);
+          console.log(`Removing temporary file ${fullPath}`);
           try {
             await fs.rm(fullPath);
           } catch (e) {
-            this.logger.warn(`${fullPath} cannot be removed during cleanup.`, { error: e });
+            console.warn(`${fullPath} cannot be removed during cleanup.`, { error: e });
           }
         }
       }
@@ -101,18 +98,18 @@ export default class DealPreparationService extends BaseService {
         try {
           await fs.access(dir, constants.F_OK);
         } catch (e) {
-          this.logger.warn(`${dir} cannot be removed during cleanup.`, { error: e });
+          console.warn(`${dir} cannot be removed during cleanup.`, { error: e });
           continue;
         }
         for (const file of await fs.readdir(dir)) {
           const regex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
           if (regex.test(file)) {
             const fullPath = path.join(dir, file);
-            this.logger.info(`Removing temporary folder ${fullPath}`);
+            console.info(`Removing temporary folder ${fullPath}`);
             try {
               await fs.rm(fullPath, { recursive: true, force: true });
             } catch (e) {
-              this.logger.warn(`${fullPath} cannot be removed during cleanup.`, { error: e });
+              console.warn(`${fullPath} cannot be removed during cleanup.`, { error: e });
             }
           }
         }

@@ -1,4 +1,4 @@
-import Scanner from '../../src/deal-preparation/Scanner';
+import Scanner from '../../src/deal-preparation/scanner/Scanner';
 import path from 'path';
 
 describe('Scanner', () => {

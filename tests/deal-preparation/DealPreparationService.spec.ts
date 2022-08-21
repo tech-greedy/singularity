@@ -1,7 +1,7 @@
 import supertest from 'supertest';
 import Datastore from '../../src/common/Datastore';
 import DealPreparationService from '../../src/deal-preparation/DealPreparationService';
-import ErrorCode from '../../src/deal-preparation/ErrorCode';
+import ErrorCode from '../../src/deal-preparation/model/ErrorCode';
 import Utils from '../Utils';
 import fs from 'fs/promises';
 import path from 'path';
@@ -549,7 +549,7 @@ describe('DealPreparationService', () => {
       });
       await fs.mkdir('./tmp/d715461e-8d42-4a53-9b33-e17ed4247304', { recursive: true });
       await fs.writeFile('./d715461e-8d42-4a53-9b33-e17ed4247304.car', 'something');
-      await service['cleanupIncompleteFiles']();
+      await DealPreparationService.cleanupIncompleteFiles();
       await expectAsync(fs.access('./d715461e-8d42-4a53-9b33-e17ed4247304.car')).toBeRejected();
       await expectAsync(fs.access('./d715461e-8d42-4a53-9b33-e17ed4247304')).toBeRejected();
     })
@@ -559,7 +559,7 @@ describe('DealPreparationService', () => {
         outDir: './non-existing',
         tmpDir: './non-existing',
       });
-      await expectAsync(service['cleanupIncompleteFiles']()).toBeResolved();
+      await expectAsync(DealPreparationService.cleanupIncompleteFiles()).toBeResolved();
     })
   })
   describe('DELETE /preparation/:id', () => {
