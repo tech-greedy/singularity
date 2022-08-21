@@ -5,6 +5,7 @@ import packageJson from '../package.json';
 import { Command } from 'commander';
 
 const version = packageJson.version;
+const defaultIpfsApi = '/ip4/127.0.0.1/tcp/5001';
 const program = new Command();
 program.name('singularity-retrieve')
   .version(version)
@@ -12,10 +13,10 @@ program.name('singularity-retrieve')
 
 program.command('ls').description('List the files under a path')
   .argument('<path>', 'The path inside a dataset, i.e. singularity://ipns/dataset.io/path/to/folder')
-  .requiredOption('--ipfs-api <ipfs_api>', 'The IPFS API to look for dataset index')
+  .option('--ipfs-api <ipfs_api>', 'The IPFS API to look for dataset index')
   .option('-v, --verbose', 'Use a more verbose output')
   .action(async (path, options) => {
-    const files = await Retrieval.list(options.ipfsApi, path);
+    const files = await Retrieval.list(options.ipfsApi ?? defaultIpfsApi, path);
     if (options.verbose) {
       console.table(files);
     } else {
@@ -27,9 +28,9 @@ program.command('ls').description('List the files under a path')
   });
 program.command('show').description('Show the detailed sources for the corresponding CID and how files are splitted')
   .argument('<path>', 'The path inside a dataset, i.e. singularity://ipns/dataset.io/path/to/folder')
-  .requiredOption('--ipfs-api <ipfs_api>', 'The IPFS API to look for dataset index')
+  .option('--ipfs-api <ipfs_api>', 'The IPFS API to look for dataset index')
   .action(async (path, options) => {
-    const sources = await Retrieval.show(options.ipfsApi, path);
+    const sources = await Retrieval.show(options.ipfsApi ?? defaultIpfsApi, path);
     console.table(sources);
     process.exit(0);
   });
@@ -37,9 +38,9 @@ program.command('cp').description('Copy the file from storage provider to local 
   .argument('<path>', 'The path inside a dataset, i.e. singularity://ipns/dataset.io/path/to/folder')
   .argument('<dest>', 'The destination to save the downloaded file or directory')
   .requiredOption('-p, --provider [providers...]', 'The storage providers to retrieve the data from')
-  .requiredOption('--ipfs-api <ipfs_api>', 'The IPFS API to look for dataset index')
+  .option('--ipfs-api <ipfs_api>', 'The IPFS API to look for dataset index')
   .action(async (path, dest, options) => {
-    await Retrieval.cp(options.ipfsApi, path, dest, options.provider);
+    await Retrieval.cp(options.ipfsApi ?? defaultIpfsApi, path, dest, options.provider);
   });
 
 program.parse();

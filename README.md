@@ -9,6 +9,8 @@ New node software for large-scale clients with PB-scale data onboarding to Filec
 
 Looking for standalone Deal Preparation? Try [singularity-prepare](./singularity-prepare.md)
 
+Looking for a complete end-to-end demonstration? Try [Getting Started Guide](./getting-started.md)
+
 ### Prerequisite
 
 ```shell
@@ -56,8 +58,9 @@ Then copy the generated binary to override the existing one from the PATH for yo
 * singularity installed globally `/home/user/.nvm/versions/node/v16.xx.x/lib/node_modules/.bin`
 * singularity cloned locally `./node_modules/.bin`
 
-Note the path may change depending on the nodejs version, if you cannot find folder above, try search for generate-car
-binary first, i.e. `find ~/.nvm -name 'generate-car'`
+Note that the path may change depending on the nodejs version.
+If you cannot find the folder above, try searching for the generate-car
+binary first (i.e.m `find ~/.nvm -name 'generate-car'`).
 
 ## Topology Choices
 
@@ -365,7 +368,28 @@ Worker to scan the dataset, make plan and generate Car file and CIDs
 
 #### enabled, num_workers
 
-Whether to enable the worker and how many worker instances. As a rule of thumb, use `min(cpu_cores / 2.5, io_MBps / 50)`
+Whether to enable the worker and how many worker instances. As a rule of thumb, use `min(cpu_cores / 2, io_MBps / 20)`
+
+## Performance
+
+### Resource usage
+
+Each generation worker consumes negligible RAM, 20-50 MiB/s disk I/O and 100-250% of CPU.
+
+### Speed
+
+Each 32GiB deal takes ~10 minutes to be generated on AMD EPYC CPU with NVME drive.
+
+### Other factors
+
+1. When dealing with lots of small files, CPU usage increases while generation speed decreases.
+Meanwhile, IO may become the bottleneck if not using SSD.
+2. When using S3 bucket public as the dataset, the Internet Speed may become the bottleneck
+
+## Backup
+
+The repo `~/.singularity` or the folder specified by `SINGULARITY_PATH` contains all state of the service.
+To backup, simply backup the repo folder.
 
 ## FAQ and common issues
 
@@ -413,3 +437,8 @@ MONGOMS_DEBUG=1 singularity daemon
 ```
 
 If the error shows `libcrypto.so.1.1` cannot be found. Try [this solution](https://stackoverflow.com/a/72633324).
+
+## Submit Feedback
+
+Create a [bug report](https://github.com/tech-greedy/singularity/issues/new?labels=bug&template=bug_report.md&title=)
+or [request a feature](https://github.com/tech-greedy/singularity/issues/new?labels=enhancement&template=feature_request.md&title=).
