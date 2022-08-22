@@ -8,7 +8,6 @@ import Datastore from '../common/Datastore';
 import Logger, { Category } from '../common/Logger';
 import ErrorCode from './model/ErrorCode';
 import GetPreparationDetailsResponse from './model/GetPreparationDetailsResponse';
-import { GetPreparationsResponse } from './model/GetPreparationsResponse';
 import UpdatePreparationRequest from './model/UpdatePreparationRequest';
 import { ObjectId } from 'mongodb';
 import GenerationRequest from '../common/model/GenerationRequest';
@@ -17,6 +16,7 @@ import config from '../common/Config';
 import handleCreatePreparationRequest from './handler/CreatePreparationRequestHandler';
 import handleUpdatePreparationRequest from './handler/UpdatePreparationRequestHandler';
 import handleDeletePreparationRequest from './handler/DeletePreparationRequestHandler';
+import handleListPreparationRequests from './handler/ListPreparationRequestHandler';
 
 export default class DealPreparationService extends BaseService {
   static AllowedDealSizes: number[] = DealPreparationService.initAllowedDealSizes();
@@ -25,7 +25,6 @@ export default class DealPreparationService extends BaseService {
   public constructor () {
     super(Category.DealPreparationService);
     this.handleUpdateGenerationRequest = this.handleUpdateGenerationRequest.bind(this);
-    this.handleListPreparationRequests = this.handleListPreparationRequests.bind(this);
     this.handleGetPreparationRequest = this.handleGetPreparationRequest.bind(this);
     this.handleGetGenerationRequest = this.handleGetGenerationRequest.bind(this);
     this.handleGetGenerationManifestRequest = this.handleGetGenerationManifestRequest.bind(this);
@@ -47,7 +46,7 @@ export default class DealPreparationService extends BaseService {
     this.app.delete('/preparation/:id', handleDeletePreparationRequest.bind(this));
     this.app.post('/generation/:dataset/:id', this.handleUpdateGenerationRequest);
     this.app.post('/generation/:dataset', this.handleUpdateGenerationRequest);
-    this.app.get('/preparations', this.handleListPreparationRequests);
+    this.app.get('/preparations', handleListPreparationRequests.bind(this));
     this.app.get('/preparation/:id', this.handleGetPreparationRequest);
     this.app.get('/generation/:dataset/:id', this.handleGetGenerationRequest);
     this.app.get('/generation/:id', this.handleGetGenerationRequest);
@@ -291,31 +290,6 @@ export default class DealPreparationService extends BaseService {
         pieceCid: generation.pieceCid,
         pieceSize: generation.pieceSize,
         carSize: generation.carSize
-      });
-    }
-    response.end(JSON.stringify(result));
-  }
-
-  private async handleListPreparationRequests (_request: Request, response: Response) {
-    this.logger.info('Received request to list all preparation requests.');
-    const scanningRequests = await Datastore.ScanningRequestModel.find();
-    const result: GetPreparationsResponse = [];
-    for (const r of scanningRequests) {
-      result.push({
-        id: r.id,
-        name: r.name,
-        path: r.path,
-        minSize: r.minSize,
-        maxSize: r.maxSize,
-        outDir: r.outDir,
-        scanningStatus: r.status,
-        scanned: r.scanned,
-        errorMessage: r.errorMessage,
-        generationTotal: await Datastore.GenerationRequestModel.count({ datasetId: r.id }),
-        generationActive: await Datastore.GenerationRequestModel.count({ datasetId: r.id, status: 'active' }),
-        generationPaused: await Datastore.GenerationRequestModel.count({ datasetId: r.id, status: 'paused' }),
-        generationCompleted: await Datastore.GenerationRequestModel.count({ datasetId: r.id, status: 'completed' }),
-        generationError: await Datastore.GenerationRequestModel.count({ datasetId: r.id, status: 'error' })
       });
     }
     response.end(JSON.stringify(result));
