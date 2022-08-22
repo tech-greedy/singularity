@@ -24,7 +24,7 @@ export default async function handleListPreparationRequests (this: DealPreparati
     const paused = generationStats.find(s => s._id.datasetId === r.id && s._id.status === 'paused')?.count ?? 0;
     const completed = generationStats.find(s => s._id.datasetId === r.id && s._id.status === 'completed')?.count ?? 0;
     const error = generationStats.find(s => s._id.datasetId === r.id && s._id.status === 'error')?.count ?? 0;
-    const total = active + paused + completed + error;
+    const total = generationStats.filter(s => s._id.datasetId === r.id).reduce((acc, s) => acc + s.count, 0);
     result.push({
       id: r.id,
       name: r.name,

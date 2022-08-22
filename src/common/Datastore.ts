@@ -277,4 +277,22 @@ export default class Datastore {
     return await Datastore.ScanningRequestModel.findOne({ name: idOrName }) ??
       (ObjectId.isValid(idOrName) ? await Datastore.ScanningRequestModel.findById(idOrName) : null);
   }
+
+  public static async findGenerationRequest (id: string, dataset: string | undefined) {
+    let found;
+    const idIsInt = !isNaN(parseInt(id));
+    if (ObjectId.isValid(id)) {
+      found = await Datastore.GenerationRequestModel.findById(id);
+    } else if (idIsInt) {
+      found = await Datastore.GenerationRequestModel.findOne({ index: id, datasetName: dataset }) ??
+        await Datastore.GenerationRequestModel.findOne({ index: id, datasetId: dataset });
+    } else {
+      return undefined;
+    }
+    if (!found) {
+      return undefined;
+    }
+
+    return found;
+  }
 }
