@@ -3,7 +3,7 @@ import Datastore from '../../../src/common/Datastore';
 import DealPreparationService from '../../../src/deal-preparation/DealPreparationService';
 import Utils from '../../Utils';
 
-fdescribe('ListPreparationRequestHandler', () => {
+describe('ListPreparationRequestHandler', () => {
   let service: DealPreparationService;
   beforeAll(async () => {
     await Utils.initDatabase();
