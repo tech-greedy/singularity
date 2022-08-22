@@ -13,6 +13,7 @@ import InputFileList, { FileInfo } from './model/InputFileList';
 import OutputFileList, { GeneratedFileInfo } from './model/OutputFileList';
 import config, { getConfigDir } from './Config';
 import HealthCheck from './model/HealthCheck';
+import { ObjectId } from 'mongodb';
 
 export default class Datastore {
   private static logger = Logger.getLogger(Category.Database);
@@ -270,5 +271,10 @@ export default class Datastore {
   public static async connect (): Promise<void> {
     await Datastore.connectMongoDb(config.connection.database);
     Datastore.setupDataModels();
+  }
+
+  public static async findScanningRequest (idOrName: string) {
+    return await Datastore.ScanningRequestModel.findOne({ name: idOrName }) ??
+      (ObjectId.isValid(idOrName) ? await Datastore.ScanningRequestModel.findById(idOrName) : null);
   }
 }

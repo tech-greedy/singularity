@@ -3,12 +3,9 @@ import express, { Express, Request, Response } from 'express';
 import { constants } from 'fs';
 import fs from 'fs/promises';
 import path from 'path';
-import xbytes from 'xbytes';
 import BaseService from '../common/BaseService';
 import Datastore from '../common/Datastore';
 import Logger, { Category } from '../common/Logger';
-import CreatePreparationRequest from './model/CreatePreparationRequest';
-import DeletePreparationRequest from './model/DeletePreparationRequest';
 import ErrorCode from './model/ErrorCode';
 import GetPreparationDetailsResponse from './model/GetPreparationDetailsResponse';
 import { GetPreparationsResponse } from './model/GetPreparationsResponse';
@@ -17,6 +14,9 @@ import { ObjectId } from 'mongodb';
 import GenerationRequest from '../common/model/GenerationRequest';
 import { GeneratedFileList } from '../common/model/OutputFileList';
 import config from '../common/Config';
+import handleCreatePreparationRequest from './handler/CreatePreparationRequestHandler';
+import handleUpdatePreparationRequest from './handler/UpdatePreparationRequestHandler';
+import handleDeletePreparationRequest from './handler/DeletePreparationRequestHandler';
 
 export default class DealPreparationService extends BaseService {
   static AllowedDealSizes: number[] = DealPreparationService.initAllowedDealSizes();
@@ -24,10 +24,7 @@ export default class DealPreparationService extends BaseService {
 
   public constructor () {
     super(Category.DealPreparationService);
-    this.handleCreatePreparationRequest = this.handleCreatePreparationRequest.bind(this);
     this.handleUpdateGenerationRequest = this.handleUpdateGenerationRequest.bind(this);
-    this.handleUpdatePreparationRequest = this.handleUpdatePreparationRequest.bind(this);
-    this.handleRemovePreparationRequest = this.handleRemovePreparationRequest.bind(this);
     this.handleListPreparationRequests = this.handleListPreparationRequests.bind(this);
     this.handleGetPreparationRequest = this.handleGetPreparationRequest.bind(this);
     this.handleGetGenerationRequest = this.handleGetGenerationRequest.bind(this);
@@ -45,9 +42,9 @@ export default class DealPreparationService extends BaseService {
       res.setHeader('Content-Type', 'application/json');
       next();
     });
-    this.app.post('/preparation', this.handleCreatePreparationRequest);
-    this.app.post('/preparation/:id', this.handleUpdatePreparationRequest);
-    this.app.delete('/preparation/:id', this.handleRemovePreparationRequest);
+    this.app.post('/preparation', handleCreatePreparationRequest.bind(this));
+    this.app.post('/preparation/:id', handleUpdatePreparationRequest.bind(this));
+    this.app.delete('/preparation/:id', handleDeletePreparationRequest.bind(this));
     this.app.post('/generation/:dataset/:id', this.handleUpdateGenerationRequest);
     this.app.post('/generation/:dataset', this.handleUpdateGenerationRequest);
     this.app.get('/preparations', this.handleListPreparationRequests);
@@ -324,84 +321,11 @@ export default class DealPreparationService extends BaseService {
     response.end(JSON.stringify(result));
   }
 
-  private async handleRemovePreparationRequest (request: Request, response: Response) {
-    const id = request.params['id'];
-    const generation = request.params['generation'];
-    const { purge } = <DeletePreparationRequest>request.body;
-    this.logger.info(`Received request to delete dataset preparation request.`, { id, generation, purge });
-    const found = await Datastore.ScanningRequestModel.findOne({ name: id }) ??
-      (ObjectId.isValid(id) ? await Datastore.ScanningRequestModel.findById(id) : undefined);
-    if (!found) {
-      this.sendError(response, ErrorCode.DATASET_NOT_FOUND);
-      return;
-    }
-
-    if (purge) {
-      for await (const { dataCid, pieceCid } of Datastore.GenerationRequestModel.find({ datasetId: found.id }, { dataCid: 1, pieceCid: 1 })) {
-        if (dataCid) {
-          const file = path.join(found.outDir, dataCid + '.car');
-          this.logger.info(`Removing file.`, { file });
-          await fs.rm(file, { force: true });
-        }
-        if (pieceCid) {
-          const file = path.join(found.outDir, pieceCid + '.car');
-          this.logger.info(`Removing file.`, { file });
-          await fs.rm(file, { force: true });
-        }
-      }
-    }
-
-    await found.delete();
-    for (const generationRequest of await Datastore.GenerationRequestModel.find({ datasetId: found.id })) {
-      await Datastore.InputFileListModel.deleteMany({ generationId: generationRequest.id });
-      await Datastore.OutputFileListModel.deleteMany({ generationId: generationRequest.id });
-      await generationRequest.delete();
-    }
-
-    response.end();
-  }
-
-  private async handleUpdatePreparationRequest (request: Request, response: Response) {
-    const id = request.params['id'];
-    const { action } = <UpdatePreparationRequest>request.body;
-    this.logger.info(`Received request to update dataset preparation request.`, { id, action });
-    if (!['resume', 'pause', 'retry'].includes(action)) {
-      this.sendError(response, ErrorCode.ACTION_INVALID);
-      return;
-    }
-    const found = await Datastore.ScanningRequestModel.findOne({ name: id }) ??
-      (ObjectId.isValid(id) ? await Datastore.ScanningRequestModel.findById(id) : undefined);
-    if (!found) {
-      this.sendError(response, ErrorCode.DATASET_NOT_FOUND);
-      return;
-    }
-    const actionMap = {
-      resume: [{ status: 'paused' }, { status: 'active', workerId: null }],
-      pause: [{ status: 'active' }, { status: 'paused', workerId: null }],
-      retry: [{ status: 'error' }, { status: 'active', $unset: { errorMessage: 1 }, workerId: null }]
-    };
-
-    const changed = (await Datastore.ScanningRequestModel.findOneAndUpdate({
-      _id: found.id,
-      ...actionMap[action][0]
-    }, actionMap[action][1])) != null
-      ? 1
-      : 0;
-
-    response.end(JSON.stringify({
-      scanningRequestsChanged: changed
-    }));
-  }
-
   private async handleUpdateGenerationRequest (request: Request, response: Response) {
     const dataset = request.params['dataset'];
     const generation = request.params['id'];
     const { action } = <UpdatePreparationRequest>request.body;
     this.logger.info(`Received request to update dataset preparation request.`, { dataset, generation, action });
-    if (!['resume', 'pause', 'retry'].includes(action)) {
-      this.sendError(response, ErrorCode.ACTION_INVALID);
-      return;
-    }
     const found = await Datastore.ScanningRequestModel.findOne({ name: dataset }) ??
       (ObjectId.isValid(dataset) ? await Datastore.ScanningRequestModel.findById(dataset) : undefined);
     if (!found) {
@@ -416,6 +340,9 @@ export default class DealPreparationService extends BaseService {
 
     let changedGenerations;
     let changedGeneration;
+    if (!action) {
+      return;
+    }
     if (!generation) {
       changedGenerations = (await Datastore.GenerationRequestModel.updateMany({
         datasetId: found.id,
@@ -452,92 +379,6 @@ export default class DealPreparationService extends BaseService {
     this.logger.warn(`Error code`, { error });
     response.status(400);
     response.end(JSON.stringify({ error }));
-  }
-
-  private async handleCreatePreparationRequest (request: Request, response: Response) {
-    const {
-      name,
-      path,
-      dealSize,
-      outDir,
-      minRatio,
-      maxRatio,
-      tmpDir
-    } = <CreatePreparationRequest>request.body;
-    this.logger.info(`Received request to start preparing dataset.`, { name, path, dealSize });
-    const dealSizeNumber = xbytes.parseSize(dealSize);
-    // Validate dealSize
-    if (!DealPreparationService.AllowedDealSizes.includes(dealSizeNumber)) {
-      this.sendError(response, ErrorCode.DEAL_SIZE_NOT_ALLOWED);
-      return;
-    }
-    if (minRatio && (minRatio < 0.5 || minRatio > 0.95)) {
-      this.sendError(response, ErrorCode.MIN_RATIO_INVALID);
-      return;
-    }
-    if (maxRatio && (maxRatio < 0.5 || maxRatio > 0.95)) {
-      this.sendError(response, ErrorCode.MAX_RATIO_INVALID);
-      return;
-    }
-    if (minRatio && maxRatio && minRatio >= maxRatio) {
-      this.sendError(response, ErrorCode.MAX_RATIO_INVALID);
-      return;
-    }
-
-    let minSize = Math.floor(dealSizeNumber * config.get<number>('deal_preparation_service.minDealSizeRatio'));
-    if (minRatio) {
-      minSize = minRatio * dealSizeNumber;
-    }
-    minSize = Math.round(minSize);
-    let maxSize = Math.floor(dealSizeNumber * config.get<number>('deal_preparation_service.maxDealSizeRatio'));
-    if (maxRatio) {
-      maxSize = maxRatio * dealSizeNumber;
-    }
-    maxSize = Math.round(maxSize);
-    if (path.startsWith('s3://') && !tmpDir) {
-      this.sendError(response, ErrorCode.TMPDIR_MISSING_FOR_S3);
-    }
-    try {
-      if (!path.startsWith('s3://')) {
-        await fs.access(path, constants.F_OK);
-      }
-      await fs.access(outDir, constants.F_OK);
-      if (tmpDir) {
-        await fs.access(tmpDir, constants.F_OK);
-      }
-    } catch (_) {
-      this.sendError(response, ErrorCode.PATH_NOT_ACCESSIBLE);
-      return;
-    }
-
-    const scanningRequest = new Datastore.ScanningRequestModel();
-    scanningRequest.name = name;
-    scanningRequest.minSize = minSize;
-    scanningRequest.maxSize = maxSize;
-    scanningRequest.path = path;
-    scanningRequest.status = 'active';
-    scanningRequest.outDir = outDir;
-    scanningRequest.tmpDir = tmpDir;
-    scanningRequest.scanned = 0;
-    try {
-      await scanningRequest.save();
-    } catch (e: any) {
-      if (e.name === 'MongoServerError' && e.code === 11000) {
-        this.sendError(response, ErrorCode.DATASET_NAME_CONFLICT);
-        return;
-      }
-      throw e;
-    }
-    response.end(JSON.stringify({
-      id: scanningRequest.id,
-      name,
-      minSize,
-      maxSize,
-      path,
-      outDir,
-      tmpDir,
-      status: scanningRequest.status
-    }));
   }
 
   private static initAllowedDealSizes (): number[] {
