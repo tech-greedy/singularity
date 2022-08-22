@@ -366,7 +366,7 @@ export default class DealReplicationWorker extends BaseService {
           for (let k = 0; k < existingDeals.length; k++) {
             const deal = existingDeals[k];
             if (deal.provider === provider) {
-              this.logger.debug(`This pieceCID ${carFile.pieceCid} has already been dealt with ${provider}. ` +
+              this.logger.info(`This pieceCID ${carFile.pieceCid} has already been dealt with ${provider}. ` +
                 `Deal CID ${deal.dealCid}. Moving on to next file.`);
               alreadyDealt = true;
             }
