@@ -9,6 +9,7 @@ import axios from 'axios';
 import { create, all, Unit } from 'mathjs';
 import GenerationRequest from '../common/model/GenerationRequest';
 import cron, { ScheduledTask } from 'node-cron';
+import fs from 'fs-extra';
 const mathconfig = {};
 const math = create(all, mathconfig);
 const exec: any = require('await-exec');// no TS support
@@ -272,8 +273,18 @@ export default class DealReplicationWorker extends BaseService {
    * @param replicationRequest
    */
   private async replicate (replicationRequest: ReplicationRequest): Promise<void> {
-    this.logger.debug(`Start replication ${replicationRequest.id}`);
+    this.logger.info(`Start replication ${replicationRequest.id}`);
     let breakOuter = false; // set this to true will terminate all concurrent deal making thread
+    let fileList: string = '';
+    if(replicationRequest.fileListPath) {
+      try {
+        fileList = await fs.readFile(replicationRequest.fileListPath, 'utf-8');
+        this.logger.info(`Replication is limited to content in ${replicationRequest.fileListPath}`);
+      } catch (error) {
+        breakOuter = true;
+        this.logger.error(`Read fileListPath failed from ${replicationRequest.fileListPath}`, error);
+      }
+    }
     const boostResultUUIDMatcher = /deal uuid: (\S+)/;
     try {
       const providers = await DealReplicationWorker.generateProvidersList(replicationRequest.storageProviders);
@@ -316,6 +327,13 @@ export default class DealReplicationWorker extends BaseService {
         let retryTimeout = config.get<number>('deal_replication_worker.min_retry_wait_ms'); // 30s, 60s, 120s ...
         for (let j = 0; j < cars.length; j++) {
           const carFile = cars[j];
+          // check if file belongs to fileList
+          if(fileList !== '' && carFile.pieceCid) {
+            if(fileList.indexOf(carFile.pieceCid) === -1) {
+              this.logger.debug(`File ${carFile.pieceCid} is not on the list`);
+              continue;
+            }
+          }
 
           // check if the replication request has been paused
           const existingRec = await Datastore.ReplicationRequestModel.findById(replicationRequest.id);
@@ -356,6 +374,7 @@ export default class DealReplicationWorker extends BaseService {
             }
             return;
           }
+          
 
           // check if the car has already dealt or have enough replica
           const existingDeals = await Datastore.DealStateModel.find({

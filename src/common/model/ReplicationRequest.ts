@@ -19,5 +19,6 @@ export default interface ReplicationRequest {
   cronSchedule?: string, // if specified, each cron will trigger sending the next maxNumberOfDeals
   cronMaxDeals?: number, // per SP total with cron considered
   cronMaxPendingDeals?: number, // per SP pending total with cron considered
+  fileListPath?: string, // limit to replicate only from the list in a txt file
   errorMessage?: string
 }

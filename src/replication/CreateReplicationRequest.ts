@@ -12,5 +12,6 @@ export default interface CreateReplicationRequest {
     isOffline: string,
     cronSchedule?: string,
     cronMaxDeals?: number,
-    cronMaxPendingDeals?: number
+    cronMaxPendingDeals?: number,
+    fileListPath?: string
   }
