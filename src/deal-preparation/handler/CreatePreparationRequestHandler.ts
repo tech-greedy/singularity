@@ -9,34 +9,40 @@ import { constants } from 'fs';
 import Datastore from '../../common/Datastore';
 import sendError from './ErrorHandler';
 
-export default async function handleCreatePreparationRequest (this: DealPreparationService, request: Request, response: Response) {
-  const {
-    name,
-    path,
-    dealSize,
-    outDir,
-    minRatio,
-    maxRatio,
-    tmpDir
-  } = <CreatePreparationRequest>request.body;
-  this.logger.info(`Received request to start preparing dataset.`, request.body);
+export interface ValidationResult {
+  errorCode?: ErrorCode,
+  minSize?: number,
+  maxSize?: number
+}
+
+export async function validateCreatePreparationRequest (
+  path: string,
+  dealSize: string,
+  outDir: string,
+  minRatio: number | undefined,
+  maxRatio: number | undefined,
+  tmpDir: string | undefined) : Promise<ValidationResult> {
   const dealSizeNumber = xbytes.parseSize(dealSize);
   // Validate dealSize
   if (!DealPreparationService.AllowedDealSizes.includes(dealSizeNumber)) {
-    sendError(this.logger, response, ErrorCode.DEAL_SIZE_NOT_ALLOWED);
-    return;
+    return {
+      errorCode: ErrorCode.DEAL_SIZE_NOT_ALLOWED
+    };
   }
   if (minRatio && (minRatio < 0.5 || minRatio > 0.95)) {
-    sendError(this.logger, response, ErrorCode.MIN_RATIO_INVALID);
-    return;
+    return {
+      errorCode: ErrorCode.MIN_RATIO_INVALID
+    };
   }
   if (maxRatio && (maxRatio < 0.5 || maxRatio > 0.95)) {
-    sendError(this.logger, response, ErrorCode.MAX_RATIO_INVALID);
-    return;
+    return {
+      errorCode: ErrorCode.MAX_RATIO_INVALID
+    };
   }
   if (minRatio && maxRatio && minRatio >= maxRatio) {
-    sendError(this.logger, response, ErrorCode.MAX_RATIO_INVALID);
-    return;
+    return {
+      errorCode: ErrorCode.MAX_RATIO_INVALID
+    };
   }
 
   let minSize = Math.floor(dealSizeNumber * config.get<number>('deal_preparation_service.minDealSizeRatio'));
@@ -50,7 +56,9 @@ export default async function handleCreatePreparationRequest (this: DealPreparat
   }
   maxSize = Math.round(maxSize);
   if (path.startsWith('s3://') && !tmpDir) {
-    sendError(this.logger, response, ErrorCode.TMPDIR_MISSING_FOR_S3);
+    return {
+      errorCode: ErrorCode.TMPDIR_MISSING_FOR_S3
+    };
   }
   try {
     if (!path.startsWith('s3://')) {
@@ -61,14 +69,36 @@ export default async function handleCreatePreparationRequest (this: DealPreparat
       await fs.access(tmpDir, constants.F_OK);
     }
   } catch (_) {
-    sendError(this.logger, response, ErrorCode.PATH_NOT_ACCESSIBLE);
-    return;
+    return {
+      errorCode: ErrorCode.PATH_NOT_ACCESSIBLE
+    };
   }
 
+  return {
+    minSize, maxSize
+  };
+}
+
+export default async function handleCreatePreparationRequest (this: DealPreparationService, request: Request, response: Response) {
+  const requestBody = <CreatePreparationRequest>request.body;
+  const {
+    name,
+    path,
+    outDir,
+    tmpDir
+  } = requestBody;
+  this.logger.info(`Received request to start preparing dataset.`, request.body);
+  const { errorCode, minSize, maxSize } = await validateCreatePreparationRequest(
+    path, requestBody.dealSize, outDir,
+    requestBody.minRatio, requestBody.maxRatio, tmpDir);
+  if (errorCode) {
+    sendError(this.logger, response, errorCode);
+    return;
+  }
   const scanningRequest = new Datastore.ScanningRequestModel();
   scanningRequest.name = name;
-  scanningRequest.minSize = minSize;
-  scanningRequest.maxSize = maxSize;
+  scanningRequest.minSize = minSize!;
+  scanningRequest.maxSize = maxSize!;
   scanningRequest.path = path;
   scanningRequest.status = 'active';
   scanningRequest.outDir = outDir;
