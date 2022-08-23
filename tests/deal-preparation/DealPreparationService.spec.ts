@@ -2,6 +2,7 @@ import Datastore from '../../src/common/Datastore';
 import DealPreparationService from '../../src/deal-preparation/DealPreparationService';
 import Utils from '../Utils';
 import fs from 'fs/promises';
+import { sleep } from '../../src/common/Util';
 
 describe('DealPreparationService', () => {
   let service: DealPreparationService;
@@ -43,6 +44,16 @@ describe('DealPreparationService', () => {
       expect(await Datastore.ScanningRequestModel.findOne({ workerId: 'b' })).toBeNull();
       expect(await Datastore.GenerationRequestModel.findOne({ workerId: 'c' })).not.toBeNull();
       expect(await Datastore.GenerationRequestModel.findOne({ workerId: 'd' })).toBeNull();
+    })
+    it('should be called every interval time', async () => {
+      const spy = spyOn<any>(service, 'cleanupHealthCheck');
+      let abort = false;
+      service['startCleanupHealthCheck'](() => Promise.resolve(abort));
+      await sleep(7000);
+      expect(spy).toHaveBeenCalledTimes(2);
+      abort = true;
+      await sleep(5000);
+      expect(spy).toHaveBeenCalledTimes(2);
     })
   })
   describe('cleanupIncompleteFiles', () => {

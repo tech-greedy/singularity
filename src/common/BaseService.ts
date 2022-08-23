@@ -4,8 +4,8 @@ import config from './Config';
 import MetricEmitter, { getMetricEmitter } from './metrics/MetricEmitter';
 
 export default abstract class BaseService {
-  protected metricEmitter: MetricEmitter;
-  protected logger: winston.Logger;
+  public metricEmitter: MetricEmitter;
+  public logger: winston.Logger;
   protected enabled: boolean;
 
   protected constructor (category: Category) {
