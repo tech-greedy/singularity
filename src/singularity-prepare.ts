@@ -48,7 +48,11 @@ program.name('singularity-prepare')
     }
     const queue = new TaskQueue({ workers: parseInt(options.parallel) });
     let task;
-    for await (const fileList of Scanner.scan(p, minSize!, maxSize!)) {
+    const scanner = new Scanner();
+    if (p.startsWith('s3://')) {
+      await scanner.initializeS3Client(p);
+    }
+    for await (const fileList of scanner.scan(p, minSize!, maxSize!, undefined, Logger.getLogger(Category.Default))) {
       console.log('Pushed a new generation request');
       task = await queue.push(async () => {
         let tmpDir : string | undefined;

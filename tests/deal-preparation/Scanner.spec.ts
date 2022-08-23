@@ -1,11 +1,16 @@
 import Scanner from '../../src/deal-preparation/scanner/Scanner';
 import path from 'path';
+import Logger, { Category } from '../../src/common/Logger';
 
 describe('Scanner', () => {
   let defaultTimeout: number;
-  beforeAll(() => {
+  const gatkScanner = new Scanner();
+  const fastAiScanner = new Scanner();
+  beforeAll(async () => {
     defaultTimeout = jasmine.DEFAULT_TIMEOUT_INTERVAL;
     jasmine.DEFAULT_TIMEOUT_INTERVAL = 15_000;
+    await gatkScanner.initializeS3Client('s3://gatk-sv-data-us-east-1');
+    await fastAiScanner.initializeS3Client('s3://fast-ai-coco');
   })
   afterAll(() => {
     jasmine.DEFAULT_TIMEOUT_INTERVAL = defaultTimeout;
@@ -21,12 +26,12 @@ describe('Scanner', () => {
   describe('scan', () => {
     it('should work with s3 path with lastFrom', async () => {
       let fileLists = [];
-      for await (const fileList of Scanner.scan('s3://fast-ai-coco', 20_000_000_000, 30_000_000_000, {
+      for await (const fileList of fastAiScanner.scan('s3://fast-ai-coco', 20_000_000_000, 30_000_000_000, {
         path: 's3://fast-ai-coco/unlabeled2017.zip',
         size: 20126613414,
         start: 0,
         end: 1
-      })) {
+      }, Logger.getLogger(Category.Default), false)) {
         fileLists.push(fileList);
       }
       expect(fileLists).toEqual([
@@ -43,7 +48,8 @@ describe('Scanner', () => {
     })
     it('should work with s3 path', async () => {
       let fileLists = [];
-      for await (const fileList of Scanner.scan('s3://fast-ai-coco', 20_000_000_000, 30_000_000_000)) {
+      for await (const fileList of fastAiScanner.scan('s3://fast-ai-coco', 20_000_000_000, 30_000_000_000,
+        undefined, Logger.getLogger(Category.Default), false)) {
         fileLists.push(fileList);
       }
       expect(fileLists.length).toEqual(3);
@@ -107,7 +113,9 @@ describe('Scanner', () => {
   describe('listS3Path', () => {
     it('should work with public dataset', async () => {
       let entries = [];
-      for await (const entry of Scanner.listS3Path('s3://gatk-sv-data-us-east-1')) {
+      const scanner = new Scanner();
+      await scanner.initializeS3Client('s3://gatk-sv-data-us-east-1');
+      for await (const entry of scanner.listS3Path('s3://gatk-sv-data-us-east-1')) {
         entries.push(entry);
       }
       // Check there is no duplicate
@@ -128,7 +136,7 @@ describe('Scanner', () => {
       // Start from middle
       const startFrom = entries[3000];
       entries = [];
-      for await (const entry of Scanner.listS3Path('s3://gatk-sv-data-us-east-1', startFrom)) {
+      for await (const entry of gatkScanner.listS3Path('s3://gatk-sv-data-us-east-1', startFrom)) {
         entries.push(entry);
       }
       expect(entries.length).toEqual(3998);
@@ -142,7 +150,8 @@ describe('Scanner', () => {
   describe('scan', () => {
     it('should work without startFile', async () => {
       const arr = [];
-      for await (const list of await Scanner.scan(path.join('tests', 'test_folder'), 12, 16)){
+      for await (const list of await new Scanner().scan(path.join('tests', 'test_folder'), 12, 16,
+        undefined, Logger.getLogger(Category.Default), false)) {
         arr.push(list);
       }
       expect(arr).toEqual([
@@ -163,9 +172,9 @@ describe('Scanner', () => {
     })
     it('should work with startFile of full file', async () => {
       const arr = [];
-      for await (const list of await Scanner.scan(path.join('tests', 'test_folder'), 12, 16, {
+      for await (const list of await new Scanner().scan(path.join('tests', 'test_folder'), 12, 16, {
         size: 27, start: 0, end: 27, path: 'tests/test_folder/b/2.txt'
-      })){
+      }, Logger.getLogger(Category.Default), false)) {
         arr.push(list);
       }
       expect(arr).toEqual([
@@ -179,9 +188,9 @@ describe('Scanner', () => {
     })
     it('should work with startFile of partial file', async () => {
       const arr = [];
-      for await (const list of await Scanner.scan(path.join('tests', 'test_folder'), 12, 16, {
+      for await (const list of await new Scanner().scan(path.join('tests', 'test_folder'), 12, 16, {
         size: 27, start: 0, end: 9, path: 'tests/test_folder/b/2.txt'
-      })){
+      }, Logger.getLogger(Category.Default), false)) {
         arr.push(list);
       }
       expect(arr).toEqual([
