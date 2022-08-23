@@ -13,5 +13,6 @@ export default interface CreateReplicationRequest {
     cronSchedule?: string,
     cronMaxDeals?: number,
     cronMaxPendingDeals?: number,
-    fileListPath?: string
+    fileListPath?: string,
+    notes?: string
   }

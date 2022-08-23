@@ -20,5 +20,6 @@ export default interface ReplicationRequest {
   cronMaxDeals?: number, // per SP total with cron considered
   cronMaxPendingDeals?: number, // per SP pending total with cron considered
   fileListPath?: string, // limit to replicate only from the list in a txt file
+  notes?: string, // any notes or tag want to store along the replication request, for tracking purpose
   errorMessage?: string
 }

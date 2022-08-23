@@ -428,6 +428,7 @@ replication.command('start')
   .option('-x, --cron-max-deals <cronmaxdeals>', 'When cron schedule specified, limit the total number of deals across entire cron, per SP.')
   .option('-xp, --cron-max-pending-deals <cronmaxpendingdeals>', 'When cron schedule specified, limit the total number of pending deals determined by dealtracking service, per SP.')
   .option('-l, --file-list-path <filelistpath>', 'Absolute path to a txt file that will limit to replicate only from the list. Must be visible by deal replication worker.')
+  .option('-n, --notes <notes>', 'Any notes or tag want to store along the replication request, for tracking purpose.')
   .action(async (datasetid, storageProviders, client, replica, options) => {
     let response!: AxiosResponse;
     try {
@@ -456,7 +457,8 @@ replication.command('start')
         cronSchedule: options.cronSchedule ? options.cronSchedule : undefined,
         cronMaxDeals: options.cronMaxDeals ? options.cronMaxDeals : undefined,
         cronMaxPendingDeals: options.cronMaxPendingDeals ? options.cronMaxPendingDeals : undefined,
-        fileListPath: options.fileListPath ? options.fileListPath : undefined
+        fileListPath: options.fileListPath ? options.fileListPath : undefined,
+        notes: options.notes ? options.notes : undefined
       });
     } catch (error) {
       CliUtil.renderErrorAndExit(error);

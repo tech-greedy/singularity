@@ -275,8 +275,8 @@ export default class DealReplicationWorker extends BaseService {
   private async replicate (replicationRequest: ReplicationRequest): Promise<void> {
     this.logger.info(`Start replication ${replicationRequest.id}`);
     let breakOuter = false; // set this to true will terminate all concurrent deal making thread
-    let fileList: string = '';
-    if(replicationRequest.fileListPath) {
+    let fileList = '';
+    if (replicationRequest.fileListPath) {
       try {
         fileList = await fs.readFile(replicationRequest.fileListPath, 'utf-8');
         this.logger.info(`Replication is limited to content in ${replicationRequest.fileListPath}`);
@@ -328,8 +328,8 @@ export default class DealReplicationWorker extends BaseService {
         for (let j = 0; j < cars.length; j++) {
           const carFile = cars[j];
           // check if file belongs to fileList
-          if(fileList !== '' && carFile.pieceCid) {
-            if(fileList.indexOf(carFile.pieceCid) === -1) {
+          if (fileList !== '' && carFile.pieceCid) {
+            if (fileList.indexOf(carFile.pieceCid) === -1) {
               this.logger.debug(`File ${carFile.pieceCid} is not on the list`);
               continue;
             }
@@ -374,7 +374,6 @@ export default class DealReplicationWorker extends BaseService {
             }
             return;
           }
-          
 
           // check if the car has already dealt or have enough replica
           const existingDeals = await Datastore.DealStateModel.find({

@@ -83,7 +83,8 @@ export default class DealReplicationService extends BaseService {
         cronSchedule: found.cronSchedule,
         cronMaxDeals: found.cronMaxDeals,
         cronMaxPendingDeals: found.cronMaxPendingDeals,
-        fileListPath: found.fileListPath
+        fileListPath: found.fileListPath,
+        notes: found.notes
       };
       const count = request.query['count'];
       if (count === 'true') {
@@ -213,7 +214,8 @@ export default class DealReplicationService extends BaseService {
         cronSchedule,
         cronMaxDeals,
         cronMaxPendingDeals,
-        fileListPath
+        fileListPath,
+        notes
       } = <CreateReplicationRequest>request.body;
       this.logger.info(`Received request to replicate dataset "${datasetId}" from client "${client}.`);
       let realDatasetId = datasetId;
@@ -251,6 +253,7 @@ export default class DealReplicationService extends BaseService {
       replicationRequest.cronMaxDeals = cronMaxDeals;
       replicationRequest.cronMaxPendingDeals = cronMaxPendingDeals;
       replicationRequest.fileListPath = fileListPath;
+      replicationRequest.notes = notes;
       try {
         await replicationRequest.save();
         // Create a deal tracking request if not exist
