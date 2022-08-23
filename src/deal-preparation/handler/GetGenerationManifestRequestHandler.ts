@@ -5,7 +5,7 @@ import ErrorCode from '../model/ErrorCode';
 import sendError from './ErrorHandler';
 import { GeneratedFileList } from '../../common/model/OutputFileList';
 
-function getContentsAndGroupings (generatedFileList: GeneratedFileList) {
+export function getContentsAndGroupings (generatedFileList: GeneratedFileList) {
   const contents: any = {};
   const groupings: any = {};
   for (const fileInfo of generatedFileList) {

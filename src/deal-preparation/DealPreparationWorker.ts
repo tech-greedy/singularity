@@ -1,5 +1,3 @@
-import { onExit, readableToString, streamEnd, streamWrite } from '@rauschma/stringio';
-import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
 import { randomUUID } from 'crypto';
 import BaseService from '../common/BaseService';
 import Datastore from '../common/Datastore';
@@ -22,6 +20,10 @@ import pAll from 'p-all';
 import * as stream from 'stream';
 import { TransformCallback } from 'stream';
 import config from '../common/Config';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+import { ChildProcessPromise, ErrorWithOutput, Output, spawn } from 'promisify-child-process';
+
+type ChildProcessOutput = Output;
 
 interface IpldNode {
   Name: string,
@@ -216,7 +218,7 @@ export default class DealPreparationWorker extends BaseService {
   }
 
   private async generate (request: GenerationRequest, fileList: FileList, tmpDir: string | undefined)
-    : Promise<[stdout: string, stderr: string, statusCode: number | null, signalCode: NodeJS.Signals | null]> {
+    : Promise<ChildProcessOutput> {
     await fs.mkdir(request.outDir, { recursive: true });
     if (tmpDir) {
       if (request.path.startsWith('s3://')) {
@@ -248,12 +250,12 @@ export default class DealPreparationWorker extends BaseService {
         End: file.end
       })));
     }
-    const [stdout, stderr, exitCode, signalCode] = await DealPreparationWorker.invokeGenerateCar(request.id, input, request.outDir, tmpDir ?? request.path);
-    this.logger.debug(`Child process finished.`, { stdout, stderr, exitCode, signalCode });
-    return [stdout, stderr, exitCode, signalCode];
+    const output = await DealPreparationWorker.invokeGenerateCar(request.id, input, request.outDir, tmpDir ?? request.path);
+    this.logger.debug(`Child process finished.`, output);
+    return output;
   }
 
-  private static async checkPauseOrRemove (generationId: string, child: ChildProcessWithoutNullStreams) {
+  private static async checkPauseOrRemove (generationId: string, child: ChildProcessPromise) {
     const generation = await Datastore.GenerationRequestModel.findById(generationId);
     if (generation?.status !== 'active') {
       try {
@@ -269,28 +271,23 @@ export default class DealPreparationWorker extends BaseService {
   }
 
   public static async invokeGenerateCar (generationId: string | undefined, input: string, outDir: string, p: string)
-    : Promise<[stdout: string, stderr: string, statusCode: number | null, signalCode: NodeJS.Signals | null]> {
+    : Promise<ChildProcessOutput> {
     const cmd = GenerateCar.path!;
     const args = ['-o', outDir, '-p', p];
     const child = spawn(cmd, args, {
-      stdio: ['pipe', 'pipe', 'pipe']
+      encoding: 'utf8',
+      maxBuffer: config.getOrDefault('deal_preparation_worker.max_buffer', 1024 * 1024 * 1024)
     });
-    (async () => {
-      await streamWrite(child.stdin, input);
-      await streamEnd(child.stdin);
-    })();
     if (generationId) {
       DealPreparationWorker.checkPauseOrRemove(generationId, child);
     }
-    const stdout = await readableToString(child.stdout);
-    let stderr = '';
-    child.stderr.on('data', function (chunk) {
-      stderr += chunk;
-    });
+    child.stdin!.write(input);
+    child.stdin!.end();
     try {
-      await onExit(child);
-    } catch (_) {}
-    return [stdout, stderr, child.exitCode, child.signalCode];
+      return await child;
+    } catch (error: any) {
+      return <ErrorWithOutput>error;
+    }
   }
 
   private async pollScanningWork (): Promise<boolean> {
@@ -345,14 +342,14 @@ export default class DealPreparationWorker extends BaseService {
         timeSpentInMs = performance.now() - timeSpentInMs;
 
         // Parse the output and update the database
-        const [stdout, stderr, statusCode, signalCode] = result!;
-        if (statusCode !== 0) {
-          this.logger.error(`${this.workerId} - Encountered an error.`, { stderr, statusCode, signalCode });
+        const { stdout, stderr, code } = result!;
+        if (code !== 0) {
+          this.logger.error(`${this.workerId} - Encountered an error.`, result);
           await Datastore.GenerationRequestModel.findOneAndUpdate({ _id: newGenerationWork.id, status: 'active' }, { status: 'error', errorMessage: stderr, workerId: null }, { projection: { _id: 1 } });
           return true;
         }
 
-        const output :GenerateCarOutput = JSON.parse(stdout);
+        const output :GenerateCarOutput = JSON.parse(stdout?.toString() ?? '');
         const carFile = path.join(newGenerationWork.outDir, output.PieceCid + '.car');
         const carFileStat = await fs.stat(carFile);
         const fileMap = new Map<string, FileInfo>();

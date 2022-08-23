@@ -78,7 +78,7 @@ program.command('daemon')
         });
         if (config.get('deal_preparation_service.enabled')) {
           if (config.get('deal_preparation_service.enable_cleanup')) {
-            await DealPreparationService.cleanupIncompleteFiles();
+            await DealPreparationService.cleanupIncompleteFiles(Logger.getLogger(Category.Default));
           }
           workers.push([cluster.fork(), 'deal_preparation_service']);
         }

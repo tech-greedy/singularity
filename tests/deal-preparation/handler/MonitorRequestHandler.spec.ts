@@ -18,15 +18,15 @@ describe('MonitorRequestHandler', () => {
   });
   describe('GET /monitor', () => {
     it('should return worker stats', async () => {
-      const now = Date.now();
       await Datastore.HealthCheckModel.create({
         workerId: 'workerId',
         downloadSpeed: 100,
-        updatedAt: now,
       });
       const response = await (supertest(service['app'])).get('/monitor');
       expect(response.status).toEqual(200);
-      expect(response.body).toEqual({});
+      expect(response.body).toEqual([jasmine.objectContaining({
+        downloadSpeed: 100, workerId: 'workerId'
+      })]);
     })
   });
 })

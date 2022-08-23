@@ -14,6 +14,7 @@ import { FileInfo } from './common/model/InputFileList';
 import TaskQueue from '@goodware/task-queue';
 import { randomUUID } from 'crypto';
 import GenerateCar from './common/GenerateCar';
+import { getContentsAndGroupings } from './deal-preparation/handler/GetGenerationManifestRequestHandler';
 
 const version = packageJson.version;
 const program = new Command();
@@ -95,7 +96,10 @@ program.name('singularity-prepare')
             Start: file.start,
             End: file.end
           })));
-          [stdout, stderr, exitCode] = await DealPreparationWorker.invokeGenerateCar(undefined, input, outDir, tmpDir ?? p);
+          const output = await DealPreparationWorker.invokeGenerateCar(undefined, input, outDir, tmpDir ?? p);
+          stdout = output.stdout?.toString() ?? '';
+          stderr = output.stderr?.toString() ?? '';
+          exitCode = output.code;
         } finally {
           if (tmpDir) {
             await fs.rm(tmpDir, { recursive: true });
@@ -117,7 +121,7 @@ program.name('singularity-prepare')
         }
         const generatedFileList = DealPreparationWorker.handleGeneratedFileList(fileMap, output.CidMap);
 
-        const [contents, groupings] = DealPreparationService.getContentsAndGroupings(generatedFileList);
+        const [contents, groupings] = getContentsAndGroupings(generatedFileList);
 
         const result = {
           piece_cid: output.PieceCid,
