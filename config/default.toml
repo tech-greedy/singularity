@@ -44,6 +44,8 @@ local_port = 37000
 enabled = true
 # Number of workers to start, one worker consumes 2 - 2.5 CPUs
 num_workers = 4
+# Buffer for child spawn
+max_buffer = 1073741824
 
 [index_service]
 enabled = true

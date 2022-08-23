@@ -13,6 +13,7 @@ import InputFileList, { FileInfo } from './model/InputFileList';
 import OutputFileList, { GeneratedFileInfo } from './model/OutputFileList';
 import config, { getConfigDir } from './Config';
 import HealthCheck from './model/HealthCheck';
+import { ObjectId } from 'mongodb';
 
 export default class Datastore {
   private static logger = Logger.getLogger(Category.Database);
@@ -270,5 +271,28 @@ export default class Datastore {
   public static async connect (): Promise<void> {
     await Datastore.connectMongoDb(config.connection.database);
     Datastore.setupDataModels();
+  }
+
+  public static async findScanningRequest (idOrName: string) {
+    return await Datastore.ScanningRequestModel.findOne({ name: idOrName }) ??
+      (ObjectId.isValid(idOrName) ? await Datastore.ScanningRequestModel.findById(idOrName) : null);
+  }
+
+  public static async findGenerationRequest (id: string, dataset: string | undefined) {
+    let found;
+    const idIsInt = !isNaN(parseInt(id));
+    if (ObjectId.isValid(id)) {
+      found = await Datastore.GenerationRequestModel.findById(id);
+    } else if (idIsInt) {
+      found = await Datastore.GenerationRequestModel.findOne({ index: id, datasetName: dataset }) ??
+        await Datastore.GenerationRequestModel.findOne({ index: id, datasetId: dataset });
+    } else {
+      return undefined;
+    }
+    if (!found) {
+      return undefined;
+    }
+
+    return found;
   }
 }
