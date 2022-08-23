@@ -122,9 +122,9 @@
       "text",
       "html"
     ],
-    "lines": 75,
-    "functions": 75,
-    "statements": 75,
+    "lines": 85,
+    "functions": 70,
+    "statements": 85,
     "per-file": true
   }
 }
