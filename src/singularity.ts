@@ -401,11 +401,13 @@ resume.command('generation').alias('gen').description('Resume a paused data gene
 
 retry.command('generation').alias('gen').description('Retry an errored data generation request')
   .option('--json', 'Output with JSON format')
+  .option('--force', 'Force retry the generation even if the generation has completed')
   .argument('<dataset>', 'The dataset id or name')
   .addArgument(new Argument('<generation_id>', 'The id or index for the generation request').argOptional())
   .action(async (dataset, generation, options) => {
     await initializeConfig(false);
-    const response = await UpdateGenerationState(dataset, generation, 'retry');
+    const action = options.force ? 'forceRetry' : 'retry';
+    const response = await UpdateGenerationState(dataset, generation, action);
     CliUtil.renderResponse(response.data, options.json);
   });
 

@@ -46,7 +46,7 @@ export default async function handleUpdateGenerationRequest (this: DealPreparati
       }
     },
     forceRetry: {
-      condition: { status: { in: ['completed', 'error'] } },
+      condition: { status: { $in: ['completed', 'error'] } },
       update: {
         status: 'active',
         $unset: {
