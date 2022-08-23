@@ -13,6 +13,5 @@ export default interface GenerationRequest {
   pieceCid?: string,
   pieceSize?: number,
   filenameOverride?: string, // when the car name is different from cid
-  tmpDir?: string,
-  skipInaccessibleFiles?: boolean,
+  tmpDir?: string
 }

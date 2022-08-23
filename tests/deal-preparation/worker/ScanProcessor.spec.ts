@@ -50,7 +50,7 @@ describe('ScanProcessor', () => {
         maxSize: 16,
         status: 'active'
       });
-      await scan(Logger.getLogger(Category.Default), created, new Scanner());
+      await scan(Logger.getLogger(Category.Default), created);
       const found = await Datastore.ScanningRequestModel.findById(created.id);
       expect(found!.status).toEqual('completed');
       expect(await Datastore.GenerationRequestModel.find({ datasetId: created.id })).toHaveSize(4);
@@ -86,7 +86,7 @@ describe('ScanProcessor', () => {
           size: 27,
         }],
       });
-      await scan(Logger.getLogger(Category.Default), scanning, new Scanner());
+      await scan(Logger.getLogger(Category.Default), scanning);
       expect((await Datastore.ScanningRequestModel.findById(scanning.id))!.scanned).toEqual(5);
       expect(await Datastore.GenerationRequestModel.findById(active.id)).not.toBeNull();
       const requests = await Datastore.GenerationRequestModel.find({}, null, { sort: { index: 1 } });
@@ -153,7 +153,7 @@ describe('ScanProcessor', () => {
           end: 21,
         }],
       });
-      await scan(Logger.getLogger(Category.Default), scanning, new Scanner());
+      await scan(Logger.getLogger(Category.Default), scanning);
       expect(await Datastore.GenerationRequestModel.findById(pending.id)).toBeNull();
       expect(await Datastore.GenerationRequestModel.findById(active.id)).not.toBeNull();
       expect(await Datastore.InputFileListModel.findById(pendingList.id)).toBeNull();
@@ -168,21 +168,21 @@ describe('ScanProcessor', () => {
     })
     it('should stop scanning when the request is removed', async () => {
       const scanning = await createLargeFileListRequest();
-      const scanPromise = scan(Logger.getLogger(Category.Default), scanning, new Scanner());
+      const scanPromise = scan(Logger.getLogger(Category.Default), scanning);
       await Datastore.ScanningRequestModel.findByIdAndDelete(scanning.id);
       await scanPromise;
       expect((await Datastore.GenerationRequestModel.find()).length).toEqual(0);
     })
     it('should stop scanning when the request is paused', async () => {
       const scanning = await createLargeFileListRequest();
-      const scanPromise = scan(Logger.getLogger(Category.Default), scanning, new Scanner());
+      const scanPromise = scan(Logger.getLogger(Category.Default), scanning);
       await Datastore.ScanningRequestModel.findByIdAndUpdate(scanning.id, {status: 'paused'});
       await scanPromise;
       expect((await Datastore.GenerationRequestModel.find()).length).toEqual(1);
     })
     it('should work with >1000 fileList', async () => {
       const scanning = await createLargeFileListRequest();
-      await scan(Logger.getLogger(Category.Default), scanning, new Scanner());
+      await scan(Logger.getLogger(Category.Default), scanning);
       expect((await Datastore.ScanningRequestModel.findById(scanning.id))!.scanned).toEqual(5000);
       const requests = await Datastore.GenerationRequestModel.find({}, null, { sort: { index: 1 } });
       expect(requests.length).toEqual(1);
@@ -203,7 +203,7 @@ describe('ScanProcessor', () => {
         outDir: '.',
         tmpDir: './tmpdir'
       })
-      await scan(Logger.getLogger(Category.Default), scanning, new Scanner());
+      await scan(Logger.getLogger(Category.Default), scanning);
       expect((await Datastore.ScanningRequestModel.findById(scanning.id))!.scanned).toEqual(6);
       const requests = await Datastore.GenerationRequestModel.find({}, null, { sort: { index: 1 } });
       /**

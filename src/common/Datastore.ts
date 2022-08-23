@@ -209,8 +209,7 @@ export default class Datastore {
       pieceCid: Schema.Types.String,
       pieceSize: Schema.Types.Number,
       filenameOverride: Schema.Types.String,
-      tmpDir: Schema.Types.String,
-      skipInaccessibleFiles: Schema.Types.Boolean
+      tmpDir: Schema.Types.String
     }, {
       timestamps: true
     });
@@ -234,8 +233,7 @@ export default class Datastore {
       status: Schema.Types.String,
       errorMessage: Schema.Types.String,
       tmpDir: Schema.Types.String,
-      scanned: Schema.Types.Number,
-      skipInaccessibleFiles: Schema.Types.Boolean,
+      scanned: Schema.Types.Number
     }, {
       timestamps: true
     });

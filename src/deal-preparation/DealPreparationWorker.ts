@@ -7,7 +7,6 @@ import scan from './worker/ScanProcessor';
 import TrafficMonitor from './worker/TrafficMonitor';
 import { processGeneration } from './worker/GenerationProcessor';
 import { AbortSignal } from '../common/AbortSignal';
-import Scanner from './scanner/Scanner';
 
 export default class DealPreparationWorker extends BaseService {
   public readonly workerId: string;
@@ -40,11 +39,7 @@ export default class DealPreparationWorker extends BaseService {
     if (newScanningWork) {
       this.logger.info(`${this.workerId} - Polled a new scanning request.`, { name: newScanningWork.name, id: newScanningWork.id });
       try {
-        const scanner = new Scanner();
-        if (newScanningWork.path.startsWith('s3://')) {
-          await scanner.initializeS3Client(newScanningWork.path);
-        }
-        await scan(this.logger, newScanningWork, scanner);
+        await scan(this.logger, newScanningWork);
       } catch (err) {
         if (err instanceof Error) {
           this.logger.error(`${this.workerId} - Encountered an error.`, err);

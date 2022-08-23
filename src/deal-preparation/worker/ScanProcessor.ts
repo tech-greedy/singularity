@@ -45,8 +45,7 @@ async function createGenerationRequest (request: ScanningRequest, index: number,
     outDir: request.outDir,
     tmpDir: request.tmpDir,
     index,
-    status: 'created',
-    skipInaccessibleFiles: request.skipInaccessibleFiles,
+    status: 'created'
   });
   logger.info('Created a new generation request.', {
     id: request.id,
@@ -86,7 +85,7 @@ async function createGenerationRequest (request: ScanningRequest, index: number,
   await Datastore.ScanningRequestModel.findByIdAndUpdate(request.id, { $inc: { scanned: fileList.length } });
 }
 
-export default async function scan (logger: winston.Logger, request: ScanningRequest, scanner: Scanner): Promise<void> {
+export default async function scan (logger: winston.Logger, request: ScanningRequest): Promise<void> {
   logger.info(`Started scanning.`, {
     id: request.id,
     name: request.name,
@@ -103,7 +102,7 @@ export default async function scan (logger: winston.Logger, request: ScanningReq
     index,
     lastFileInfo
   } = await findLastGeneration(request, logger);
-  for await (const fileList of scanner.scan(request.path, request.minSize, request.maxSize, lastFileInfo, logger)) {
+  for await (const fileList of Scanner.scan(request.path, request.minSize, request.maxSize, lastFileInfo, logger)) {
     if (!await Datastore.ScanningRequestModel.findById(request.id)) {
       logger.info('The scanning request has been removed. Scanning stopped.', {
         id: request.id,

@@ -2,12 +2,11 @@ import { FileInfo, FileList } from '../../common/model/InputFileList';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
 import { rrdir } from './rrdir';
-import { S3Client, ListObjectsV2Command, ListObjectsV2CommandOutput, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, ListObjectsV2Command, ListObjectsV2CommandOutput } from '@aws-sdk/client-s3';
 import axios from 'axios';
 import NoopRequestSigner from '../../common/s3/NoopRequestSigner';
 import { getRetryStrategy } from '../../common/s3/S3RetryStrategy';
 import winston from 'winston';
-import fs, { constants } from 'fs-extra';
 
 interface Entry {
   path: string,
@@ -16,17 +15,6 @@ interface Entry {
 }
 
 export default class Scanner {
-  private s3Client : S3Client | undefined;
-
-  public async initializeS3Client (path: string) :Promise<void> {
-    if (path.startsWith('s3://')) {
-      const s3Path = path.slice('s3://'.length);
-      const bucketName = s3Path.split('/')[0];
-      const region = await Scanner.detectS3Region(bucketName);
-      this.s3Client = new S3Client({ region, signer: new NoopRequestSigner(), retryStrategy: getRetryStrategy() });
-    }
-  }
-
   public static async detectS3Region (bucketName: string) : Promise<string> {
     const response = await axios.head(`https://s3.amazonaws.com/${encodeURIComponent(bucketName)}`, {
       validateStatus: status => status < 400
@@ -38,10 +26,12 @@ export default class Scanner {
     return region;
   }
 
-  public async * listS3Path (path: string, startFrom?: Entry, logger?: winston.Logger) : AsyncGenerator<Entry> {
+  public static async * listS3Path (path: string, startFrom?: Entry, logger?: winston.Logger) : AsyncGenerator<Entry> {
     const s3Path = path.slice('s3://'.length);
     const bucketName = s3Path.split('/')[0];
     const prefix = s3Path.slice(bucketName.length + 1);
+    const region = await Scanner.detectS3Region(bucketName);
+    const client = new S3Client({ region, signer: new NoopRequestSigner(), retryStrategy: getRetryStrategy() });
     let token: string | undefined;
     if (startFrom) {
       yield startFrom;
@@ -53,7 +43,7 @@ export default class Scanner {
         StartAfter: startFrom?.path?.slice('s3://'.length + bucketName.length + 1),
         ContinuationToken: token
       });
-      const response: ListObjectsV2CommandOutput = await this.s3Client!.send(command);
+      const response: ListObjectsV2CommandOutput = await client.send(command);
       token = response.NextContinuationToken;
       const contents = response.Contents!;
       if (logger) {
@@ -89,64 +79,23 @@ export default class Scanner {
     }
   }
 
-  private static async isLocalPathAccessible (path: string) : Promise<boolean> {
-    try {
-      await fs.access(path, constants.R_OK);
-    } catch {
-      return false;
-    }
-
-    return true;
-  }
-
-  private async isS3PathAccessible (path: string) : Promise<boolean> {
-    const s3Path = path.slice('s3://'.length);
-    const bucketName = s3Path.split('/')[0];
-    const key = s3Path.slice(bucketName.length + 1);
-    const command = new HeadObjectCommand({
-      Bucket: bucketName,
-      Key: key
-    });
-    try {
-      await this.s3Client!.send(command);
-    } catch (error) {
-      return false;
-    }
-
-    return true;
-  }
-
-  private isPathAccessible (path: string) : Promise<boolean> {
-    if (path.startsWith('s3://')) {
-      return this.isS3PathAccessible(path);
-    } else {
-      return Scanner.isLocalPathAccessible(path);
-    }
-  }
-
-  public async * scan (root: string, minSize: number, maxSize: number,
-    last: FileInfo | undefined, logger: winston.Logger, skipInaccessibleFiles?: boolean)
-    : AsyncGenerator<FileList> {
+  public static async * scan (root: string, minSize: number, maxSize: number, last?: FileInfo, logger?: winston.Logger): AsyncGenerator<FileList> {
     let currentList: FileList = [];
     let currentSize = 0;
     let entries;
     if (root.startsWith('s3://')) {
       if (last) {
-        entries = this.listS3Path(root, {
+        entries = Scanner.listS3Path(root, {
           path: last.path,
           size: last.size
         }, logger);
       } else {
-        entries = this.listS3Path(root, undefined, logger);
+        entries = Scanner.listS3Path(root, undefined, logger);
       }
     } else {
       entries = Scanner.listPath(root, last?.path);
     }
     for await (const entry of entries) {
-      if (skipInaccessibleFiles && !await this.isPathAccessible(entry.path)) {
-        logger.warn(`Skipping inaccessible file ${entry.path}`);
-        continue;
-      }
       if (last && last.path === entry.path) {
         if (last.end === undefined || last.end === last.size) {
           last = undefined;
