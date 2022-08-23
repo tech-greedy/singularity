@@ -193,7 +193,7 @@ async function moveToTmpdir (
   return moveAborted;
 }
 
-async function generate (logger: winston.Logger, request: GenerationRequest, fileList: FileList, tmpDir: string | undefined)
+export async function generate (logger: winston.Logger, request: GenerationRequest, fileList: FileList, tmpDir: string | undefined)
   : Promise<ChildProcessOutput> {
   logger.debug(`Spawning generate-car.`, {
     outPath: request.outDir,
