@@ -114,6 +114,7 @@ go-bodyshop/bodyshop.exe
 .singularity
 tmpdir
 tmp
+outDir
 
 # Unit test results
 nunitresults.xml

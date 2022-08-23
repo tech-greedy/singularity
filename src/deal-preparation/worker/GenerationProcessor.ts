@@ -76,7 +76,7 @@ export async function processGeneration (
 
   // Handle the error and update the database
   if (code !== 0) {
-    logger.error(`Encountered an error.`, result);
+    logger.error(`${worker.workerId} Encountered an error.`, result);
     await Datastore.GenerationRequestModel.findOneAndUpdate({
       _id: newGenerationWork.id,
       status: 'active'
@@ -105,7 +105,7 @@ export async function processGeneration (
 
   // Check if the scanning request is still there
   if (!await Datastore.ScanningRequestModel.findById(newGenerationWork.datasetId)) {
-    logger.info('Scanning request has been removed. Give up updating the generation request', {
+    logger.info(`${worker.workerId} Scanning request has been removed. Give up updating the generation request`, {
       datasetId: newGenerationWork.datasetId,
       datasetName: newGenerationWork.datasetName
     });
@@ -127,7 +127,7 @@ export async function processGeneration (
       upsert: true,
       projection: { _id: 1 }
     });
-    logger.debug('Created new OUTPUT file list for the generation request.', {
+    logger.debug(`${worker.workerId} Created new OUTPUT file list for the generation request.`, {
       id: newGenerationWork.id,
       name: newGenerationWork.datasetName,
       index: newGenerationWork.index,
@@ -149,7 +149,7 @@ export async function processGeneration (
     projection: { _id: 1 }
   });
 
-  logger.info(`Finished Generation of dataset.`,
+  logger.info(`${worker.workerId} Finished Generation of dataset.`,
     {
       id: newGenerationWork.id,
       datasetName: newGenerationWork.datasetName,
@@ -224,7 +224,7 @@ async function isGenerationRequestNoLongerActive (id: string) : Promise<boolean>
   return (await Datastore.GenerationRequestModel.findById(id))?.status !== 'active';
 }
 
-async function invokeGenerateCar (generationId: string | undefined, input: string, outDir: string, p: string)
+export async function invokeGenerateCar (generationId: string | undefined, input: string, outDir: string, p: string)
   : Promise<ChildProcessOutput> {
   const cmd = GenerateCar.path!;
   const args = ['-o', outDir, '-p', p];
@@ -259,7 +259,7 @@ async function checkPauseOrRemove (generationId: string, child: ChildProcessProm
   setTimeout(() => checkPauseOrRemove(generationId, child), 5000);
 }
 
-function handleGeneratedFileList (
+export function handleGeneratedFileList (
   fileMap: Map<string, FileInfo>,
   cidMap: CidMapType) : GeneratedFileList {
   const list: GeneratedFileList = [];

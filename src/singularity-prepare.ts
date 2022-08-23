@@ -7,7 +7,6 @@ import path from 'path';
 import xbytes from 'xbytes';
 import DealPreparationService from './deal-preparation/DealPreparationService';
 import Scanner from './deal-preparation/scanner/Scanner';
-import DealPreparationWorker, { GenerateCarOutput } from './deal-preparation/DealPreparationWorker';
 import { FileInfo } from './common/model/InputFileList';
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
@@ -15,6 +14,9 @@ import TaskQueue from '@goodware/task-queue';
 import { randomUUID } from 'crypto';
 import GenerateCar from './common/GenerateCar';
 import { getContentsAndGroupings } from './deal-preparation/handler/GetGenerationManifestRequestHandler';
+import { moveFileList, moveS3FileList } from './deal-preparation/worker/MoveProcessor';
+import Logger, { Category } from './common/Logger';
+import { GenerateCarOutput, handleGeneratedFileList, invokeGenerateCar } from './deal-preparation/worker/GenerationProcessor';
 
 const version = packageJson.version;
 const program = new Command();
@@ -84,9 +86,9 @@ program.name('singularity-prepare')
           await fs.mkdir(outDir, { recursive: true });
           if (tmpDir) {
             if (p.startsWith('s3://')) {
-              await DealPreparationWorker.moveS3FileList(fileList, p, tmpDir);
+              await moveS3FileList(Logger.getLogger(Category.Default), fileList, p, tmpDir);
             } else {
-              await DealPreparationWorker.moveFileList(fileList, p, tmpDir);
+              await moveFileList(Logger.getLogger(Category.Default), fileList, p, tmpDir);
             }
             tmpDir = path.resolve(tmpDir);
           }
@@ -96,7 +98,7 @@ program.name('singularity-prepare')
             Start: file.start,
             End: file.end
           })));
-          const output = await DealPreparationWorker.invokeGenerateCar(undefined, input, outDir, tmpDir ?? p);
+          const output = await invokeGenerateCar(undefined, input, outDir, tmpDir ?? p);
           stdout = output.stdout?.toString() ?? '';
           stderr = output.stderr?.toString() ?? '';
           exitCode = output.code;
@@ -119,7 +121,7 @@ program.name('singularity-prepare')
         for (const fileInfo of fileList) {
           fileMap.set(path.relative(parentPath, fileInfo.path).split(path.sep).join('/'), fileInfo);
         }
-        const generatedFileList = DealPreparationWorker.handleGeneratedFileList(fileMap, output.CidMap);
+        const generatedFileList = handleGeneratedFileList(fileMap, output.CidMap);
 
         const [contents, groupings] = getContentsAndGroupings(generatedFileList);
 
