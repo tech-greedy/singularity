@@ -192,6 +192,7 @@ Arguments:
 Options:
   -s, --deal-size <deal_size>  Target deal size, i.e. 32GiB (default: "32 GiB")
   -t, --tmp-dir <tmp_dir>      Optional temporary directory. May be useful when it is at least 2x faster than the dataset source, such as when the dataset is on network mount, and the I/O is the bottleneck
+  -f, --skip-inaccessible-files  Skip inaccessible files. Scanning may take longer to complete.
   -m, --min-ratio <min_ratio>  Min ratio of deal to sector size, i.e. 0.55
   -M, --max-ratio <max_ratio>  Max ratio of deal to sector size, i.e. 0.95
   -h, --help                   display help for command
@@ -412,6 +413,13 @@ The repo `~/.singularity` or the folder specified by `SINGULARITY_PATH` contains
 To backup, simply backup the repo folder.
 
 ## FAQ and common issues
+
+### How to handle inaccessible files
+
+Use `--skip-inaccessible-files` when creating the data preparation request `singularity prep create`.
+
+For existing generation requests, use `singularity prep retry gen --skip-inaccessible-files`,
+however this currently only works when the tmpDir is used.
 
 ### Does it work on Windows
 

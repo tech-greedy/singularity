@@ -332,14 +332,14 @@ async function UpdateScanningState (id: string, action: string): Promise<AxiosRe
   return response;
 }
 
-async function UpdateGenerationState (dataset: string, generation: string | undefined, action: string): Promise<AxiosResponse> {
+async function UpdateGenerationState (dataset: string, generation: string | undefined, update: any): Promise<AxiosResponse> {
   const url: string = config.get('connection.deal_preparation_service');
   let response!: AxiosResponse;
   try {
     if (generation) {
-      response = await axios.post(`${url}/generation/${dataset}/${generation}`, { action });
+      response = await axios.post(`${url}/generation/${dataset}/${generation}`, update);
     } else {
-      response = await axios.post(`${url}/generation/${dataset}`, { action });
+      response = await axios.post(`${url}/generation/${dataset}`, update);
     }
   } catch (error) {
     CliUtil.renderErrorAndExit(error);
@@ -387,7 +387,7 @@ pause.command('generation').alias('gen').description('Pause an active data gener
   .addArgument(new Argument('<generation_id>', 'The id or index for the generation request').argOptional())
   .action(async (dataset, generation, options) => {
     await initializeConfig(false);
-    const response = await UpdateGenerationState(dataset, generation, 'pause');
+    const response = await UpdateGenerationState(dataset, generation, { action: 'pause' });
     CliUtil.renderResponse(response.data, options.json);
   });
 
@@ -397,19 +397,24 @@ resume.command('generation').alias('gen').description('Resume a paused data gene
   .addArgument(new Argument('<generation_id>', 'The id or index for the generation request').argOptional())
   .action(async (dataset, generation, options) => {
     await initializeConfig(false);
-    const response = await UpdateGenerationState(dataset, generation, 'resume');
+    const response = await UpdateGenerationState(dataset, generation, { action: 'resume' });
     CliUtil.renderResponse(response.data, options.json);
   });
 
 retry.command('generation').alias('gen').description('Retry an errored data generation request')
   .option('--json', 'Output with JSON format')
   .option('--force', 'Force retry the generation even if the generation has completed')
+  .option('-f, --skip-inaccessible-files', 'Skip inaccessible files. This may lead to a smaller CAR file being generated.')
   .argument('<dataset>', 'The dataset id or name')
   .addArgument(new Argument('<generation_id>', 'The id or index for the generation request').argOptional())
   .action(async (dataset, generation, options) => {
     await initializeConfig(false);
     const action = options.force ? 'forceRetry' : 'retry';
-    const response = await UpdateGenerationState(dataset, generation, action);
+    const update = {
+      action,
+      skipInaccessibleFiles: options.skipInaccessibleFiles
+    };
+    const response = await UpdateGenerationState(dataset, generation, update);
     CliUtil.renderResponse(response.data, options.json);
   });
 

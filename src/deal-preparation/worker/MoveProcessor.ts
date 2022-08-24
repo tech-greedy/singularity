@@ -81,6 +81,7 @@ export async function moveS3FileList (
           if (error.Code !== 'AccessDenied' || !skipInaccessibleFiles) {
             throw error;
           }
+          logger.info(`Skipped inaccessible file - ${fileInfo.path}`);
           skipped.add(fileInfo);
         }
       };
@@ -132,6 +133,7 @@ export async function moveFileList (logger: winston.Logger, fileList: FileList, 
       if (error.errno !== -13 || !skipInaccessibleFiles) {
         throw error;
       }
+      logger.info(`Skipped inaccessible file - ${fileInfo.path}`);
       skipped.add(fileInfo);
     }
   }

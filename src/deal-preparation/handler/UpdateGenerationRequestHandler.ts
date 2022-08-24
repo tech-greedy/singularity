@@ -8,7 +8,7 @@ import UpdateGenerationRequest from '../model/UpdateGenerationRequest';
 export default async function handleUpdateGenerationRequest (this: DealPreparationService, request: Request, response: Response) {
   const dataset = request.params['dataset'];
   const id = request.params['id'];
-  const { action, tmpDir, outDir } = <UpdateGenerationRequest>request.body;
+  const { action, tmpDir, outDir, skipInaccessibleFiles } = <UpdateGenerationRequest>request.body;
   this.logger.info(`Received request to update dataset preparation request.`, {
     dataset,
     id,
@@ -42,7 +42,10 @@ export default async function handleUpdateGenerationRequest (this: DealPreparati
         $unset: {
           errorMessage: 1
         },
-        workerId: null
+        workerId: null,
+        $set: {
+          skipInaccessibleFiles
+        }
       }
     },
     forceRetry: {
@@ -52,7 +55,10 @@ export default async function handleUpdateGenerationRequest (this: DealPreparati
         $unset: {
           errorMessage: 1
         },
-        workerId: null
+        workerId: null,
+        $set: {
+          skipInaccessibleFiles
+        }
       }
     }
   };
