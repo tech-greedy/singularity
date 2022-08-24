@@ -3,7 +3,6 @@ import DealPreparationService from '../../src/deal-preparation/DealPreparationSe
 import Utils from '../Utils';
 import fs from 'fs/promises';
 import { sleep } from '../../src/common/Util';
-import DealPreparationWorker from '../../src/deal-preparation/DealPreparationWorker';
 
 describe('DealPreparationService', () => {
   let service: DealPreparationService;

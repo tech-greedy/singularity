@@ -107,20 +107,20 @@ describe('DealPreparationWorker', () => {
         errorMessage: jasmine.stringMatching(/no such file or directory|cannot find the file/)
       }));
     })
-  })
-  it('should update the database with error message if it counter any error', async () => {
-    const created = await Datastore.ScanningRequestModel.create({
-      name: 'name',
-      path: '/home/shane/test_folder_not_exist',
-      minSize: 12,
-      maxSize: 16,
-      status: 'active'
-    });
-    expect(await worker['pollWork']()).toEqual(true);
-    expect(await Datastore.ScanningRequestModel.findById(created.id)).toEqual(jasmine.objectContaining({
-      status: 'error',
-      errorMessage: jasmine.stringContaining('ENOENT')
-    }))
+    it('should update the database with error message if it counter any error', async () => {
+      const created = await Datastore.ScanningRequestModel.create({
+        name: 'name',
+        path: '/home/shane/test_folder_not_exist',
+        minSize: 12,
+        maxSize: 16,
+        status: 'active'
+      });
+      expect(await worker['pollWork']()).toEqual(true);
+      expect(await Datastore.ScanningRequestModel.findById(created.id)).toEqual(jasmine.objectContaining({
+        status: 'error',
+        errorMessage: jasmine.stringContaining('ENOENT')
+      }))
+    })
   })
   it('should update the database with error message if processGeneration throws any error', async () => {
     spyOn(GenerationProcessor, 'processGeneration').and.throwError('custom error');
