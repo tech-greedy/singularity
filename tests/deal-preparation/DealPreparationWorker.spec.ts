@@ -149,4 +149,7 @@ describe('DealPreparationWorker', () => {
     await worker['pollGenerationWork']();
     expect(await fs.pathExists(tmpDir)).toBe(false);
   })
+  it('should not throw when start', () => {
+    new DealPreparationWorker().start();
+  })
 })
