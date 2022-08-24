@@ -85,7 +85,8 @@ export default async function handleCreatePreparationRequest (this: DealPreparat
     name,
     path,
     outDir,
-    tmpDir
+    tmpDir,
+    skipInaccessibleFiles
   } = requestBody;
   this.logger.info(`Received request to start preparing dataset.`, request.body);
   const { errorCode, minSize, maxSize } = await validateCreatePreparationRequest(
@@ -104,6 +105,7 @@ export default async function handleCreatePreparationRequest (this: DealPreparat
   scanningRequest.outDir = outDir;
   scanningRequest.tmpDir = tmpDir;
   scanningRequest.scanned = 0;
+  scanningRequest.skipInaccessibleFiles = skipInaccessibleFiles;
   try {
     this.logger.info(`Creating dataset preparation request.`, { scanningRequest });
     await scanningRequest.save();

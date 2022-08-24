@@ -193,6 +193,7 @@ preparation.command('create').description('Start deal preparation for a local da
   .argument('<outDir>', 'The output Directory to save CAR files')
   .option('-s, --deal-size <deal_size>', 'Target deal size, i.e. 32GiB', '32 GiB')
   .option('-t, --tmp-dir <tmp_dir>', 'Optional temporary directory. May be useful when it is at least 2x faster than the dataset source, such as when the dataset is on network mount, and the I/O is the bottleneck')
+  .option('-f, --skip-inaccessible-files', 'Skip inaccessible files. Scanning may take longer to complete.')
   .addOption(new Option('-m, --min-ratio <min_ratio>', 'Min ratio of deal to sector size, i.e. 0.55').argParser(parseFloat))
   .addOption(new Option('-M, --max-ratio <max_ratio>', 'Max ratio of deal to sector size, i.e. 0.95').argParser(parseFloat))
   .action(async (name, p: string, outDir, options) => {
@@ -220,7 +221,8 @@ preparation.command('create').description('Start deal preparation for a local da
         outDir: path.resolve(outDir),
         minRatio: options.minRatio,
         maxRatio: options.maxRatio,
-        tmpDir: options.tmpDir ? path.resolve(options.tmpDir) : undefined
+        tmpDir: options.tmpDir ? path.resolve(options.tmpDir) : undefined,
+        skipInaccessibleFiles: options.skipInaccessibleFiles
       });
     } catch (error) {
       CliUtil.renderErrorAndExit(error);
@@ -330,14 +332,14 @@ async function UpdateScanningState (id: string, action: string): Promise<AxiosRe
   return response;
 }
 
-async function UpdateGenerationState (dataset: string, generation: string | undefined, action: string): Promise<AxiosResponse> {
+async function UpdateGenerationState (dataset: string, generation: string | undefined, update: any): Promise<AxiosResponse> {
   const url: string = config.get('connection.deal_preparation_service');
   let response!: AxiosResponse;
   try {
     if (generation) {
-      response = await axios.post(`${url}/generation/${dataset}/${generation}`, { action });
+      response = await axios.post(`${url}/generation/${dataset}/${generation}`, update);
     } else {
-      response = await axios.post(`${url}/generation/${dataset}`, { action });
+      response = await axios.post(`${url}/generation/${dataset}`, update);
     }
   } catch (error) {
     CliUtil.renderErrorAndExit(error);
@@ -385,7 +387,7 @@ pause.command('generation').alias('gen').description('Pause an active data gener
   .addArgument(new Argument('<generation_id>', 'The id or index for the generation request').argOptional())
   .action(async (dataset, generation, options) => {
     await initializeConfig(false);
-    const response = await UpdateGenerationState(dataset, generation, 'pause');
+    const response = await UpdateGenerationState(dataset, generation, { action: 'pause' });
     CliUtil.renderResponse(response.data, options.json);
   });
 
@@ -395,19 +397,24 @@ resume.command('generation').alias('gen').description('Resume a paused data gene
   .addArgument(new Argument('<generation_id>', 'The id or index for the generation request').argOptional())
   .action(async (dataset, generation, options) => {
     await initializeConfig(false);
-    const response = await UpdateGenerationState(dataset, generation, 'resume');
+    const response = await UpdateGenerationState(dataset, generation, { action: 'resume' });
     CliUtil.renderResponse(response.data, options.json);
   });
 
 retry.command('generation').alias('gen').description('Retry an errored data generation request')
   .option('--json', 'Output with JSON format')
   .option('--force', 'Force retry the generation even if the generation has completed')
+  .option('-f, --skip-inaccessible-files', 'Skip inaccessible files. This may lead to a smaller CAR file being generated.')
   .argument('<dataset>', 'The dataset id or name')
   .addArgument(new Argument('<generation_id>', 'The id or index for the generation request').argOptional())
   .action(async (dataset, generation, options) => {
     await initializeConfig(false);
     const action = options.force ? 'forceRetry' : 'retry';
-    const response = await UpdateGenerationState(dataset, generation, action);
+    const update = {
+      action,
+      skipInaccessibleFiles: options.skipInaccessibleFiles
+    };
+    const response = await UpdateGenerationState(dataset, generation, update);
     CliUtil.renderResponse(response.data, options.json);
   });
 

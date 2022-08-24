@@ -30,6 +30,7 @@ describe('GenerationProcessor', () => {
       }
     }
     await fs.rm('tests/subfolder1', { recursive: true, force: true });
+    await fs.rm('unittest', { recursive: true, force: true });
     jasmine.DEFAULT_TIMEOUT_INTERVAL = defaultTimeout;
   })
 
@@ -226,6 +227,47 @@ describe('GenerationProcessor', () => {
       finished: false,
     }));
   });
+  it('should skip inaccessible files', async () => {
+    const scanning = await Datastore.ScanningRequestModel.create({
+      name: 'name',
+      status: 'completed'
+    })
+    const created = await Datastore.GenerationRequestModel.create({
+      datasetId: scanning.id,
+      datasetName: 'name',
+      path: 'unittest',
+      index: 0,
+      status: 'active',
+      outDir: '.',
+      tmpDir: './tmpdir',
+      skipInaccessibleFiles: true
+    });
+    await fs.mkdirp('unittest');
+    await fs.writeFile('unittest/test1.txt', 'test1');
+    await fs.writeFile('unittest/test2.txt', 'test2');
+    await fs.chmod('unittest/test1.txt', 0);
+    await Datastore.InputFileListModel.create({
+      generationId: created.id,
+      index: 0,
+      fileList: [
+        {
+          path: 'unittest/test1.txt',
+          size: 5,
+        },
+        {
+          path: 'unittest/test2.txt',
+          size: 5,
+        }
+      ]
+    })
+    expect(await processGeneration(worker, created)).toEqual(jasmine.objectContaining({
+      finished: true
+    }));
+    const generatedFileList = await Datastore.OutputFileListModel.findOne({
+      generatedId: created.id
+    });
+    expect(generatedFileList!.generatedFileList.some(file => file.path.includes('test1.txt'))).toBeFalse();
+  })
   it('should generate commp, car files', async () => {
     const scanning = await Datastore.ScanningRequestModel.create({
       name: 'name',

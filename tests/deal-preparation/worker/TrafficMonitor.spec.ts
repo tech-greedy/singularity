@@ -8,7 +8,6 @@ describe('TrafficMonitor', () => {
     expect(monitor.downloaded).toEqual(888);
     monitor.countNewChunk(new Int8Array(888 ));
     expect(monitor.downloaded).toEqual(888 * 2);
-    await sleep(100);
     monitor.countNewChunk(new Int8Array(888 ));
     expect(monitor.downloaded).toEqual(888 * 3);
     await sleep(1000);

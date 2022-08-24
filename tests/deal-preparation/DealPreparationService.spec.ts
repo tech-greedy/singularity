@@ -78,4 +78,7 @@ describe('DealPreparationService', () => {
       await expectAsync(DealPreparationService.cleanupIncompleteFiles(service['logger'])).toBeResolved();
     })
   })
+  it('should not throw when start', () => {
+    new DealPreparationService().start();
+  })
 });

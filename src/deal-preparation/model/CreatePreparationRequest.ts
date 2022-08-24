@@ -5,5 +5,6 @@ export default interface CreatePreparationRequest {
   outDir: string,
   minRatio?: number,
   maxRatio?: number,
-  tmpDir?: string
+  tmpDir?: string,
+  skipInaccessibleFiles?: boolean,
 }

@@ -28,6 +28,7 @@ program.name('singularity-prepare')
   .argument('<outDir>', 'The output Directory to save CAR files and manifest files')
   .option('-s, --deal-size <deal_size>', 'Target deal size, i.e. 32GiB', '32GiB')
   .option('-t, --tmp-dir <tmp_dir>', 'Optional temporary directory. May be useful when it is at least 2x faster than the dataset source, such as when the dataset is on network mount, and the I/O is the bottleneck')
+  .option('-f, --skip-inaccessible-files', 'Skip inaccessible files. Scanning may take longer to complete.')
   .addOption(new Option('-m, --min-ratio <min_ratio>', 'Min ratio of deal to sector size, i.e. 0.55').default('0.55').argParser(parseFloat))
   .addOption(new Option('-M, --max-ratio <max_ratio>', 'Max ratio of deal to sector size, i.e. 0.95').default('0.95').argParser(parseFloat))
   .addOption(new Option('-j, --parallel <parallel>', 'How many generation jobs to run at the same time').default('1'))
@@ -48,7 +49,11 @@ program.name('singularity-prepare')
     }
     const queue = new TaskQueue({ workers: parseInt(options.parallel) });
     let task;
-    for await (const fileList of Scanner.scan(p, minSize!, maxSize!)) {
+    const scanner = new Scanner();
+    if (p.startsWith('s3://')) {
+      await scanner.initializeS3Client(p);
+    }
+    for await (const fileList of scanner.scan(p, minSize!, maxSize!, undefined, Logger.getLogger(Category.Default), options.skipInaccessibleFiles)) {
       console.log('Pushed a new generation request');
       task = await queue.push(async () => {
         let tmpDir : string | undefined;

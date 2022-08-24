@@ -6,7 +6,7 @@ import fs from 'fs-extra';
 import { FileInfo, FileList } from '../../common/model/InputFileList';
 import winston from 'winston';
 import GenerationRequest from '../../common/model/GenerationRequest';
-import { moveFileList, moveS3FileList } from './MoveProcessor';
+import { moveFileList, MoveResult, moveS3FileList } from './MoveProcessor';
 import { ChildProcessPromise, ErrorWithOutput, Output, spawn } from 'promisify-child-process';
 import GenerateCar from '../../common/GenerateCar';
 import config from '../../common/Config';
@@ -15,8 +15,6 @@ import TrafficMonitor from './TrafficMonitor';
 import DealPreparationWorker from '../DealPreparationWorker';
 
 type ChildProcessOutput = Output;
-
-type Aborted = boolean;
 
 interface ProcessGenerationOutput {
   tmpDir?: string;
@@ -52,7 +50,7 @@ export async function processGeneration (
     finished: false
   };
   // Get all the file lists for this generation request, in sorted order.
-  const fileList = (await Datastore.InputFileListModel.find({
+  let fileList = (await Datastore.InputFileListModel.find({
     generationId: newGenerationWork.id
   }))
     .sort((a, b) => a.index - b.index)
@@ -61,9 +59,13 @@ export async function processGeneration (
   if (newGenerationWork.tmpDir) {
     returnValue.tmpDir = path.join(newGenerationWork.tmpDir, randomUUID());
   }
-  const moveAborted = await moveToTmpdir(logger, trafficMonitor, newGenerationWork, fileList, returnValue.tmpDir);
-  if (moveAborted) {
+  const moveResult = await moveToTmpdir(logger, trafficMonitor, newGenerationWork, fileList, returnValue.tmpDir);
+  if (moveResult.aborted) {
     return returnValue;
+  }
+
+  if (moveResult.skipped.size > 0) {
+    fileList = fileList.filter(f => !moveResult.skipped.has(f));
   }
   const result = await generate(logger, newGenerationWork, fileList, returnValue.tmpDir);
   timeSpentInMs = performance.now() - timeSpentInMs;
@@ -165,32 +167,36 @@ async function moveToTmpdir (
   trafficMonitor: TrafficMonitor,
   request: GenerationRequest,
   fileList: FileList,
-  tmpDir: string | undefined): Promise<Aborted> {
+  tmpDir: string | undefined): Promise<MoveResult> {
   await fs.mkdir(request.outDir, { recursive: true });
-  let moveAborted = false;
+  let moveResult : MoveResult = {
+    aborted: false, skipped: new Set<FileInfo>()
+  };
   if (tmpDir) {
     if (request.path.startsWith('s3://')) {
       try {
-        moveAborted = await moveS3FileList(
+        moveResult = await moveS3FileList(
           logger,
           fileList,
           request.path,
           tmpDir,
+          request.skipInaccessibleFiles,
           trafficMonitor.countNewChunk.bind(trafficMonitor),
           () => isGenerationRequestNoLongerActive(request.id));
       } finally {
         trafficMonitor.downloaded = 0;
       }
     } else {
-      moveAborted = await moveFileList(
+      moveResult = await moveFileList(
         logger,
         fileList,
         request.path,
         tmpDir,
+        request.skipInaccessibleFiles,
         () => isGenerationRequestNoLongerActive(request.id));
     }
   }
-  return moveAborted;
+  return moveResult;
 }
 
 export async function generate (logger: winston.Logger, request: GenerationRequest, fileList: FileList, tmpDir: string | undefined)
