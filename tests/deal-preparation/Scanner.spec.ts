@@ -2,7 +2,7 @@ import Scanner from '../../src/deal-preparation/scanner/Scanner';
 import path from 'path';
 import Logger, { Category } from '../../src/common/Logger';
 
-describe('Scanner', () => {
+fdescribe('Scanner', () => {
   let defaultTimeout: number;
   const gatkScanner = new Scanner();
   const fastAiScanner = new Scanner();

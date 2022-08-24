@@ -18,7 +18,8 @@ async function createLargeFileListRequest () {
   const f = async function * (): AsyncGenerator<FileList> {
     yield fileList;
   };
-  spyOn(Scanner, 'scan').and.returnValue(f());
+  const scanner = new Scanner();
+  spyOn(scanner, 'scan').and.returnValue(f());
   const scanning = await Datastore.ScanningRequestModel.create({
     name: 'name',
     path: 'tests/test_folder',
@@ -27,10 +28,10 @@ async function createLargeFileListRequest () {
     status: 'active',
     outDir: '.'
   })
-  return scanning;
+  return { scanning, scanner };
 }
 
-describe('ScanProcessor', () => {
+fdescribe('ScanProcessor', () => {
   beforeAll(async () => {
     await Utils.initDatabase();
     GenerateCar.initialize();
@@ -167,22 +168,22 @@ describe('ScanProcessor', () => {
       })])
     })
     it('should stop scanning when the request is removed', async () => {
-      const scanning = await createLargeFileListRequest();
-      const scanPromise = scan(Logger.getLogger(Category.Default), scanning, new Scanner());
+      const { scanning, scanner } = await createLargeFileListRequest();
+      const scanPromise = scan(Logger.getLogger(Category.Default), scanning, scanner);
       await Datastore.ScanningRequestModel.findByIdAndDelete(scanning.id);
       await scanPromise;
       expect((await Datastore.GenerationRequestModel.find()).length).toEqual(0);
     })
     it('should stop scanning when the request is paused', async () => {
-      const scanning = await createLargeFileListRequest();
-      const scanPromise = scan(Logger.getLogger(Category.Default), scanning, new Scanner());
+      const { scanning, scanner } = await createLargeFileListRequest();
+      const scanPromise = scan(Logger.getLogger(Category.Default), scanning, scanner);
       await Datastore.ScanningRequestModel.findByIdAndUpdate(scanning.id, {status: 'paused'});
       await scanPromise;
       expect((await Datastore.GenerationRequestModel.find()).length).toEqual(1);
     })
     it('should work with >1000 fileList', async () => {
-      const scanning = await createLargeFileListRequest();
-      await scan(Logger.getLogger(Category.Default), scanning, new Scanner());
+      const { scanning, scanner } = await createLargeFileListRequest();
+      await scan(Logger.getLogger(Category.Default), scanning, scanner);
       expect((await Datastore.ScanningRequestModel.findById(scanning.id))!.scanned).toEqual(5000);
       const requests = await Datastore.GenerationRequestModel.find({}, null, { sort: { index: 1 } });
       expect(requests.length).toEqual(1);
