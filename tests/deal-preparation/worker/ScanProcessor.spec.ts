@@ -31,7 +31,7 @@ async function createLargeFileListRequest () {
   return { scanning, scanner };
 }
 
-fdescribe('ScanProcessor', () => {
+describe('ScanProcessor', () => {
   beforeAll(async () => {
     await Utils.initDatabase();
     GenerateCar.initialize();

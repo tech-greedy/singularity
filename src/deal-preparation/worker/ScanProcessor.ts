@@ -46,7 +46,7 @@ async function createGenerationRequest (request: ScanningRequest, index: number,
     tmpDir: request.tmpDir,
     index,
     status: 'created',
-    skipInaccessibleFiles: request.skipInaccessibleFiles,
+    skipInaccessibleFiles: request.skipInaccessibleFiles
   });
   logger.info('Created a new generation request.', {
     id: request.id,
@@ -103,7 +103,7 @@ export default async function scan (logger: winston.Logger, request: ScanningReq
     index,
     lastFileInfo
   } = await findLastGeneration(request, logger);
-  for await (const fileList of scanner.scan(request.path, request.minSize, request.maxSize, lastFileInfo, logger)) {
+  for await (const fileList of scanner.scan(request.path, request.minSize, request.maxSize, lastFileInfo, logger, request.skipInaccessibleFiles)) {
     if (!await Datastore.ScanningRequestModel.findById(request.id)) {
       logger.info('The scanning request has been removed. Scanning stopped.', {
         id: request.id,

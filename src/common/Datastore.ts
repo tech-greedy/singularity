@@ -235,7 +235,7 @@ export default class Datastore {
       errorMessage: Schema.Types.String,
       tmpDir: Schema.Types.String,
       scanned: Schema.Types.Number,
-      skipInaccessibleFiles: Schema.Types.Boolean,
+      skipInaccessibleFiles: Schema.Types.Boolean
     }, {
       timestamps: true
     });

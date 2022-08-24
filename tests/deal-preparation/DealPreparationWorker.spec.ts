@@ -5,7 +5,7 @@ import fs from 'fs-extra';
 import GenerateCar from '../../src/common/GenerateCar';
 import * as GenerationProcessor from '../../src/deal-preparation/worker/GenerationProcessor';
 import { sleep } from '../../src/common/Util';
-fdescribe('DealPreparationWorker', () => {
+describe('DealPreparationWorker', () => {
   let worker: DealPreparationWorker;
   let defaultTimeout: number;
   beforeAll(async () => {

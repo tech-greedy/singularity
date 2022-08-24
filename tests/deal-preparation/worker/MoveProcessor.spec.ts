@@ -17,6 +17,28 @@ async function stream2buffer (stream: Stream): Promise<Buffer> {
 
 describe('MoveProcessor', () => {
   describe('moveFileList', () => {
+    it('should skip inaccessible files', async () => {
+      try {
+        await fs.mkdirp('/tmp/unittest');
+        await fs.writeFile('/tmp/unittest/test.txt', 'test');
+        await fs.chmod('/tmp/unittest/test.txt', 0);
+        const fileList: FileList = [
+          {
+            path: '/tmp/unittest/test.txt',
+            size: 4
+          }
+        ];
+        const parentDir = '/tmp/unittest';
+        const tmpDir = '/tmp/tmpdir';
+        const moveResult = await moveFileList(Logger.getLogger(Category.Default), fileList, parentDir, tmpDir, true);
+        expect(moveResult.aborted).toEqual(false)
+        expect(moveResult.skipped.size).toEqual(1);
+        expect(await fs.readdir(tmpDir)).toEqual([]);
+      } finally {
+        await fs.rm('/tmp/unittest', { recursive: true });
+        await fs.rm('/tmp/tmpdir', { recursive: true });
+      }
+    })
     it('should move all local files to tmpdir', async () => {
       const fileList: FileList = [
         {
@@ -41,6 +63,18 @@ describe('MoveProcessor', () => {
     })
   })
   describe('moveS3FileList', () => {
+    it('should skip moving inaccessible files', async () => {
+      const fileList: FileList = [{
+        path: 's3://lab41openaudiocorpus/test.txt',
+        size: 0
+      }];
+      const tmpDir = './moveFileList-tests-tmp2';
+      const moveResult = await moveS3FileList(Logger.getLogger(Category.Default), fileList, 's3://lab41openaudiocorpus', tmpDir, true);
+      expect(moveResult.aborted).toEqual(false)
+      expect(moveResult.skipped.size).toEqual(1);
+      expect((await fs.readdir(path.join(tmpDir, 'lab41openaudiocorpus')))).toEqual([]);
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    })
     it('should move all s3 files to tmpdir', async () => {
       const fileList: FileList = [
         {
