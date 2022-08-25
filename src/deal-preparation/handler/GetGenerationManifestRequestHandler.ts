@@ -4,6 +4,7 @@ import Datastore from '../../common/Datastore';
 import ErrorCode from '../model/ErrorCode';
 import sendError from './ErrorHandler';
 import { GeneratedFileList } from '../../common/model/OutputFileList';
+import canonicalize from 'canonicalize';
 
 export function getContentsAndGroupings (generatedFileList: GeneratedFileList) {
   const contents: any = {};
@@ -57,5 +58,5 @@ export default async function handleGetGenerationManifestRequest (this: DealPrep
     contents,
     groupings
   };
-  response.end(JSON.stringify(result));
+  response.end(canonicalize(result));
 }
