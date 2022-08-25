@@ -356,6 +356,30 @@ preparation.command('upload-manifest').description('Upload manifest to web3.stor
     }
   });
 
+preparation.command('update-generation').description('Update generation request')
+  .argument('<dataset>', 'The dataset id or name')
+  .addArgument(new Argument('<generationId>', 'The id or index for the generation request').argOptional())
+  .option('-t, --tmp-dir <tmp_dir>', 'Change the temporary directory')
+  .option('-o, --out-dir <out_dir>', 'Change the output directory')
+  .option('-f, --skip-inaccessible-files', 'Change whether to skip inaccessible files')
+  .action(async (dataset, generationId, options) => {
+    await initializeConfig(false, false);
+    if (options.tmpDir) {
+      await fs.mkdirp(options.tmpDir);
+      options.tmpDir = path.resolve(options.tmpDir);
+    }
+    if (options.outDir) {
+      await fs.mkdirp(options.outDir);
+      options.outDir = path.resolve(options.outDir);
+    }
+    const response = await UpdateGenerationState(dataset, generationId, {
+      tmpDir: options.tmpDir,
+      outDir: options.outDir,
+      skipInaccessibleFiles: options.skipInaccessibleFiles
+    });
+    CliUtil.renderResponse(response.data, options.json);
+  });
+
 preparation.command('generation-manifest').description('Get the Slingshot v3.x manifest data for a single deal generation request')
   .option('--dataset <dataset>', 'The dataset id or name, required if looking for generation request using index')
   .option('--pretty', 'Whether to add indents to output JSON')

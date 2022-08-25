@@ -3,6 +3,7 @@ import ErrorCode, { ErrorMessage } from '../../../src/deal-preparation/model/Err
 import Datastore from '../../../src/common/Datastore';
 import DealPreparationService from '../../../src/deal-preparation/DealPreparationService';
 import Utils from '../../Utils';
+import fs from 'fs-extra';
 
 describe('UpdateGenerationRequestHandler', () => {
   let service: DealPreparationService;
@@ -10,6 +11,10 @@ describe('UpdateGenerationRequestHandler', () => {
   beforeAll(async () => {
     await Utils.initDatabase();
     service = new DealPreparationService();
+    await fs.mkdirp('./tmp/1');
+    await fs.mkdirp('./tmp/2');
+    await fs.mkdirp('./out/1');
+    await fs.mkdirp('./out/2');
   });
   beforeEach(async () => {
     await Datastore.ScanningRequestModel.deleteMany();
@@ -17,6 +22,10 @@ describe('UpdateGenerationRequestHandler', () => {
     await Datastore.InputFileListModel.deleteMany();
     await Datastore.OutputFileListModel.deleteMany();
   });
+  afterAll(async () => {
+    await fs.rmdir('./tmp', { recursive: true });
+    await fs.rmdir('./out', { recursive: true });
+  })
 
   describe('POST /generation/:dataset', () => {
     it('should return error if dataset is not found', async () => {
@@ -36,8 +45,8 @@ describe('UpdateGenerationRequestHandler', () => {
       const r1 = await Datastore.GenerationRequestModel.create({
         datasetId: scanning.id,
         status: 'active',
-        tmpDir: 'tmpdir1',
-        outDir: 'outdir1',
+        tmpDir: './tmp/1',
+        outDir: './out/1',
       });
       const r2 = await Datastore.GenerationRequestModel.create({
         datasetId: scanning.id,
@@ -45,14 +54,14 @@ describe('UpdateGenerationRequestHandler', () => {
       });
       let response = await supertest(service['app'])
         .post('/generation/' + scanning.id)
-        .send({ tmpDir: 'tmpdir2', outDir: 'outdir2' }).set('Accept', 'application/json');
+        .send({ tmpDir: './tmp/2', outDir: './out/2' }).set('Accept', 'application/json');
       expect(await Datastore.GenerationRequestModel.findById(r1.id)).toEqual(jasmine.objectContaining({
-        tmpDir: 'tmpdir2',
-        outDir: 'outdir2',
+        tmpDir: './tmp/2',
+        outDir: './out/2',
       }));
       expect(await Datastore.GenerationRequestModel.findById(r2.id)).toEqual(jasmine.objectContaining({
-        tmpDir: 'tmpdir2',
-        outDir: 'outdir2',
+        tmpDir: './tmp/2',
+        outDir: './out/2',
       }));
       expect(response.body).toEqual({
         success: true
@@ -62,11 +71,11 @@ describe('UpdateGenerationRequestHandler', () => {
         .send({ tmpDir: null, outDir: undefined }).set('Accept', 'application/json');
       expect(await Datastore.GenerationRequestModel.findById(r1.id)).toEqual(jasmine.objectContaining({
         tmpDir: null,
-        outDir: 'outdir2',
+        outDir: './out/2',
       }));
       expect(await Datastore.GenerationRequestModel.findById(r2.id)).toEqual(jasmine.objectContaining({
         tmpDir: null,
-        outDir: 'outdir2',
+        outDir: './out/2',
       }));
     })
     it('should change status for all generation requests if generation is not given', async () => {
@@ -101,6 +110,20 @@ describe('UpdateGenerationRequestHandler', () => {
     });
 
     describe('POST /generation/:dataset/:id', () => {
+      it('should return error if tmpdir is not accessible', async () => {
+        const scanning = await Datastore.ScanningRequestModel.create({
+          name: 'name',
+          status: 'active'
+        });
+        const response = await supertest(service['app'])
+          .post(`/generation/${scanning.id}`)
+          .send({ tmpDir: './tmp/3', outDir: './out/3' }).set('Accept', 'application/json');
+        expect(response.status).toEqual(400);
+        expect(response.body).toEqual({
+          error: ErrorCode.PATH_NOT_ACCESSIBLE,
+          message: ErrorMessage[ErrorCode.PATH_NOT_ACCESSIBLE],
+        });
+      })
       it('should change tmpdir and outdir of a specified generation request', async () => {
         const scanning = await Datastore.ScanningRequestModel.create({
           name: 'name',
@@ -109,15 +132,15 @@ describe('UpdateGenerationRequestHandler', () => {
         const r1 = await Datastore.GenerationRequestModel.create({
           datasetId: scanning.id,
           status: 'active',
-          tmpDir: 'tmpdir1',
-          outDir: 'outdir1',
+          tmpDir: './tmp/1',
+          outDir: './out/1',
         });
         let response = await supertest(service['app'])
           .post(`/generation/${scanning.id}/${r1.id}`)
-          .send({ tmpDir: 'tmpdir2', outDir: 'outdir2' }).set('Accept', 'application/json');
+          .send({ tmpDir: './tmp/2', outDir: './out/2' }).set('Accept', 'application/json');
         expect(await Datastore.GenerationRequestModel.findById(r1.id)).toEqual(jasmine.objectContaining({
-          tmpDir: 'tmpdir2',
-          outDir: 'outdir2',
+          tmpDir: './tmp/2',
+          outDir: './out/2',
         }));
         expect(response.body).toEqual({
           success: true
@@ -127,7 +150,7 @@ describe('UpdateGenerationRequestHandler', () => {
           .send({ tmpDir: null, outDir: undefined }).set('Accept', 'application/json');
         expect(await Datastore.GenerationRequestModel.findById(r1.id)).toEqual(jasmine.objectContaining({
           tmpDir: null,
-          outDir: 'outdir2',
+          outDir: './out/2',
         }));
       })
       it('should return 400 if generation does not exist', async () => {
