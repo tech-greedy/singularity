@@ -450,8 +450,12 @@ export default class DealReplicationWorker extends BaseService {
             }
             this.logger.info(`Waiting ${retryTimeout} ms to retry`);
             await new Promise(resolve => setTimeout(resolve, retryTimeout));
-            retryTimeout *= 2; // expoential back off
-            retryCount++;
+            if (!errorMsg.includes('proposed provider collateral below minimum')) {
+              retryTimeout *= 2; // expoential back off
+              retryCount++;
+            } else {
+              this.logger.warn(`Keep retry on this error message without expoential back off`);
+            }
           } while (retryCount < config.get<number>('deal_replication_worker.max_retry_count'));
           if (state === 'proposed') {
             dealsMadePerSP++;
