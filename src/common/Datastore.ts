@@ -1,6 +1,6 @@
 import fs from 'fs';
 import { MongoMemoryServer } from 'mongodb-memory-server';
-import mongoose, { Schema } from 'mongoose';
+import mongoose, { Mongoose, Schema } from 'mongoose';
 import Logger, { Category } from './Logger';
 import DealState from './model/DealState';
 import DealTrackingState from './model/DealTrackingState';
@@ -14,6 +14,7 @@ import OutputFileList, { GeneratedFileInfo } from './model/OutputFileList';
 import config, { getConfigDir } from './Config';
 import HealthCheck from './model/HealthCheck';
 import { ObjectId } from 'mongodb';
+import ManifestUploadState from './model/ManifestUploadState';
 
 export default class Datastore {
   private static logger = Logger.getLogger(Category.Database);
@@ -37,6 +38,8 @@ export default class Datastore {
   public static InputFileListModel: mongoose.Model<InputFileList, {}, {}, {}>;
   // eslint-disable-next-line @typescript-eslint/ban-types
   public static OutputFileListModel: mongoose.Model<OutputFileList, {}, {}, {}>;
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  public static ManifestUploadStateModel: mongoose.Model<ManifestUploadState, {}, {}, {}>;
 
   private static DB_NAME = 'singularity';
 
@@ -57,8 +60,8 @@ export default class Datastore {
     });
   }
 
-  private static async connectMongoDb (connectionString: string): Promise<void> {
-    await mongoose.connect(connectionString, { dbName: Datastore.DB_NAME });
+  public static async connectMongoDb (connectionString: string): Promise<Mongoose> {
+    return mongoose.connect(connectionString, { dbName: Datastore.DB_NAME });
   }
 
   private static setupDataModels (): void {
@@ -72,6 +75,19 @@ export default class Datastore {
     this.setupDealTrackingStateSchema();
     this.setupInputFileListSchema();
     this.setupOutputFileListSchema();
+    this.setupManifestUploadStateSchema();
+  }
+
+  private static setupManifestUploadStateSchema () {
+    const schema = new Schema<ManifestUploadState>({
+      pieceCid: {
+        type: Schema.Types.String,
+        index: 1
+      },
+      slugName: Schema.Types.String,
+      state: Schema.Types.String
+    });
+    Datastore.ManifestUploadStateModel = mongoose.model<ManifestUploadState>('ManifestUploadState', schema);
   }
 
   private static setupOutputFileListSchema () {
@@ -270,9 +286,10 @@ export default class Datastore {
     }
   }
 
-  public static async connect (): Promise<void> {
-    await Datastore.connectMongoDb(config.connection.database);
+  public static async connect (): Promise<Mongoose> {
+    const mongoose = await Datastore.connectMongoDb(config.connection.database);
     Datastore.setupDataModels();
+    return mongoose;
   }
 
   public static async findScanningRequest (idOrName: string) {

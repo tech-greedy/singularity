@@ -263,6 +263,12 @@ singularity prep generation-status -h
 singularity prep generation-manifest -h
 ```
 
+#### Upload Slingshot 3.x Manifest to web3.storage
+
+```shell
+WEB3_STORAGE_TOKEN="eyJ..." singularity prep upload-manifest -h
+```
+
 #### Monitor service health and download speed
 
 ```shell
