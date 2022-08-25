@@ -107,7 +107,8 @@
   "bin": {
     "singularity": "dist/src/singularity.js",
     "singularity-retrieve": "dist/src/singularity-retrieve.js",
-    "singularity-prepare": "dist/src/singularity-prepare.js"
+    "singularity-prepare": "dist/src/singularity-prepare.js",
+    "singularity-import": "dist/src/singularity-import.js"
   },
   "nyc": {
     "extends": "@istanbuljs/nyc-config-typescript",
