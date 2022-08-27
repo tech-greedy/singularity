@@ -24,5 +24,6 @@ export default interface MinerDeal {
     Root: Cid,
     PieceCid: Cid,
     PieceSize: number
-  }
+  },
+  CreationTime: string
 }
