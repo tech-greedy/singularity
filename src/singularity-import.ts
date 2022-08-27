@@ -3,7 +3,7 @@
 import packageJson from '../package.json';
 import { Command, Option } from 'commander';
 import ImportOptions from './import/ImportOptions';
-import { validateImportOptions } from './import/Util';
+import { startImportLoop } from './import/Util';
 
 const version = packageJson.version;
 const program = new Command();
@@ -36,7 +36,7 @@ program.option('-c, --client <addresses...>', 'List of client addresses to filte
   .option('-d, --dry-run', 'Do not import deals, just print the deals that would be imported or downloaded', false)
   .option('-l, --loop', 'Keep monitoring the incoming deals and perform the import indefinitely', false)
   .action(async (options: ImportOptions) => {
-    validateImportOptions(options);
+    await startImportLoop(options);
   });
 program.addHelpText('after', `
 

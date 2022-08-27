@@ -1,12 +1,13 @@
 export default interface ImportOptions {
   client?: string[],
   path?: string[],
-  urlPrefix?: string,
-  downloadConcurrency: number,
+  urlTemplate?: string,
+  downloadThreads: number,
   downloadFolder?: string,
   removeImported: boolean,
-  importInterval: number,
-  maxConcurrentImports: number,
+  interval: number,
+  concurrency: number,
+  importConcurrency: number,
   dryRun: boolean,
   loop: boolean
 }
