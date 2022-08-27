@@ -2,6 +2,8 @@
 
 import packageJson from '../package.json';
 import { Command, Option } from 'commander';
+import ImportOptions from './import/ImportOptions';
+import { validateImportOptions } from './import/Util';
 
 const version = packageJson.version;
 const program = new Command();
@@ -31,21 +33,10 @@ program.option('-c, --client <addresses...>', 'List of client addresses to filte
   .addOption(new Option('-m, --max-concurrent-imports <import_concurrency>',
     'This sets an upper limit of concurrent imports when the value from --import-interval is less than the actual time the storage provider spends to import a deal.')
     .argParser(parseInt).default(1))
-  .option('-d, --dry-run', 'Do not import deals, just print the deals that would be imported or downloaded')
-  .option('-l, --loop', 'Keep monitoring the incoming deals and perform the import indefinitely')
-  .action(async (options) => {
-    const clients: string[] = options.client;
-    const paths: string[] = options.path;
-    const urlPrefix: string = options.urlPrefix;
-    const interval: number = options.interval;
-    const allowConcurrentImports: boolean = options.allowConcurrentImports;
-    console.log({
-      clients,
-      paths,
-      urlPrefix,
-      interval,
-      allowConcurrentImports
-    });
+  .option('-d, --dry-run', 'Do not import deals, just print the deals that would be imported or downloaded', false)
+  .option('-l, --loop', 'Keep monitoring the incoming deals and perform the import indefinitely', false)
+  .action(async (options: ImportOptions) => {
+    validateImportOptions(options);
   });
 program.addHelpText('after', `
 
