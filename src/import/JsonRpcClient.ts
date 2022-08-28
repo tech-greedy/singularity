@@ -22,7 +22,7 @@ export type JsonRpcResult<T> = {
 export default class JsonRpcClient {
   constructor (private url: string, private prefix?: string, private config?: AxiosRequestConfig) {}
 
-  async call<P, R> (method: string, params: P): Promise<JsonRpcResult<R>> {
+  public async call<P, R> (method: string, params: P): Promise<JsonRpcResult<R>> {
     try {
       const response = await axios.post<JsonRpcResult<R>>(
         this.url,
