@@ -11,7 +11,7 @@ program.name('singularity-import')
   .version(version)
   .description('A tool to automatically import offline deals made by singularity');
 
-program.option('-c, --client <addresses...>', 'List of client addresses to filter the deal proposals', '*')
+program.option('-c, --client <addresses...>', 'List of client addresses to filter the deal proposals')
   .option('-p, --path <paths...>', 'List of paths to find the CAR files')
   .option('-s, --since <seconds_ago>',
     'Import deals that are proposed since this many seconds old and skip those that are older', parseInt, 86400)
