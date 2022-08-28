@@ -12,7 +12,7 @@ export default async function handleListPreparationRequests (this: DealPreparati
           datasetId: '$datasetId',
           status: '$status'
         },
-        count: { $count: {} }
+        count: { $sum: 1 }
       }
     }
   ]);

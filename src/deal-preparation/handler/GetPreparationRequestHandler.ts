@@ -25,7 +25,7 @@ export default async function handleGetPreparationRequest (this: DealPreparation
         _id: {
           status: '$status'
         },
-        count: { $count: {} }
+        count: { $sum: 1 }
       }
     }
   ]);
