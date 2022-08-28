@@ -51,9 +51,10 @@ export default class DealPreparationService extends BaseService {
     this.app.get('/monitor', handleMonitorRequest.bind(this));
   }
 
-  public start (): void {
+  public async start (): Promise<void> {
     const bind = config.get<string>('deal_preparation_service.bind');
     const port = config.get<number>('deal_preparation_service.port');
+    await this.initialize();
     this.startCleanupHealthCheck();
     this.app!.listen(port, bind, () => {
       this.logger.info(`Service started listening at http://${bind}:${port}`);

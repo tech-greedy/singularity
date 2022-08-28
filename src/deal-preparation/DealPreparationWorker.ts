@@ -1,4 +1,3 @@
-import { randomUUID } from 'crypto';
 import BaseService from '../common/BaseService';
 import Datastore from '../common/Datastore';
 import { Category } from '../common/Logger';
@@ -10,22 +9,20 @@ import { AbortSignal } from '../common/AbortSignal';
 import Scanner from './scanner/Scanner';
 
 export default class DealPreparationWorker extends BaseService {
-  public readonly workerId: string;
   public readonly trafficMonitor: TrafficMonitor;
 
   public constructor () {
     super(Category.DealPreparationWorker);
-    this.workerId = randomUUID();
     this.trafficMonitor = new TrafficMonitor(1000);
     this.startHealthCheck = this.startHealthCheck.bind(this);
     this.startPollWork = this.startPollWork.bind(this);
   }
 
-  public start (): void {
+  public async start (): Promise<void> {
     if (!this.enabled) {
       this.logger.warn('Worker is not enabled. Exit now...');
     }
-
+    await this.initialize();
     this.startHealthCheck();
     this.startPollWork();
   }
@@ -39,6 +36,7 @@ export default class DealPreparationWorker extends BaseService {
     });
     if (newScanningWork) {
       this.logger.info(`${this.workerId} - Polled a new scanning request.`, { name: newScanningWork.name, id: newScanningWork.id });
+      await Datastore.HealthCheckModel.findOneAndUpdate({ workerId: this.workerId }, { $set: { state: 'scanning' } });
       try {
         const scanner = new Scanner();
         if (newScanningWork.path.startsWith('s3://')) {
@@ -52,6 +50,8 @@ export default class DealPreparationWorker extends BaseService {
           return true;
         }
         throw err;
+      } finally {
+        await Datastore.HealthCheckModel.findOneAndUpdate({ workerId: this.workerId }, { $set: { state: 'idle' } });
       }
     }
 
@@ -69,6 +69,7 @@ export default class DealPreparationWorker extends BaseService {
       new: true
     });
     if (newGenerationWork) {
+      await Datastore.HealthCheckModel.findOneAndUpdate({ workerId: this.workerId }, { $set: { state: 'generation_start' } });
       this.logger.info(`${this.workerId} - Polled a new generation request.`,
         { id: newGenerationWork.id, datasetName: newGenerationWork.datasetName, index: newGenerationWork.index });
       let tmpDir : string | undefined;
@@ -86,6 +87,7 @@ export default class DealPreparationWorker extends BaseService {
         }
         this.logger.error(`${this.workerId} - Encountered an error.`, error);
       } finally {
+        await Datastore.HealthCheckModel.findOneAndUpdate({ workerId: this.workerId }, { $set: { state: 'idle' } });
         if (tmpDir) {
           await fs.rm(tmpDir, { recursive: true });
         }
@@ -115,6 +117,11 @@ export default class DealPreparationWorker extends BaseService {
 
   private async pollWork (): Promise<boolean> {
     this.logger.debug(`${this.workerId} - Polling for work`);
+    const health = await Datastore.HealthCheckModel.findOne({ workerId: this.workerId });
+    if (health?.state !== 'idle') {
+      this.logger.info(`${this.workerId} - Not ready yet.`);
+      return false;
+    }
     let hasDoneWork = await this.pollScanningWork();
     if (!hasDoneWork) {
       hasDoneWork = await this.pollGenerationWork();
@@ -141,9 +148,6 @@ export default class DealPreparationWorker extends BaseService {
         $set: {
           downloadSpeed: this.trafficMonitor.downloaded
         }
-      },
-      {
-        upsert: true
       }
     );
   }
