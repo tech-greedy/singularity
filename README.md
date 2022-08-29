@@ -272,7 +272,7 @@ WEB3_STORAGE_TOKEN="eyJ..." singularity prep upload-manifest -h
 #### Monitor service health and download speed
 
 ```shell
-singularity prep monitor
+singularity monitor
 ```
 
 ### Deal Replication
