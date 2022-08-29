@@ -2,6 +2,11 @@ import config, { ConfigInitializer } from '../../src/common/Config';
 import fs from 'fs-extra';
 import { sleep } from '../../src/common/Util';
 describe('Config', () => {
+  afterAll(() => {
+    ConfigInitializer.unwatchFile();
+    ConfigInitializer['initialized'] = false;
+    ConfigInitializer.initialize();
+  })
   describe('config', () => {
     describe('get', () => {
       it('should get a value', () => {
