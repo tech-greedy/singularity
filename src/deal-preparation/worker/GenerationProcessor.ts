@@ -14,6 +14,10 @@ import { GeneratedFileList } from '../../common/model/OutputFileList';
 import TrafficMonitor from './TrafficMonitor';
 import DealPreparationWorker from '../DealPreparationWorker';
 
+export class GenerationProcessor {
+  public static childProcessPid: number | undefined;
+}
+
 type ChildProcessOutput = Output;
 
 interface ProcessGenerationOutput {
@@ -59,6 +63,7 @@ export async function processGeneration (
   if (newGenerationWork.tmpDir) {
     returnValue.tmpDir = path.join(newGenerationWork.tmpDir, randomUUID());
   }
+  await Datastore.HealthCheckModel.findOneAndUpdate({ workerId: worker.workerId }, { $set: { state: 'generation_moving_to_tmpdir' } });
   const moveResult = await moveToTmpdir(logger, trafficMonitor, newGenerationWork, fileList, returnValue.tmpDir);
   if (moveResult.aborted) {
     return returnValue;
@@ -67,6 +72,7 @@ export async function processGeneration (
   if (moveResult.skipped.size > 0) {
     fileList = fileList.filter(f => !moveResult.skipped.has(f));
   }
+  await Datastore.HealthCheckModel.findOneAndUpdate({ workerId: worker.workerId }, { $set: { state: 'generation_generating_car_and_commp' } });
   const result = await generate(logger, newGenerationWork, fileList, returnValue.tmpDir);
   timeSpentInMs = performance.now() - timeSpentInMs;
 
@@ -76,6 +82,7 @@ export async function processGeneration (
     code
   } = result;
 
+  await Datastore.HealthCheckModel.findOneAndUpdate({ workerId: worker.workerId }, { $set: { state: 'generation_parsing_output' } });
   // Handle the error and update the database
   if (code !== 0) {
     logger.error(`${worker.workerId} Encountered an error.`, result);
@@ -114,6 +121,7 @@ export async function processGeneration (
     return returnValue;
   }
 
+  await Datastore.HealthCheckModel.findOneAndUpdate({ workerId: worker.workerId }, { $set: { state: 'generation_saving_output' } });
   // Populate the output file list with the generated file list
   for (let i = 0; i < generatedFileList.length; i += 1000) {
     await Datastore.OutputFileListModel.updateOne({
@@ -243,10 +251,13 @@ export async function invokeGenerateCar (generationId: string | undefined, input
   }
   child.stdin!.write(input);
   child.stdin!.end();
+  GenerationProcessor.childProcessPid = child.pid;
   try {
     return await child;
   } catch (error: any) {
     return <ErrorWithOutput>error;
+  } finally {
+    GenerationProcessor.childProcessPid = undefined;
   }
 }
 

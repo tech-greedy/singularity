@@ -4,6 +4,7 @@
 import { homedir } from 'os';
 import path from 'path';
 import cluster from 'node:cluster';
+
 process.env.NODE_CONFIG_DIR = process.env.SINGULARITY_PATH || path.join(homedir(), '.singularity');
 import { Argument, Command, Option } from 'commander';
 import packageJson from '../package.json';
@@ -170,7 +171,7 @@ function sleep (ms: number): Promise<void> {
   });
 }
 
-preparation.command('monitor').description('Monitor worker status and download speed')
+program.command('monitor').description('Monitor worker status and download speed')
   .action(async () => {
     await initializeConfig(false, false);
     const url: string = config.get('connection.deal_preparation_service');
@@ -183,12 +184,30 @@ preparation.command('monitor').description('Monitor worker status and download s
       }
 
       const data: HealthCheck[] = response.data;
-      CliUtil.renderResponse(data.map(d => ({
-        downloadSpeed: xbytes(d.downloadSpeed) + '/s',
-        workerId: d.workerId
-      })), false);
-      const total = data.map(d => d.downloadSpeed ?? 0).reduce((a, b) => a + b, 0);
-      console.log('Total Speed: ' + xbytes(total) + '/s');
+      const result: { [key: string]: any } = {};
+      for (const d of data) {
+        result[d.pid.toString()] = {
+          ...d,
+          downloadSpeed: xbytes(d.downloadSpeed) + '/s',
+          cpuUsage: (d.cpuUsage ?? 0).toFixed(2) + '%',
+          memoryUsage: xbytes(d.memoryUsage ?? 0),
+          childCpuUsage: (d.childCpuUsage ?? 0).toFixed(2) + '%',
+          childMemoryUsage: xbytes(d.childMemoryUsage ?? 0)
+        };
+      }
+      result['Total'] = {
+        downloadSpeed:
+          xbytes(data.reduce((acc, d) => acc + d.downloadSpeed, 0)) + '/s',
+        cpuUsage:
+          (data.reduce((acc, d) => acc + (d.cpuUsage ?? 0), 0)).toFixed(2) + '%',
+        memoryUsage:
+          xbytes(data.reduce((acc, d) => acc + (d.memoryUsage ?? 0), 0)),
+        childCpuUsage:
+          (data.reduce((acc, d) => acc + (d.childCpuUsage ?? 0), 0)).toFixed(2) + '%',
+        childMemoryUsage:
+          xbytes(data.reduce((acc, d) => acc + (d.childMemoryUsage ?? 0), 0))
+      };
+      CliUtil.renderResponse(result, false);
       await sleep(5000);
     }
   });
@@ -254,7 +273,10 @@ preparation.command('status').description('Check the status of a deal preparatio
     if (options.json) {
       console.log(JSON.stringify(data, null, 2));
     } else {
-      const { generationRequests, ...summary } = data;
+      const {
+        generationRequests,
+        ...summary
+      } = data;
       console.log('Scanning Request Summary');
       console.table([summary]);
       console.log('Corresponding Generation Requests');
@@ -336,7 +358,10 @@ preparation.command('upload-manifest').description('Upload manifest to web3.stor
             'X-NAME': `${result.piece_cid}.json.zst`
           }
         });
-      }, { retries: 5, minTimeout: 2500 });
+      }, {
+        retries: 5,
+        minTimeout: 2500
+      });
       await Datastore.ManifestUploadStateModel.create({
         pieceCid: result.piece_cid,
         slugName: slugName,
@@ -388,7 +413,7 @@ preparation.command('generation-manifest').description('Get the Slingshot v3.x m
   .action(async (id, options) => {
     await initializeConfig(false, false);
     const url: string = config.get('connection.deal_preparation_service');
-    let response! : AxiosResponse;
+    let response!: AxiosResponse;
     try {
       response = options.dataset ? await axios.get(`${url}/generation-manifest/${options.dataset}/${id}`) : await axios.get(`${url}/generation-manifest/${id}`);
     } catch (error) {
@@ -422,7 +447,11 @@ preparation.command('generation-status').description('Check the status of a sing
     if (options.json) {
       console.log(JSON.stringify(data, null, 2));
     } else {
-      const { fileList, generatedFileList, ...summary } = data;
+      const {
+        fileList,
+        generatedFileList,
+        ...summary
+      } = data;
       console.log('Generation Request Summary');
       console.table([summary]);
       console.log('File Lists');

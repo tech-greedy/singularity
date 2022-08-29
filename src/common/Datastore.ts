@@ -265,12 +265,20 @@ export default class Datastore {
         index: true,
         unique: true
       },
+      type: Schema.Types.String,
       downloadSpeed: Schema.Types.Number,
+      state: Schema.Types.String,
       updatedAt: {
         type: Schema.Types.Date,
         index: 1,
         expires: 60
-      }
+      },
+      pid: Schema.Types.Number,
+      cpuUsage: Schema.Types.Number,
+      memoryUsage: Schema.Types.Number,
+      childPid: Schema.Types.Number,
+      childCpuUsage: Schema.Types.Number,
+      childMemoryUsage: Schema.Types.Number
     }, {
       timestamps: true
     });
