@@ -14,7 +14,9 @@ import { GeneratedFileList } from '../../common/model/OutputFileList';
 import TrafficMonitor from './TrafficMonitor';
 import DealPreparationWorker from '../DealPreparationWorker';
 
-export let childProcessPid: number | undefined;
+export class GenerationProcessor {
+  public static childProcessPid: number | undefined;
+}
 
 type ChildProcessOutput = Output;
 
@@ -249,13 +251,13 @@ export async function invokeGenerateCar (generationId: string | undefined, input
   }
   child.stdin!.write(input);
   child.stdin!.end();
-  childProcessPid = child.pid;
+  GenerationProcessor.childProcessPid = child.pid;
   try {
     return await child;
   } catch (error: any) {
     return <ErrorWithOutput>error;
   } finally {
-    childProcessPid = undefined;
+    GenerationProcessor.childProcessPid = undefined;
   }
 }
 

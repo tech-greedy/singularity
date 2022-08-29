@@ -14,6 +14,7 @@ describe('DealPreparationWorker', () => {
     GenerateCar.initialize();
     defaultTimeout = jasmine.DEFAULT_TIMEOUT_INTERVAL;
     jasmine.DEFAULT_TIMEOUT_INTERVAL = 15_000;
+    await worker.initialize(() => Promise.resolve(true));
   });
   beforeEach(async () => {
     await Datastore.ScanningRequestModel.deleteMany();

@@ -3,10 +3,10 @@ import Logger, { Category } from './Logger';
 import config from './Config';
 import MetricEmitter, { getMetricEmitter } from './metrics/MetricEmitter';
 import { randomUUID } from 'crypto';
-import { childProcessPid } from '../deal-preparation/worker/GenerationProcessor';
 import pidusage from 'pidusage';
 import Datastore from './Datastore';
 import { AbortSignal } from './AbortSignal';
+import { GenerationProcessor } from '../deal-preparation/worker/GenerationProcessor';
 
 export default abstract class BaseService {
   public readonly workerId: string;
@@ -33,7 +33,7 @@ export default abstract class BaseService {
     setTimeout(async () => this.startUpdateUsage(abortSignal), 5000);
   }
 
-  public async initialize (): Promise<void> {
+  public async initialize (abortSignal?: AbortSignal): Promise<void> {
     await Datastore.HealthCheckModel.create({
       workerId: this.workerId,
       type: this.type,
@@ -41,12 +41,12 @@ export default abstract class BaseService {
       pid: process.pid,
       downloadSpeed: 0
     });
-    this.startUpdateUsage();
+    this.startUpdateUsage(abortSignal);
   }
 
   private async updateUsage (): Promise<void> {
     const pid = process.pid;
-    const childPid = childProcessPid;
+    const childPid = GenerationProcessor.childProcessPid;
     if (childPid) {
       const usage = await pidusage([pid, childPid]);
       const cpuUsage = usage[pid].cpu;
