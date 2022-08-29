@@ -17,12 +17,18 @@ class DummyService extends BaseService {
 
 describe('BaseService', () => {
   let service: DummyService;
+  let defaultTimeout: number;
 
   beforeAll(async () => {
     await Utils.initDatabase();
     service = new DummyService();
+    defaultTimeout = jasmine.DEFAULT_TIMEOUT_INTERVAL;
     jasmine.DEFAULT_TIMEOUT_INTERVAL = 15_000;
   });
+
+  afterAll(async () => {
+    jasmine.DEFAULT_TIMEOUT_INTERVAL = defaultTimeout;
+  })
 
   beforeEach(async () => {
     await Datastore.HealthCheckModel.deleteMany();
