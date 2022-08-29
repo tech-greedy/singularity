@@ -15,7 +15,7 @@ class DummyService extends BaseService {
   }
 }
 
-fdescribe('BaseService', () => {
+describe('BaseService', () => {
   let service: DummyService;
 
   beforeAll(async () => {
