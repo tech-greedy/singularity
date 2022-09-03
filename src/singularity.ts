@@ -33,6 +33,7 @@ import { compress } from '@xingrz/cppzst';
 import progress from 'cli-progress';
 import asyncRetry from 'async-retry';
 import pAll from 'p-all';
+import ObjectsToCsv from 'objects-to-csv';
 
 const logger = Logger.getLogger(Category.Default);
 const version = packageJson.version;
@@ -725,15 +726,58 @@ replication.command('csv').description('Write a deal replication result as csv.'
   .argument('<id>', 'Existing ID of deal replication request.')
   .argument('<outDir>', 'The output Directory to save the CSV file.')
   .action(async (id, outDir) => {
-    await initializeConfig(false, false);
-    let response!: AxiosResponse;
+    let msg = '';
     try {
-      const url: string = config.get('connection.deal_replication_service');
-      response = await axios.post(`${url}/replication/${id}/csv`, { outDir: path.resolve(outDir) });
+      await initializeConfig(false, false);
+      const mongoose = await Datastore.connect();
+      const replicationRequest = await Datastore.ReplicationRequestModel.findById(id);
+      if (replicationRequest) {
+        const providers = await DealReplicationWorker.generateProvidersList(replicationRequest.storageProviders);
+        for (let j = 0; j < providers.length; j++) {
+          const provider = providers[j];
+          const deals = await Datastore.DealStateModel.find({
+            replicationRequestId: id,
+            provider: provider,
+            state: { $nin: ['slashed', 'error', 'expired', 'proposal_expired'] }
+          });
+          let urlPrefix = replicationRequest.urlPrefix;
+          if (!urlPrefix.endsWith('/')) {
+            urlPrefix += '/';
+          }
+
+          if (deals.length > 0) {
+            const csvRow = [];
+            for (let i = 0; i < deals.length; i++) {
+              const deal = deals[i];
+              csvRow.push({
+                miner_id: deal.provider,
+                deal_cid: deal.dealCid,
+                filename: `${deal.pieceCid}.car`,
+                piece_cid: deal.pieceCid,
+                start_epoch: deal.startEpoch,
+                full_url: `${urlPrefix}${deal.pieceCid}.car`
+              });
+            }
+            const csv = new ObjectsToCsv(csvRow);
+            let fileListFilename = '';
+            if (replicationRequest.fileListPath) {
+              fileListFilename += '_' + path.parse(replicationRequest.fileListPath).name;
+            }
+            const filename = `${outDir}${path.sep}${provider}${fileListFilename}_${id}.csv`;
+            await csv.toDisk(filename);
+            msg += `CSV saved to ${filename}\n`;
+          } else {
+            msg += `No deal found to export in ${id}\n`;
+          }
+        }
+      } else {
+        msg = `Replication request not found ${id}`;
+      }
+      await mongoose.disconnect();
     } catch (error) {
       CliUtil.renderErrorAndExit(error);
     }
-    CliUtil.renderResponse(response.data, false);
+    CliUtil.renderResponse({ msg }, false);
   });
 
 program.showSuggestionAfterError();

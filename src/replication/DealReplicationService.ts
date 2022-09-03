@@ -9,10 +9,6 @@ import GetReplicationDetailsResponse from './model/GetReplicationDetailsResponse
 import { GetReplicationsResponse, GetReplicationsResponseItem } from './model/GetReplicationsResponse';
 import UpdateReplicationRequest from './model/UpdateReplicationRequest';
 import { ObjectId } from 'mongodb';
-import ObjectsToCsv from 'objects-to-csv';
-import GenerateCSVRequest from './model/GenerateCSVRequest';
-import path from 'path';
-import DealReplicationWorker from './DealReplicationWorker';
 import config from '../common/Config';
 
 export default class DealReplicationService extends BaseService {
@@ -25,7 +21,6 @@ export default class DealReplicationService extends BaseService {
       this.handleUpdateReplicationRequest = this.handleUpdateReplicationRequest.bind(this);
       this.handleListReplicationRequests = this.handleListReplicationRequests.bind(this);
       this.handleGetReplicationRequest = this.handleGetReplicationRequest.bind(this);
-      this.handlePrintCSVReplicationRequest = this.handlePrintCSVReplicationRequest.bind(this);
       this.startCleanupHealthCheck = this.startCleanupHealthCheck.bind(this);
       if (!this.enabled) {
         this.logger.warn('Deal Replication Service is not enabled. Exit now...');
@@ -42,7 +37,6 @@ export default class DealReplicationService extends BaseService {
       this.app.post('/replication/:id', this.handleUpdateReplicationRequest);
       this.app.get('/replications', this.handleListReplicationRequests);
       this.app.get('/replication/:id', this.handleGetReplicationRequest);
-      this.app.post('/replication/:id/csv', this.handlePrintCSVReplicationRequest);
     }
 
     public start (): void {
@@ -120,7 +114,7 @@ export default class DealReplicationService extends BaseService {
       response.end(JSON.stringify(result));
     }
 
-    private async handleListReplicationRequests (response: Response) {
+    private async handleListReplicationRequests (_request: Request, response: Response) {
       this.logger.info('Received request to list all replication requests.');
       const replicationRequests = await Datastore.ReplicationRequestModel.find();
       const result: GetReplicationsResponse = [];
@@ -284,50 +278,6 @@ export default class DealReplicationService extends BaseService {
       }
 
       response.end(JSON.stringify({ id: replicationRequest.id }));
-    }
-
-    private async handlePrintCSVReplicationRequest (request: Request, response: Response) {
-      const id = request.params['id'];
-      const { outDir } = <GenerateCSVRequest>request.body;
-      const replicationRequest = await Datastore.ReplicationRequestModel.findById(id);
-      if (replicationRequest) {
-        const providers = await DealReplicationWorker.generateProvidersList(replicationRequest.storageProviders);
-        providers.forEach(async provider => {
-          const deals = await Datastore.DealStateModel.find({
-            replicationRequestId: id,
-            provider: provider,
-            state: { $nin: ['slashed', 'error', 'expired', 'proposal_expired'] }
-          });
-          this.logger.info(`Found ${deals.length} deals from replication request ${id}`);
-          let urlPrefix = replicationRequest.urlPrefix;
-          if (!urlPrefix.endsWith('/')) {
-            urlPrefix += '/';
-          }
-
-          if (deals.length > 0) {
-            const csvRow = [];
-            for (let i = 0; i < deals.length; i++) {
-              const deal = deals[i];
-              csvRow.push({
-                miner_id: deal.provider,
-                deal_cid: deal.dealCid,
-                filename: `${deal.pieceCid}.car`,
-                piece_cid: deal.pieceCid,
-                start_epoch: deal.startEpoch,
-                full_url: `${urlPrefix}${deal.pieceCid}.car`
-              });
-            }
-            const csv = new ObjectsToCsv(csvRow);
-            const filename = `${outDir}${path.sep}${provider}_${id}.csv`;
-            await csv.toDisk(filename);
-            response.end(`CSV saved to ${filename}`);
-          }
-        });
-
-      } else {
-        this.logger.error(`Could not find replication request ${id}`);
-      }
-      response.end();
     }
 
     private async cleanupHealthCheck (): Promise<void> {

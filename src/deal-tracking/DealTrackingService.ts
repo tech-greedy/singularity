@@ -22,7 +22,7 @@ export default class DealTrackingService extends BaseService {
 
   private async startDealTracking (): Promise<void> {
     await this.dealTracking();
-    setTimeout(this.startDealTracking, 3_600_000);
+    setTimeout(this.startDealTracking, config.getOrDefault<number>('interval_ms.lotus_api', 3_600_000));
   }
 
   private async dealTracking (): Promise<void> {
