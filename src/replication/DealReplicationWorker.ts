@@ -195,6 +195,8 @@ export default class DealReplicationWorker extends BaseService {
           { notation: 'fixed' });
         const unpaddedSize = carFile.pieceSize! * 127 / 128;
         const manualStateless = replicationRequest.maxPrice > 0 ? '' : '--manual-stateless-deal';// only zero priced deal support manual stateless deal
+        // TODO consider implement something similar to this to get rid of collateral below minimum error when proposing with lotus
+        // https://github.com/filecoin-project/boost/blob/d561bbf72e40c0b7b19f359ae23a8c0d1afd910d/cmd/boost/deal_cmd.go#L209
         return `${this.lotusCMD} client deal --manual-piece-cid=${carFile.pieceCid} --manual-piece-size=${unpaddedSize} ` +
           `${manualStateless} --from=${replicationRequest.client} --verified-deal=${replicationRequest.isVerfied} --start-epoch=${startEpoch} ` +
           `${carFile.dataCid} ${provider} ${priceInFilWithSize} ${replicationRequest.duration}`;
@@ -384,7 +386,7 @@ export default class DealReplicationWorker extends BaseService {
           for (let k = 0; k < existingDeals.length; k++) {
             const deal = existingDeals[k];
             if (deal.provider === provider) {
-              this.logger.info(`This pieceCID ${carFile.pieceCid} has already been dealt with ${provider}. ` +
+              this.logger.debug(`This pieceCID ${carFile.pieceCid} has already been dealt with ${provider}. ` +
                 `Deal CID ${deal.dealCid}. Moving on to next file.`);
               alreadyDealt = true;
             }
@@ -450,12 +452,12 @@ export default class DealReplicationWorker extends BaseService {
             }
             this.logger.info(`Waiting ${retryTimeout} ms to retry`);
             await new Promise(resolve => setTimeout(resolve, retryTimeout));
-            if (!errorMsg.includes('proposed provider collateral below minimum')) {
-              retryTimeout *= 2; // expoential back off
-              retryCount++;
+            if (errorMsg.includes('proposed provider collateral below minimum')) {
+              this.logger.warn(`Keep retry on this error without expoential back off. These can usually resolve itself within timely manner.`);
             } else {
-              this.logger.warn(`Keep retry on this error message without expoential back off`);
+              retryTimeout *= 2; // expoential back off
             }
+            retryCount++;
           } while (retryCount < config.get<number>('deal_replication_worker.max_retry_count'));
           if (state === 'proposed') {
             dealsMadePerSP++;
