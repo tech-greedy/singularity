@@ -562,7 +562,7 @@ replication.command('csv').description('Write a deal replication result as csv.'
     let response!: AxiosResponse;
     try {
       const url: string = config.get('connection.deal_replication_service');
-      response = await axios.post(`${url}/replication/${id}/csv`, { outDir });
+      response = await axios.post(`${url}/replication/${id}/csv`, { outDir: path.resolve(outDir) });
     } catch (error) {
       CliUtil.renderErrorAndExit(error);
     }
