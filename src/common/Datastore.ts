@@ -1,18 +1,20 @@
-import config from 'config';
 import fs from 'fs';
 import { MongoMemoryServer } from 'mongodb-memory-server';
-import mongoose, { Schema } from 'mongoose';
+import mongoose, { Mongoose, Schema } from 'mongoose';
 import Logger, { Category } from './Logger';
 import DealState from './model/DealState';
 import DealTrackingState from './model/DealTrackingState';
 import GenerationRequest from './model/GenerationRequest';
-import HealthCheck from './model/HealthCheck';
 import ProviderMetric from './model/ProviderMetric';
 import ReplicationRequest from './model/ReplicationRequest';
 import ScanningRequest from './model/ScanningRequest';
 import path from 'path';
 import InputFileList, { FileInfo } from './model/InputFileList';
 import OutputFileList, { GeneratedFileInfo } from './model/OutputFileList';
+import config, { getConfigDir } from './Config';
+import HealthCheck from './model/HealthCheck';
+import { ObjectId } from 'mongodb';
+import ManifestUploadState from './model/ManifestUploadState';
 
 export default class Datastore {
   private static logger = Logger.getLogger(Category.Database);
@@ -36,6 +38,8 @@ export default class Datastore {
   public static InputFileListModel: mongoose.Model<InputFileList, {}, {}, {}>;
   // eslint-disable-next-line @typescript-eslint/ban-types
   public static OutputFileListModel: mongoose.Model<OutputFileList, {}, {}, {}>;
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  public static ManifestUploadStateModel: mongoose.Model<ManifestUploadState, {}, {}, {}>;
 
   private static DB_NAME = 'singularity';
 
@@ -56,8 +60,8 @@ export default class Datastore {
     });
   }
 
-  private static async connectMongoDb (connectionString: string): Promise<void> {
-    await mongoose.connect(connectionString, { dbName: Datastore.DB_NAME });
+  public static async connectMongoDb (connectionString: string): Promise<Mongoose> {
+    return mongoose.connect(connectionString, { dbName: Datastore.DB_NAME });
   }
 
   private static setupDataModels (): void {
@@ -71,6 +75,19 @@ export default class Datastore {
     this.setupDealTrackingStateSchema();
     this.setupInputFileListSchema();
     this.setupOutputFileListSchema();
+    this.setupManifestUploadStateSchema();
+  }
+
+  private static setupManifestUploadStateSchema () {
+    const schema = new Schema<ManifestUploadState>({
+      pieceCid: {
+        type: Schema.Types.String,
+        index: 1
+      },
+      slugName: Schema.Types.String,
+      state: Schema.Types.String
+    });
+    Datastore.ManifestUploadStateModel = mongoose.model<ManifestUploadState>('ManifestUploadState', schema);
   }
 
   private static setupOutputFileListSchema () {
@@ -210,7 +227,8 @@ export default class Datastore {
       pieceCid: Schema.Types.String,
       pieceSize: Schema.Types.Number,
       filenameOverride: Schema.Types.String,
-      tmpDir: Schema.Types.String
+      tmpDir: Schema.Types.String,
+      skipInaccessibleFiles: Schema.Types.Boolean
     }, {
       timestamps: true
     });
@@ -234,7 +252,8 @@ export default class Datastore {
       status: Schema.Types.String,
       errorMessage: Schema.Types.String,
       tmpDir: Schema.Types.String,
-      scanned: Schema.Types.Number
+      scanned: Schema.Types.Number,
+      skipInaccessibleFiles: Schema.Types.Boolean
     }, {
       timestamps: true
     });
@@ -248,30 +267,61 @@ export default class Datastore {
         index: true,
         unique: true
       },
+      type: Schema.Types.String,
       downloadSpeed: Schema.Types.Number,
+      state: Schema.Types.String,
       updatedAt: {
         type: Schema.Types.Date,
         index: 1,
         expires: 60
-      }
+      },
+      pid: Schema.Types.Number,
+      cpuUsage: Schema.Types.Number,
+      memoryUsage: Schema.Types.Number,
+      childPid: Schema.Types.Number,
+      childCpuUsage: Schema.Types.Number,
+      childMemoryUsage: Schema.Types.Number
     }, {
       timestamps: true
     });
-
     Datastore.HealthCheckModel = mongoose.model<HealthCheck>('HealthCheck', healthCheckSchema);
   }
 
   public static async init (inMemory: boolean): Promise<void> {
-    if (config.has('database.start_local') && config.get('database.start_local')) {
-      const localPath = config.has('database.local_path') ? path.resolve(process.env.NODE_CONFIG_DIR!, config.get<string>('database.local_path')) : undefined;
-      await Datastore.setupLocalMongoDb(config.get('database.local_bind'), config.get('database.local_port'), inMemory ? undefined : localPath);
+    if (config.get('database.start_local')) {
+      await Datastore.setupLocalMongoDb(
+        config.get('database.local_bind'),
+        config.get('database.local_port'),
+        inMemory ? undefined : path.resolve(getConfigDir(), config.get<string>('database.local_path')));
     }
   }
 
-  public static async connect (): Promise<void> {
-    if (config.has('connection.database')) {
-      await Datastore.connectMongoDb(config.get('connection.database'));
-      Datastore.setupDataModels();
+  public static async connect (): Promise<Mongoose> {
+    const mongoose = await Datastore.connectMongoDb(config.connection.database);
+    Datastore.setupDataModels();
+    return mongoose;
+  }
+
+  public static async findScanningRequest (idOrName: string) {
+    return await Datastore.ScanningRequestModel.findOne({ name: idOrName }) ??
+      (ObjectId.isValid(idOrName) ? await Datastore.ScanningRequestModel.findById(idOrName) : null);
+  }
+
+  public static async findGenerationRequest (id: string, dataset: string | undefined) {
+    let found;
+    const idIsInt = !isNaN(parseInt(id));
+    if (ObjectId.isValid(id)) {
+      found = await Datastore.GenerationRequestModel.findById(id);
+    } else if (idIsInt) {
+      found = await Datastore.GenerationRequestModel.findOne({ index: id, datasetName: dataset }) ??
+        await Datastore.GenerationRequestModel.findOne({ index: id, datasetId: dataset });
+    } else {
+      return undefined;
     }
+    if (!found) {
+      return undefined;
+    }
+
+    return found;
   }
 }

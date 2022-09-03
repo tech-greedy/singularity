@@ -112,7 +112,11 @@ go-bodyshop/bodyshop.exe
 
 # temporary data
 .singularity
+tmpdir
+tmp
+outDir
 
 # Unit test results
 nunitresults.xml
 config/cars/
+

@@ -1,9 +1,9 @@
 import BaseService from '../common/BaseService';
 import { Category } from '../common/Logger';
-import config from 'config';
 import Datastore from '../common/Datastore';
 import axios, { AxiosRequestHeaders } from 'axios';
 import DealReplicationWorker from '../replication/DealReplicationWorker';
+import config from '../common/Config';
 
 export default class DealTrackingService extends BaseService {
   public constructor () {
@@ -11,11 +11,12 @@ export default class DealTrackingService extends BaseService {
     this.startDealTracking = this.startDealTracking.bind(this);
   }
 
-  public start (): void {
+  public async start (): Promise<void> {
     if (!this.enabled) {
       this.logger.warn('Service is not enabled. Exit now...');
     }
 
+    await this.initialize();
     this.startDealTracking();
   }
 

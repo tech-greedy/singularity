@@ -12,5 +12,6 @@ export default interface ScanningRequest {
   status: 'active' | 'completed' | 'error' | 'paused',
   errorMessage?: string,
   tmpDir?: string,
-  scanned: number
+  scanned: number,
+  skipInaccessibleFiles?: boolean,
 }

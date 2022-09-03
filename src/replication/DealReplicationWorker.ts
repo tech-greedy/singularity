@@ -1,21 +1,19 @@
 /* eslint @typescript-eslint/no-var-requires: "off" */
-import { randomUUID } from 'crypto';
 import BaseService from '../common/BaseService';
 import Datastore from '../common/Datastore';
 import { Category } from '../common/Logger';
 import ReplicationRequest from '../common/model/ReplicationRequest';
-import config from 'config';
 import axios from 'axios';
 import { create, all, Unit } from 'mathjs';
 import GenerationRequest from '../common/model/GenerationRequest';
 import cron, { ScheduledTask } from 'node-cron';
 import fs from 'fs-extra';
+import config from '../common/Config';
 const mathconfig = {};
 const math = create(all, mathconfig);
 const exec: any = require('await-exec');// no TS support
 
 export default class DealReplicationWorker extends BaseService {
-  private readonly workerId: string;
   private readonly lotusCMD: string;
   private readonly boostCMD: string;
   // holds reference to all started crons to be updated
@@ -23,18 +21,18 @@ export default class DealReplicationWorker extends BaseService {
 
   public constructor () {
     super(Category.DealReplicationWorker);
-    this.workerId = randomUUID();
     this.startHealthCheck = this.startHealthCheck.bind(this);
     this.startPollWork = this.startPollWork.bind(this);
     this.lotusCMD = config.get('deal_replication_worker.lotus_cli_cmd');
     this.boostCMD = config.get('deal_replication_worker.boost_cli_cmd');
   }
 
-  public start (): void {
+  public async start (): Promise<void> {
     if (!this.enabled) {
       this.logger.warn('Deal Replication Worker is not enabled. Exit now...');
     }
 
+    await this.initialize();
     this.startHealthCheck();
     this.startPollWork();
   }

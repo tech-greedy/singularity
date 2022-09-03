@@ -12,7 +12,9 @@
     "test": "jasmine-ts --config=./tests/jasmine.json",
     "coverage": "nyc jasmine-ts --config=./tests/jasmine.json",
     "lint": "eslint --ext ts --fix src/",
-    "lint:nofix": "eslint --ext ts src/"
+    "lint:nofix": "eslint --ext ts src/",
+    "markdownlint": "markdownlint-cli2-fix *.md",
+    "markdownlint:nofix": "markdownlint-cli2 *.md"
   },
   "repository": {
     "type": "git",
@@ -31,13 +33,15 @@
     "@istanbuljs/nyc-config-typescript": "^1.0.2",
     "@kei-g/chmod": "^1.0.7",
     "@types/async-retry": "^1.4.3",
-    "@types/config": "^0.0.41",
+    "@types/cli-progress": "^3.11.0",
     "@types/express": "^4.17.13",
     "@types/fs-extra": "^9.0.13",
     "@types/jasmine": "^4.0.0",
+    "@types/lodash.clonedeep": "^4.5.7",
     "@types/node": "^16.11.45",
     "@types/objects-to-csv": "^1.3.1",
     "@types/picomatch": "^2.3.0",
+    "@types/pidusage": "^2.0.2",
     "@types/supertest": "^2.0.12",
     "@types/typescript": "^2.0.0",
     "@typescript-eslint/eslint-plugin": "^5.15.0",
@@ -50,10 +54,12 @@
     "eslint-plugin-prefer-arrow": "^1.2.3",
     "eslint-plugin-promise": "^5.0.0",
     "eslint-plugin-standard": "^5.0.0",
+    "husky": "^8.0.1",
     "jasmine": "^3.99.0",
     "jasmine-reporters": "^2.5.0",
     "jasmine-spec-reporter": "^7.0.0",
     "jasmine-ts": "^0.4.0",
+    "markdownlint-cli2": "^0.5.1",
     "nyc": "^15.1.0",
     "supertest": "^6.2.2",
     "ts-node": "^10.7.0",
@@ -63,32 +69,39 @@
     "@aws-sdk/client-s3": "^3.135.0",
     "@goodware/task-queue": "^2.1.3",
     "@gzuidhof/go-npm": "^0.1.13",
+    "@iarna/toml": "^2.2.5",
     "@rauschma/stringio": "^1.4.0",
     "@techgreedy/generate-car": "2.1.2",
     "@types/node-cron": "^3.0.1",
+    "@xingrz/cppzst": "^2.1.0-alpha.8",
     "async-retry": "^1.3.3",
     "await-exec": "^0.1.2",
     "axios": "^0.26.1",
     "body-parser": "^1.19.2",
+    "canonicalize": "^1.0.8",
+    "cli-progress": "^3.11.2",
     "commander": "^9.1.0",
-    "config": "^3.3.7",
     "express": "^5.0.0-beta.1",
     "express-winston": "^4.2.0",
     "fs-extra": "^10.1.0",
     "ipfs-client": "^0.7.8",
     "ipfs-core": "^0.14.2",
+    "lodash.clonedeep": "^4.5.0",
     "mathjs": "^10.6.1",
     "minimist": "^1.2.6",
     "mongodb": "^4.3.1",
     "mongodb-memory-server": "^8.4.1",
-    "mongoose": "^6.2.7",
+    "mongoose": "^6.4.6",
+    "multipart-download": "^1.2.4",
     "node-cron": "^3.0.1",
     "objects-to-csv": "^1.3.6",
+    "p-all": "^3.0.0",
     "picomatch": "^2.3.1",
-    "toml": "^3.0.0",
+    "pidusage": "^3.0.0",
+    "promisify-child-process": "^4.1.1",
+    "semaphore-async-await": "^1.5.1",
     "winston": "^3.6.0",
-    "xbytes": "^1.7.0",
-    "p-all": "^3.0.0"
+    "xbytes": "^1.7.0"
   },
   "directories": {
     "test": "tests"
@@ -100,7 +113,8 @@
   "bin": {
     "singularity": "dist/src/singularity.js",
     "singularity-retrieve": "dist/src/singularity-retrieve.js",
-    "singularity-prepare": "dist/src/singularity-prepare.js"
+    "singularity-prepare": "dist/src/singularity-prepare.js",
+    "singularity-import": "dist/src/singularity-import.js"
   },
   "nyc": {
     "extends": "@istanbuljs/nyc-config-typescript",
@@ -113,15 +127,15 @@
       "src/**"
     ],
     "exclude": [
-      "src/deal-preparation/rrdir.js"
+      "src/deal-preparation/scanner/rrdir.js"
     ],
     "reporter": [
       "text",
       "html"
     ],
-    "lines": 75,
-    "functions": 75,
-    "statements": 75,
+    "lines": 90,
+    "functions": 70,
+    "statements": 90,
     "per-file": true
   }
 }
