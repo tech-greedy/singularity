@@ -9,12 +9,9 @@ export interface GetReplicationsResponseItem {
     cronSchedule?: string,
     cronMaxDeals?: number,
     cronMaxPendingDeals?: number,
-    errorMessage?: string,
-    replicationCompleted: number,
-    replicationActive: number,
-    replicationPaused: number,
-    replicationTotal: number,
-    replicationError: number
+    fileListPath?: string,
+    notes?: string,
+    errorMessage?: string
   }
 
 export type GetReplicationsResponse = GetReplicationsResponseItem[];

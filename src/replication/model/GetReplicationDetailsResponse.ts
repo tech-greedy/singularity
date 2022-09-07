@@ -1,3 +1,5 @@
+import DealState from '../../common/model/DealState';
+
 export default interface GetReplicationDetailsResponse {
     id: string,
     datasetId: string,
@@ -14,5 +16,16 @@ export default interface GetReplicationDetailsResponse {
     status: 'active' | 'paused' | 'completed' | 'error',
     cronSchedule?: string,
     cronMaxDeals?: number,
-    cronMaxPendingDeals?: number
+    cronMaxPendingDeals?: number,
+    fileListPath?: string,
+    notes?: string,
+    dealsTotal?: number,
+    dealsProposed?: number,
+    dealsPublished?: number,
+    dealsActive?: number,
+    dealsProposalExpired?: number,
+    dealsExpired?: number,
+    dealsSlashed?: number,
+    dealsError?: number,
+    deals?: Array<DealState>
   }

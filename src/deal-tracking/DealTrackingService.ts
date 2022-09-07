@@ -2,8 +2,8 @@ import BaseService from '../common/BaseService';
 import { Category } from '../common/Logger';
 import Datastore from '../common/Datastore';
 import axios, { AxiosRequestHeaders } from 'axios';
-import DealReplicationWorker from '../replication/DealReplicationWorker';
 import config from '../common/Config';
+import { DateToHeight } from '../common/ChainHeight';
 
 export default class DealTrackingService extends BaseService {
   public constructor () {
@@ -22,7 +22,7 @@ export default class DealTrackingService extends BaseService {
 
   private async startDealTracking (): Promise<void> {
     await this.dealTracking();
-    setTimeout(this.startDealTracking, 600_000);
+    setTimeout(this.startDealTracking, config.getOrDefault<number>('interval_ms.lotus_api', 3_600_000));
   }
 
   private async dealTracking (): Promise<void> {
@@ -39,9 +39,7 @@ export default class DealTrackingService extends BaseService {
       try {
         await this.updateDealFromLotus(client);
         // only clean up expired deals when updateDealFromLotus update success
-        if (config.get('deal_replication_worker.enabled')) {
-          await this.markExpired(client);
-        }
+        await this.markExpiredDeals(client);
       } catch (error) {
         this.logger.error('Encountered an error when updating deals from lotus', error);
       }
@@ -86,22 +84,22 @@ export default class DealTrackingService extends BaseService {
             this.logger.info('Reached to the last page or last checked deal.');
             break;
           }
-          const publishedDeal = await Datastore.DealStateModel.findOne({
+          const existingDeal = await Datastore.DealStateModel.findOne({
             dealId: deal['dealid']
           });
-          if (publishedDeal) {
+          if (existingDeal) { // Deal state will be updated later by updateDealFromLotus
             continue;
           }
-          const proposedDeal = await Datastore.DealStateModel.findOne({
+          const newlyProposedDeal = await Datastore.DealStateModel.findOne({
             pieceCid: deal['piece_cid'],
             provider: deal['provider'],
             client: deal['client'],
             state: 'proposed'
           });
 
-          if (proposedDeal) {
+          if (newlyProposedDeal) {
             await Datastore.DealStateModel.updateOne({
-              _id: proposedDeal._id
+              _id: newlyProposedDeal._id
             }, {
               $set: {
                 dealId: deal['dealid'],
@@ -190,8 +188,8 @@ export default class DealTrackingService extends BaseService {
     } while (response.data['deals'].length > 0);
   }
   */
-  private async markExpired (client: string): Promise<void> {
-    const chainHeight = await DealReplicationWorker.getCurrentChainHeight(config.get('deal_replication_worker.lotus_cli_cmd'));
+  private async markExpiredDeals (client: string): Promise<void> {
+    const chainHeight = DateToHeight(new Date()); // Only support mainnet!
     let modified = (await Datastore.DealStateModel.updateMany({
       client,
       state: {

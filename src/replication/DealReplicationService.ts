@@ -6,12 +6,8 @@ import Logger, { Category } from '../common/Logger';
 import CreateReplicationRequest from './model/CreateReplicationRequest';
 import ErrorCode from './model/ErrorCode';
 import GetReplicationDetailsResponse from './model/GetReplicationDetailsResponse';
-import { GetReplicationsResponse } from './model/GetReplicationsResponse';
+import { GetReplicationsResponse, GetReplicationsResponseItem } from './model/GetReplicationsResponse';
 import UpdateReplicationRequest from './model/UpdateReplicationRequest';
-import { ObjectId } from 'mongodb';
-import ObjectsToCsv from 'objects-to-csv';
-import GenerateCSVRequest from './model/GenerateCSVRequest';
-import path from 'path';
 import config from '../common/Config';
 
 export default class DealReplicationService extends BaseService {
@@ -24,7 +20,6 @@ export default class DealReplicationService extends BaseService {
       this.handleUpdateReplicationRequest = this.handleUpdateReplicationRequest.bind(this);
       this.handleListReplicationRequests = this.handleListReplicationRequests.bind(this);
       this.handleGetReplicationRequest = this.handleGetReplicationRequest.bind(this);
-      this.handlePrintCSVReplicationRequest = this.handlePrintCSVReplicationRequest.bind(this);
       this.startCleanupHealthCheck = this.startCleanupHealthCheck.bind(this);
       if (!this.enabled) {
         this.logger.warn('Deal Replication Service is not enabled. Exit now...');
@@ -41,7 +36,6 @@ export default class DealReplicationService extends BaseService {
       this.app.post('/replication/:id', this.handleUpdateReplicationRequest);
       this.app.get('/replications', this.handleListReplicationRequests);
       this.app.get('/replication/:id', this.handleGetReplicationRequest);
-      this.app.post('/replication/:id/csv', this.handlePrintCSVReplicationRequest);
     }
 
     public start (): void {
@@ -55,16 +49,36 @@ export default class DealReplicationService extends BaseService {
 
     private async handleGetReplicationRequest (request: Request, response: Response) {
       const id = request.params['id'];
-      if (!ObjectId.isValid(id)) {
-        this.sendError(response, ErrorCode.INVALID_OBJECT_ID);
-        return;
-      }
+      const verbose = request.query['verbose'] === 'true';
       this.logger.info(`Received request to get details of dataset replication request "${id}".`);
       const found = await Datastore.ReplicationRequestModel.findById(id);
       if (!found) {
         this.sendError(response, ErrorCode.DATASET_NOT_FOUND);
         return;
       }
+      const dealStateStats = await Datastore.DealStateModel.aggregate([
+        {
+          $match: {
+            replicationRequestId: found.id
+          }
+        },
+        {
+          $group: {
+            _id: {
+              state: '$state'
+            },
+            count: { $sum: 1 }
+          }
+        }
+      ]);
+      const proposed = dealStateStats.find(s => s._id.state === 'proposed')?.count ?? 0;
+      const published = dealStateStats.find(s => s._id.state === 'published')?.count ?? 0;
+      const active = dealStateStats.find(s => s._id.state === 'active')?.count ?? 0;
+      const proposalExpired = dealStateStats.find(s => s._id.state === 'proposal_expired')?.count ?? 0;
+      const expired = dealStateStats.find(s => s._id.state === 'expired')?.count ?? 0;
+      const slashed = dealStateStats.find(s => s._id.state === 'slashed')?.count ?? 0;
+      const error = dealStateStats.find(s => s._id.state === 'error')?.count ?? 0;
+      const total = dealStateStats.reduce((acc, s) => acc + s.count, 0);
       const result: GetReplicationDetailsResponse = {
         id: found.id,
         datasetId: found.datasetId,
@@ -81,8 +95,21 @@ export default class DealReplicationService extends BaseService {
         status: found.status,
         cronSchedule: found.cronSchedule,
         cronMaxDeals: found.cronMaxDeals,
-        cronMaxPendingDeals: found.cronMaxPendingDeals
+        cronMaxPendingDeals: found.cronMaxPendingDeals,
+        fileListPath: found.fileListPath,
+        notes: found.notes,
+        dealsProposed: proposed,
+        dealsPublished: published,
+        dealsActive: active,
+        dealsProposalExpired: proposalExpired,
+        dealsExpired: expired,
+        dealsSlashed: slashed,
+        dealsError: error,
+        dealsTotal: total
       };
+      if (verbose) {
+        result.deals = await Datastore.DealStateModel.find({ replicationRequestId: id });
+      }
       response.end(JSON.stringify(result));
     }
 
@@ -91,7 +118,7 @@ export default class DealReplicationService extends BaseService {
       const replicationRequests = await Datastore.ReplicationRequestModel.find();
       const result: GetReplicationsResponse = [];
       for (const r of replicationRequests) {
-        result.push({
+        const obj: GetReplicationsResponseItem = {
           id: r.id,
           datasetId: r.datasetId,
           replica: r.maxReplicas,
@@ -99,23 +126,20 @@ export default class DealReplicationService extends BaseService {
           client: r.client,
           maxNumberOfDeals: r.maxNumberOfDeals,
           status: r.status,
-          errorMessage: r.errorMessage,
-          replicationTotal: await Datastore.ReplicationRequestModel.count({ datasetId: r.id }),
-          replicationActive: await Datastore.ReplicationRequestModel.count({ datasetId: r.id, status: 'active' }),
-          replicationPaused: await Datastore.ReplicationRequestModel.count({ datasetId: r.id, status: 'paused' }),
-          replicationCompleted: await Datastore.ReplicationRequestModel.count({ datasetId: r.id, status: 'completed' }),
-          replicationError: await Datastore.ReplicationRequestModel.count({ datasetId: r.id, status: 'error' })
-        });
+          cronSchedule: r.cronSchedule,
+          cronMaxDeals: r.cronMaxDeals,
+          cronMaxPendingDeals: r.cronMaxPendingDeals,
+          fileListPath: r.fileListPath,
+          notes: r.notes,
+          errorMessage: r.errorMessage
+        };
+        result.push(obj);
       }
       response.end(JSON.stringify(result));
     }
 
     private async handleUpdateReplicationRequest (request: Request, response: Response) {
       const id = request.params['id'];
-      if (!ObjectId.isValid(id)) {
-        this.sendError(response, ErrorCode.INVALID_OBJECT_ID);
-        return;
-      }
       const { status, cronSchedule, cronMaxDeals, cronMaxPendingDeals } = <UpdateReplicationRequest>request.body;
       this.logger.info(`Received request to update replication request "${id}" with ` +
       `status: "${status}", cron schedule: ${cronSchedule} and cronMaxDeal: ${cronMaxDeals}.`);
@@ -192,7 +216,9 @@ export default class DealReplicationService extends BaseService {
         maxNumberOfDeals,
         cronSchedule,
         cronMaxDeals,
-        cronMaxPendingDeals
+        cronMaxPendingDeals,
+        fileListPath,
+        notes
       } = <CreateReplicationRequest>request.body;
       this.logger.info(`Received request to replicate dataset "${datasetId}" from client "${client}.`);
       let realDatasetId = datasetId;
@@ -229,6 +255,8 @@ export default class DealReplicationService extends BaseService {
       replicationRequest.cronSchedule = cronSchedule;
       replicationRequest.cronMaxDeals = cronMaxDeals;
       replicationRequest.cronMaxPendingDeals = cronMaxPendingDeals;
+      replicationRequest.fileListPath = fileListPath;
+      replicationRequest.notes = notes;
       try {
         await replicationRequest.save();
         // Create a deal tracking request if not exist
@@ -250,45 +278,6 @@ export default class DealReplicationService extends BaseService {
       }
 
       response.end(JSON.stringify({ id: replicationRequest.id }));
-    }
-
-    private async handlePrintCSVReplicationRequest (request: Request, response: Response) {
-      const id = request.params['id'];
-      const { outDir } = <GenerateCSVRequest>request.body;
-      const replicationRequest = await Datastore.ReplicationRequestModel.findById(id);
-      if (replicationRequest) {
-        const deals = await Datastore.DealStateModel.find({
-          replicationRequestId: id,
-          state: { $nin: ['slashed', 'error', 'expired', 'proposal_expired'] }
-        });
-        this.logger.info(`Found ${deals.length} deals from replication request ${id}`);
-        let urlPrefix = replicationRequest.urlPrefix;
-        if (!urlPrefix.endsWith('/')) {
-          urlPrefix += '/';
-        }
-
-        if (deals.length > 0) {
-          const csvRow = [];
-          for (let i = 0; i < deals.length; i++) {
-            const deal = deals[i];
-            csvRow.push({
-              miner_id: deal.provider,
-              deal_cid: deal.dealCid,
-              filename: `${deal.pieceCid}.car`,
-              piece_cid: deal.pieceCid,
-              start_epoch: deal.startEpoch,
-              full_url: `${urlPrefix}/${deal.pieceCid}.car`
-            });
-          }
-          const csv = new ObjectsToCsv(csvRow);
-          const filename = `${outDir}${path.sep}${deals[0].provider}_${id}.csv`;
-          await csv.toDisk(filename);
-          response.end(`CSV saved to ${filename}`);
-        }
-      } else {
-        this.logger.error(`Could not find replication request ${id}`);
-      }
-      response.end();
     }
 
     private async cleanupHealthCheck (): Promise<void> {
