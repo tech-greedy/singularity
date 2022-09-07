@@ -39,8 +39,8 @@ export default class DealTrackingService extends BaseService {
       try {
         await this.updateDealFromLotus(client);
         // only clean up expired deals when updateDealFromLotus update success
-        if (config.get('deal_replication_worker.enabled')) {
-          await this.markExpired(client);
+        if (config.get('deal_replication_worker.enabled')) { // why do we need this check?
+          await this.markExpired(client); // rename to markExpiredDeals
         }
       } catch (error) {
         this.logger.error('Encountered an error when updating deals from lotus', error);
@@ -89,7 +89,7 @@ export default class DealTrackingService extends BaseService {
           const publishedDeal = await Datastore.DealStateModel.findOne({
             dealId: deal['dealid']
           });
-          if (publishedDeal) {
+          if (publishedDeal) {// if it is a published deal but the state has changed to slashed or active, we need to update the database
             continue;
           }
           const proposedDeal = await Datastore.DealStateModel.findOne({
@@ -191,6 +191,7 @@ export default class DealTrackingService extends BaseService {
   }
   */
   private async markExpired (client: string): Promise<void> {
+    // Deal tracking service should not depend on lotus CLI. You can use the height of current time. Use ChainHeight.ts. Give it a few hours of buffer time in case the chain is delayed.
     const chainHeight = await DealReplicationWorker.getCurrentChainHeight(config.get('deal_replication_worker.lotus_cli_cmd'));
     let modified = (await Datastore.DealStateModel.updateMany({
       client,

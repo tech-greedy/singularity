@@ -662,7 +662,7 @@ replication.command('list')
     CliUtil.renderResponse(response.data, options.json);
   });
 
-replication.command('schedule')
+replication.command('schedule') //rename to reschedule
   .description('Change an existing deal replication request\'s cron schedule.')
   .argument('<id>', 'Existing ID of deal replication request.')
   .argument('<schedule>', 'Updated cron schedule.')
@@ -763,6 +763,8 @@ replication.command('csv').description('Write a deal replication result as csv.'
             if (replicationRequest.fileListPath) {
               fileListFilename += '_' + path.parse(replicationRequest.fileListPath).name;
             }
+            // fs.mkdirp(outDir)
+            // use path.join instead of path.sep
             const filename = `${outDir}${path.sep}${provider}${fileListFilename}_${id}.csv`;
             await csv.toDisk(filename);
             msg += `CSV saved to ${filename}\n`;

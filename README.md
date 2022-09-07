@@ -295,7 +295,7 @@ use with the tool.
 Once you have the lite node setup, you can import your wallet key for the verified client address.
 
 #### Deal making
-
+//Please update every commands you've added and/or modified
 ```shell
 $ singularity repl start -h                                                                 
 Usage: singularity replication start [options] <datasetid> <storage-providers> <client> [# of replica]

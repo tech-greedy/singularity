@@ -48,8 +48,10 @@ export default class DealReplicationService extends BaseService {
         });
     }
 
+    // We want to use an optional flag to show all the proposed deals and their status
     private async handleGetReplicationRequest (request: Request, response: Response) {
       const id = request.params['id'];
+      // Move below logic to something like Datastore.findReplicationRequestById
       if (!ObjectId.isValid(id)) {
         this.sendError(response, ErrorCode.INVALID_OBJECT_ID);
         return;
@@ -128,6 +130,7 @@ export default class DealReplicationService extends BaseService {
           maxNumberOfDeals: r.maxNumberOfDeals,
           status: r.status,
           errorMessage: r.errorMessage
+          // We need cron job details here too
         };
         result.push(obj);
       }

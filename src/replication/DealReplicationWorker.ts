@@ -11,6 +11,7 @@ import fs from 'fs-extra';
 import config from '../common/Config';
 const mathconfig = {};
 const math = create(all, mathconfig);
+// Try use promisify-child-process to replace await-exec
 const exec: any = require('await-exec');// no TS support
 
 export default class DealReplicationWorker extends BaseService {
@@ -50,6 +51,7 @@ export default class DealReplicationWorker extends BaseService {
 
   private async pollWork (): Promise<boolean> {
     this.logger.debug(`${this.workerId} - Polling for work`);
+    // this should run continuously instead of once per pollWork
     await this.checkCronChange();
     const hasDoneWork = await this.pollReplicationWork();
     return hasDoneWork;
@@ -114,6 +116,7 @@ export default class DealReplicationWorker extends BaseService {
    * @param storageProviders
    * @returns
    */
+  // We can remove async now. Pando integration is no longer part of the scope
   public static async generateProvidersList (storageProviders: string): Promise<Array<string>> {
     return storageProviders.split(',');
   }
@@ -297,6 +300,7 @@ export default class DealReplicationWorker extends BaseService {
           pieceCid: 1
         });
       const makeDealAll = providers.map(async (provider) => {
+        // you cannot reuse the breakOuter from outer scope, each parallel task will be writing to the same var
         if (breakOuter) {
           this.stopCronIfExist(replicationRequest.id);
           return;
@@ -329,6 +333,7 @@ export default class DealReplicationWorker extends BaseService {
           const carFile = cars[j];
           // check if file belongs to fileList
           if (fileList !== '' && carFile.pieceCid) {
+            // this is not a reliable way to cehck if filelist contains piececid, it should be split by newline, converted into a set and check inclusion
             if (fileList.indexOf(carFile.pieceCid) === -1) {
               this.logger.debug(`File ${carFile.pieceCid} is not on the list`);
               continue;
@@ -393,6 +398,7 @@ export default class DealReplicationWorker extends BaseService {
             continue; // go to next file
           }
           if (existingDeals.length >= existingRec.maxReplicas) {
+            // this not be a debug or info
             this.logger.warn(`This pieceCID ${carFile.pieceCid} has reached enough ` +
               `replica (${existingRec.maxReplicas}) planned by the request ${existingRec.id}.`);
             continue; // go to next file
@@ -449,6 +455,7 @@ export default class DealReplicationWorker extends BaseService {
               state = 'error';
             }
             this.logger.info(`Waiting ${retryTimeout} ms to retry`);
+            // use await sleep(retryTimeout)
             await new Promise(resolve => setTimeout(resolve, retryTimeout));
             if (errorMsg.includes('proposed provider collateral below minimum')) {
               this.logger.warn(`Keep retry on this error without expoential back off. These can usually resolve itself within timely manner.`);
