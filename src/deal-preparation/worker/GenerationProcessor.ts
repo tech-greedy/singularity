@@ -229,7 +229,7 @@ export async function generate (logger: winston.Logger, request: GenerationReque
       End: file.end
     })));
   }
-  const output = await invokeGenerateCar(request.id, input, request.outDir, tmpDir ?? request.path);
+  const output = await invokeGenerateCar(logger, request.id, input, request.outDir, tmpDir ?? request.path);
   logger.debug(`Child process finished.`, output);
   return output;
 }
@@ -238,7 +238,7 @@ async function isGenerationRequestNoLongerActive (id: string) : Promise<boolean>
   return (await Datastore.GenerationRequestModel.findById(id))?.status !== 'active';
 }
 
-export async function invokeGenerateCar (generationId: string | undefined, input: string, outDir: string, p: string)
+export async function invokeGenerateCar (logger: winston.Logger, generationId: string | undefined, input: string, outDir: string, p: string)
   : Promise<ChildProcessOutput> {
   const cmd = GenerateCar.path!;
   const args = ['-o', outDir, '-p', p];
@@ -247,7 +247,7 @@ export async function invokeGenerateCar (generationId: string | undefined, input
     maxBuffer: config.getOrDefault('deal_preparation_worker.max_buffer', 1024 * 1024 * 1024)
   });
   if (generationId) {
-    checkPauseOrRemove(generationId, child);
+    checkPauseOrRemove(logger, generationId, child);
   }
   child.stdin!.write(input);
   child.stdin!.end();
@@ -261,9 +261,12 @@ export async function invokeGenerateCar (generationId: string | undefined, input
   }
 }
 
-async function checkPauseOrRemove (generationId: string, child: ChildProcessPromise) {
+async function checkPauseOrRemove (logger: winston.Logger, generationId: string, child: ChildProcessPromise) {
   const generation = await Datastore.GenerationRequestModel.findById(generationId);
   if (generation?.status !== 'active') {
+    logger.warn(`Generation request has been removed or paused. Killing the child process.`, {
+      generationId
+    });
     try {
       child.kill();
     } catch (_) {
@@ -273,7 +276,7 @@ async function checkPauseOrRemove (generationId: string, child: ChildProcessProm
   if (child.exitCode) {
     return;
   }
-  setTimeout(() => checkPauseOrRemove(generationId, child), 5000);
+  setTimeout(() => checkPauseOrRemove(logger, generationId, child), 5000);
 }
 
 export function handleGeneratedFileList (
