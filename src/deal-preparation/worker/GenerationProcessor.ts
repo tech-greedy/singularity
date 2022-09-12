@@ -265,7 +265,8 @@ async function checkPauseOrRemove (logger: winston.Logger, generationId: string,
   const generation = await Datastore.GenerationRequestModel.findById(generationId);
   if (generation?.status !== 'active') {
     logger.warn(`Generation request has been removed or paused. Killing the child process.`, {
-      generationId
+      generationId,
+      generation: JSON.stringify(generation)
     });
     try {
       child.kill();
