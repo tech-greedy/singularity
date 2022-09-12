@@ -276,7 +276,7 @@ async function checkPauseOrRemove (logger: winston.Logger, generationId: string,
   if (child.exitCode) {
     return;
   }
-  setTimeout(() => checkPauseOrRemove(generationId, child), 5000);
+  setTimeout(() => checkPauseOrRemove(logger, generationId, child), 5000);
 }
 
 export function handleGeneratedFileList (
