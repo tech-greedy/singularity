@@ -268,8 +268,7 @@ async function checkPauseOrRemove (logger: winston.Logger, generationId: string,
   }
   if (generation?.status !== 'active') {
     logger.warn(`Generation request has been removed or paused. Killing the child process.`, {
-      generationId,
-      generation: JSON.stringify(generation)
+      generationId
     });
     try {
       child.kill();
