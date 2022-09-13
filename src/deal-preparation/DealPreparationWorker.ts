@@ -51,7 +51,7 @@ export default class DealPreparationWorker extends BaseService {
         }
         throw err;
       } finally {
-        const modified = await Datastore.HealthCheckModel.findOneAndUpdate({ workerId: this.workerId }, { $set: { state: 'idle' } });
+        const modified = await Datastore.HealthCheckModel.findOneAndUpdate({ workerId: this.workerId }, { $set: { state: 'idle' } }, { new: true });
         this.logger.info(`[${this.workerId}] Set worker state to idle`, { modified });
       }
     }
@@ -88,7 +88,7 @@ export default class DealPreparationWorker extends BaseService {
         }
         this.logger.error(`${this.workerId} - Encountered an error.`, error);
       } finally {
-        const modified = await Datastore.HealthCheckModel.findOneAndUpdate({ workerId: this.workerId }, { $set: { state: 'idle' } });
+        const modified = await Datastore.HealthCheckModel.findOneAndUpdate({ workerId: this.workerId }, { $set: { state: 'idle' } }, { new: true });
         this.logger.info(`[${this.workerId}] Set worker state to idle`, { modified });
         if (tmpDir) {
           await fs.rm(tmpDir, { recursive: true });
