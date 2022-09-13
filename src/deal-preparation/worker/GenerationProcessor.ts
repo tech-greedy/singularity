@@ -263,6 +263,9 @@ export async function invokeGenerateCar (logger: winston.Logger, generationId: s
 
 async function checkPauseOrRemove (logger: winston.Logger, generationId: string, child: ChildProcessPromise) {
   const generation = await Datastore.GenerationRequestModel.findById(generationId);
+  if (generation?.status === 'completed') {
+    return;
+  }
   if (generation?.status !== 'active') {
     logger.warn(`Generation request has been removed or paused. Killing the child process.`, {
       generationId
