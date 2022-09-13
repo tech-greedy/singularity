@@ -88,7 +88,8 @@ export default class DealPreparationWorker extends BaseService {
         }
         this.logger.error(`${this.workerId} - Encountered an error.`, error);
       } finally {
-        await Datastore.HealthCheckModel.findOneAndUpdate({ workerId: this.workerId }, { $set: { state: 'idle' } });
+        const modified = await Datastore.HealthCheckModel.findOneAndUpdate({ workerId: this.workerId }, { $set: { state: 'idle' } });
+        this.logger.info(`[${this.workerId}] Set worker state to idle`, { modified });
         if (tmpDir) {
           await fs.rm(tmpDir, { recursive: true });
         }
