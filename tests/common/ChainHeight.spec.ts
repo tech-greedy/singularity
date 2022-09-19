@@ -1,4 +1,10 @@
-import { DateToHeight, HeightToDate, HeightToTimestamp, TimestampToHeight } from '../../src/common/ChainHeight';
+import {
+  DateToHeight,
+  HeightFromCurrentTime,
+  HeightToDate,
+  HeightToTimestamp,
+  TimestampToHeight
+} from '../../src/common/ChainHeight';
 
 describe('ChainHeight', () => {
   describe('DateToHeight', () => {
@@ -23,6 +29,12 @@ describe('ChainHeight', () => {
     it('should convert a timestamp to a height', () => {
       const timestamp = 1660376130;
       expect(TimestampToHeight(timestamp)).toEqual(2_068_991);
+    });
+  });
+  describe('HeightFromCurrentTime', () => {
+    it('should convert the current time to a height', () => {
+      const height = TimestampToHeight(Date.now() / 1000);
+      expect(HeightFromCurrentTime()).toEqual(height);
     });
   });
 });

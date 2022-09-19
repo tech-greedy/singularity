@@ -14,12 +14,33 @@ describe('DealTrackingService', () => {
     await Datastore.DealTrackingStateModel.deleteMany();
   })
   describe('start', () => {
-    it('should start the service', () => {
+    it('should start the service', async () => {
       const trackingSpy = spyOn<any>(service, 'startDealTracking').and.stub();
-      service.start();
+      await service.start();
       expect(trackingSpy).toHaveBeenCalled()
     })
   })
+  describe('markExpired', () => {
+    it('should mark expired deals', async () => {
+      await Datastore.DealStateModel.create({
+        dealId: 1,
+        client: 'f0xxxx',
+        state: 'proposed',
+        startEpoch: 1,
+      });
+      await Datastore.DealStateModel.create({
+        dealId: 2,
+        client: 'f0xxxx',
+        state: 'active',
+        expiration: 1,
+      });
+      await service['markExpired']('f0xxxx');
+      const deal1 = await Datastore.DealStateModel.findOne({ dealId: 1 });
+      const deal2 = await Datastore.DealStateModel.findOne({ dealId: 2 });
+      expect(deal1?.state).toEqual('proposal_expired');
+      expect(deal2?.state).toEqual('expired');
+    });
+  });
   describe('dealTracking', () => {
     it('should start tracking on all clients', async () => {
       await Datastore.DealTrackingStateModel.create({
@@ -171,109 +192,89 @@ describe('DealTrackingService', () => {
     })
   })
 
-  xdescribe('insertDealFromFilscan', () => {
-    xit('should download all deal ids for a client - real network call', async () => {
-      await service['insertDealFromFilscan']('f3vfs6f7tagrcpnwv65wq3leznbajqyg77bmijrpvoyjv3zjyi3urq25vigfbs3ob6ug5xdihajumtgsxnz2pa', 0);
+  describe('insertDealFromFilscan', () => {
+    it('should download all deal ids for a client - real network call', async () => {
+      await service['insertDealFromFilscan']('f3vp7m3244tjtxrvg4n2lfedtqnnnzhyno3ym6vnl4wzozztik4f2kvzfbfbgzcga7g3mckddw6x4ahp5n4iwa', 1596000);
       const stored = await Datastore.DealStateModel.find({});
-      expect(stored.length).toEqual(767);
-      expect(stored[1].dealId).toEqual(766);
+      expect(stored.length).toEqual(85);
+      expect(stored[0].dealId).toEqual(1596643);
     }, 5 * 60 * 1000);
 
-    it('should handle duplication deals', async () => {
-      const spy = spyOn(axios, 'get').and.returnValues(Promise.resolve({
+    it('should handle duplicate deals', async () => {
+      const deals = Array(25).fill(undefined).map((_, i) => (
+      { dealid: 100 + i, provider: 'provider1', start_epoch: 0, end_epoch: 0}));
+      const spy = spyOn(axios, 'post').and.returnValues(Promise.resolve({
         data: {
-          deals: [
-            {
-              id: 100,
-              provider: 'provider1'
-            }
-          ]
+          result: {
+            deals
+          }
         }
       }),Promise.resolve({
         data: {
+          result: {
           deals: [
             {
-              id: 100,
-              provider: 'provider2'
+              dealid: 100,
+              provider: 'provider2', start_epoch: 0, end_epoch: 0
             }
-          ]
+          ]}
         }
       }),Promise.resolve({
         data: {
+          result: {
           deals: [
-          ]
+          ]}
         }
       }));
-      await service['insertDealFromFilscan']('test_client', 0);
-      expect(spy).toHaveBeenCalledTimes(3);
-      const stored = await Datastore.DealStateModel.find({});
-      expect(stored.length).toEqual(1);
-      expect(stored[0].provider).toEqual('provider1');
+      await service['insertDealFromFilscan']('f0xxxx', 0);
+      expect(spy).toHaveBeenCalledTimes(2);
+      const stored = await Datastore.DealStateModel.find();
+      expect(stored.length).toEqual(25);
+      for (const deal of stored) {
+        expect(deal.provider).toEqual('provider1');
+      }
     })
 
     it('should store deals from last deal', async () => {
-      const spy = spyOn(axios, 'get').and.returnValues(Promise.resolve({
+      const deals = Array(20).fill(undefined).map((_, i) => (
+          { dealid: 120 - i, provider: 'provider1', start_epoch: 0, end_epoch: 0}));
+      const spy = spyOn(axios, 'post').and.returnValues(Promise.resolve({
         data: {
-          deals: [
-            {
-              id: 200,
-              provider: 'provider1'
-            }
-          ]
-        }
-      }),Promise.resolve({
-        data: {
-          deals: [
-            {
-              id: 100,
-              provider: 'provider2'
-            }
-          ]
-        }
-      }),Promise.resolve({
-        data: {
-          deals: [
-          ]
+          result: {deals}
         }
       }));
-      await service['insertDealFromFilscan']('test_client', 100);
-      expect(spy).toHaveBeenCalledTimes(2);
+      await service['insertDealFromFilscan']('test_client', 110);
+      expect(spy).toHaveBeenCalledTimes(1);
       const stored = await Datastore.DealStateModel.find({});
-      expect(stored.length).toEqual(1);
+      expect(stored.length).toEqual(10);
     })
 
-    it('should store all deal ids to database', async () => {
-      const spy = spyOn(axios, 'get').and.returnValues(Promise.resolve({
-        data: {
+    it('should update proposed deals in the database with deal id', async () => {
+      await Datastore.DealStateModel.create({
+        pieceCid: 'piece_cid',
+        provider: 'provider',
+        client: 'f0xxxx',
+        state: 'proposed'
+      })
+      const spy = spyOn(axios, 'post').and.returnValues(Promise.resolve({
+        data: {result: {
           deals: [
             {
-              id: 200,
-              provider: 'provider1'
+              dealid: 200,
+              provider: 'provider',
+              start_epoch: 0,
+                end_epoch: 0,
+              client: 'f0xxxx',
+              piece_cid: 'piece_cid'
             }
           ]
-        }
-      }),Promise.resolve({
-        data: {
-          deals: [
-            {
-              id: 100,
-              provider: 'provider2'
-            }
-          ]
-        }
-      }),Promise.resolve({
-        data: {
-          deals: [
-          ]
-        }
+        }}
       }));
-      await service['insertDealFromFilscan']('test_client', 0);
-      expect(spy).toHaveBeenCalledTimes(3);
-      expect(spy).toHaveBeenCalledWith('https://filfox.info/api/v1/deal/list?address=test_client&pageSize=100&page=0');
-      expect(spy).toHaveBeenCalledWith('https://filfox.info/api/v1/deal/list?address=test_client&pageSize=100&page=1');
-      expect(spy).toHaveBeenCalledWith('https://filfox.info/api/v1/deal/list?address=test_client&pageSize=100&page=2');
+      await service['insertDealFromFilscan']('f0xxxx', 0);
+      expect(spy).toHaveBeenCalledTimes(1);
       const stored = await Datastore.DealStateModel.find({});
-      expect(stored.length).toEqual(2);
+      expect(stored.length).toEqual(1);
+      expect(stored[0].dealId).toEqual(200);
     })
   })
 })

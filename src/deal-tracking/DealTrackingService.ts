@@ -2,8 +2,8 @@ import BaseService from '../common/BaseService';
 import { Category } from '../common/Logger';
 import Datastore from '../common/Datastore';
 import axios, { AxiosRequestHeaders } from 'axios';
-import DealReplicationWorker from '../replication/DealReplicationWorker';
 import config from '../common/Config';
+import { HeightFromCurrentTime } from '../common/ChainHeight';
 
 export default class DealTrackingService extends BaseService {
   public constructor () {
@@ -48,6 +48,8 @@ export default class DealTrackingService extends BaseService {
     }
   }
 
+  private static readonly FilscanPagination = 25;
+
   /**
    * Read from filscan api for PublishStorageDeal status
    *
@@ -59,7 +61,7 @@ export default class DealTrackingService extends BaseService {
     let page = 0;
     let response;
     do {
-      const offset = page * 25;
+      const offset = page * DealTrackingService.FilscanPagination;
       let breakOuter = false;
 
       let url = 'https://api.filscan.io:8700/rpc/v1';
@@ -70,7 +72,7 @@ export default class DealTrackingService extends BaseService {
       response = await axios.post(url, {
         id: 1,
         jsonrpc: '2.0',
-        params: [client, offset, 25],
+        params: [client, offset, DealTrackingService.FilscanPagination],
         method: 'filscan.GetMarketDeal'
       }, {
         headers: {
@@ -81,9 +83,9 @@ export default class DealTrackingService extends BaseService {
         const jsonResult = response.data['result'];
         this.logger.debug(`Received ${offset} out of ${jsonResult['total']} deal entries.`);
         for (const deal of jsonResult['deals']) {
-          if (deal['dealid'] <= lastDeal || jsonResult['deals'].length < 25) {
+          if (deal['dealid'] <= lastDeal) {
             breakOuter = true;
-            this.logger.info('Reached to the last page or last checked deal.');
+            this.logger.info('Reached to the last checked deal.');
             break;
           }
           const publishedDeal = await Datastore.DealStateModel.findOne({
@@ -123,6 +125,10 @@ export default class DealTrackingService extends BaseService {
             });
             this.logger.debug(`Deal ${deal['dealid']} inserted as published.`);
           }
+        }
+        if (jsonResult['deals'].length < DealTrackingService.FilscanPagination) {
+          this.logger.info('Reached to the last page.');
+          break;
         }
         if (breakOuter) {
           break;
@@ -191,7 +197,7 @@ export default class DealTrackingService extends BaseService {
   }
   */
   private async markExpired (client: string): Promise<void> {
-    const chainHeight = await DealReplicationWorker.getCurrentChainHeight(config.get('deal_replication_worker.lotus_cli_cmd'));
+    const chainHeight = HeightFromCurrentTime() - 120;
     let modified = (await Datastore.DealStateModel.updateMany({
       client,
       state: {
