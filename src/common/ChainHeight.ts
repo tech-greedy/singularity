@@ -18,3 +18,7 @@ export function HeightToTimestamp (height: number) : number {
 export function TimestampToHeight (timestamp: number) : number {
   return Math.floor((timestamp - genesisTimestamp) / 30);
 }
+
+export function HeightFromCurrentTime () : number {
+  return TimestampToHeight(Date.now() / 1000);
+}
