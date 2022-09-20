@@ -4,12 +4,12 @@ import BaseService from '../common/BaseService';
 import Datastore from '../common/Datastore';
 import Logger, { Category } from '../common/Logger';
 import CreateReplicationRequest from './model/CreateReplicationRequest';
-import ErrorCode from './model/ErrorCode';
+import ErrorCode, { ErrorMessage } from './model/ErrorCode';
 import GetReplicationDetailsResponse from './model/GetReplicationDetailsResponse';
 import { GetReplicationsResponse, GetReplicationsResponseItem } from './model/GetReplicationsResponse';
 import UpdateReplicationRequest from './model/UpdateReplicationRequest';
-import { ObjectId } from 'mongodb';
 import config from '../common/Config';
+import { AbortSignal } from '../common/AbortSignal';
 
 export default class DealReplicationService extends BaseService {
 
@@ -49,15 +49,10 @@ export default class DealReplicationService extends BaseService {
     }
 
     private async handleGetReplicationRequest (request: Request, response: Response) {
-      const id = request.params['id'];
-      if (!ObjectId.isValid(id)) {
-        this.sendError(response, ErrorCode.INVALID_OBJECT_ID);
-        return;
-      }
-      this.logger.info(`Received request to get details of dataset replication request "${id}".`);
-      const found = await Datastore.ReplicationRequestModel.findById(id);
+      this.logger.info(`Received request to get details of dataset replication request "${request.params['id']}".`);
+      const found = await Datastore.findReplicationRequest(request.params['id']);
       if (!found) {
-        this.sendError(response, ErrorCode.DATASET_NOT_FOUND);
+        this.sendError(response, ErrorCode.REPLICATION_NOT_FOUND);
         return;
       }
       const dealStateStats = await Datastore.DealStateModel.aggregate([
@@ -75,13 +70,13 @@ export default class DealReplicationService extends BaseService {
           }
         }
       ]);
-      const proposed = dealStateStats.find(s => s._id.status === 'proposed')?.count ?? 0;
-      const published = dealStateStats.find(s => s._id.status === 'published')?.count ?? 0;
-      const active = dealStateStats.find(s => s._id.status === 'active')?.count ?? 0;
-      const proposalExpired = dealStateStats.find(s => s._id.status === 'proposal_expired')?.count ?? 0;
-      const expired = dealStateStats.find(s => s._id.status === 'expired')?.count ?? 0;
-      const slashed = dealStateStats.find(s => s._id.status === 'slashed')?.count ?? 0;
-      const error = dealStateStats.find(s => s._id.status === 'error')?.count ?? 0;
+      const proposed = dealStateStats.find(s => s._id.state === 'proposed')?.count ?? 0;
+      const published = dealStateStats.find(s => s._id.state === 'published')?.count ?? 0;
+      const active = dealStateStats.find(s => s._id.state === 'active')?.count ?? 0;
+      const proposalExpired = dealStateStats.find(s => s._id.state === 'proposal_expired')?.count ?? 0;
+      const expired = dealStateStats.find(s => s._id.state === 'expired')?.count ?? 0;
+      const slashed = dealStateStats.find(s => s._id.state === 'slashed')?.count ?? 0;
+      const error = dealStateStats.find(s => s._id.state === 'error')?.count ?? 0;
       const total = dealStateStats.reduce((acc, s) => acc + s.count, 0);
       const result: GetReplicationDetailsResponse = {
         id: found.id,
@@ -136,16 +131,12 @@ export default class DealReplicationService extends BaseService {
 
     private async handleUpdateReplicationRequest (request: Request, response: Response) {
       const id = request.params['id'];
-      if (!ObjectId.isValid(id)) {
-        this.sendError(response, ErrorCode.INVALID_OBJECT_ID);
-        return;
-      }
       const { status, cronSchedule, cronMaxDeals, cronMaxPendingDeals } = <UpdateReplicationRequest>request.body;
       this.logger.info(`Received request to update replication request "${id}" with ` +
       `status: "${status}", cron schedule: ${cronSchedule} and cronMaxDeal: ${cronMaxDeals}.`);
-      const found = await Datastore.ReplicationRequestModel.findById(id);
+      const found = await Datastore.findReplicationRequest(id);
       if (!found) {
-        this.sendError(response, ErrorCode.DATASET_NOT_FOUND);
+        this.sendError(response, ErrorCode.REPLICATION_NOT_FOUND);
         return;
       }
       if (!['active', 'paused'].includes(found.status)) {
@@ -198,7 +189,7 @@ export default class DealReplicationService extends BaseService {
     private sendError (response: Response, error: ErrorCode) {
       this.logger.warn(`Error code - ${error}`);
       response.status(400);
-      response.end(JSON.stringify({ error }));
+      response.end(JSON.stringify({ error, message: ErrorMessage[error] }));
     }
 
     private async handleCreateReplicationRequest (request: Request, response: Response) {
@@ -221,26 +212,23 @@ export default class DealReplicationService extends BaseService {
         notes
       } = <CreateReplicationRequest>request.body;
       this.logger.info(`Received request to replicate dataset "${datasetId}" from client "${client}.`);
-      let realDatasetId = datasetId;
-      const existingSR = await Datastore.ScanningRequestModel.findOne({
-        name: datasetId
-      });
-      if (existingSR) {
-        realDatasetId = existingSR._id.toString();
+      const scanning = await Datastore.findScanningRequest(datasetId);
+      if (!scanning) {
+        this.sendError(response, ErrorCode.DATASET_NOT_FOUND);
+        return;
       }
-
       // Search GenerationRequest by datasetId, if not even one can be found, immediately return error
       const existingGR = await Datastore.GenerationRequestModel.findOne({
-        datasetId: realDatasetId
+        datasetId: scanning.id
       });
       if (existingGR == null) {
-        this.logger.error(`Did not find any existing GenerationRequest with datasetId ${realDatasetId}`);
-        this.sendError(response, ErrorCode.DATASET_NOT_FOUND);
+        this.logger.error(`Did not find any existing GenerationRequest with datasetId ${scanning.id}`);
+        this.sendError(response, ErrorCode.GENERATION_NOT_FOUND);
         return;
       }
 
       const replicationRequest = new Datastore.ReplicationRequestModel();
-      replicationRequest.datasetId = realDatasetId;
+      replicationRequest.datasetId = scanning.id;
       replicationRequest.maxReplicas = replica;
       replicationRequest.storageProviders = storageProviders;
       replicationRequest.client = client;
@@ -290,8 +278,11 @@ export default class DealReplicationService extends BaseService {
       }
     }
 
-    private async startCleanupHealthCheck (): Promise<void> {
+    private async startCleanupHealthCheck (abortSignal?: AbortSignal): Promise<void> {
+      if (abortSignal && await abortSignal()) {
+        return;
+      }
       await this.cleanupHealthCheck();
-      setTimeout(this.startCleanupHealthCheck, 5000);
+      setTimeout(async () => this.startCleanupHealthCheck(abortSignal), 5000);
     }
 }

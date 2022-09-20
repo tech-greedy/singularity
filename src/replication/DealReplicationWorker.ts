@@ -10,7 +10,6 @@ import cron, { ScheduledTask } from 'node-cron';
 import fs from 'fs-extra';
 import config from '../common/Config';
 import { AbortSignal } from '../common/AbortSignal';
-// no TS support
 import { spawn } from 'promisify-child-process';
 import { sleep } from '../common/Util';
 import { HeightFromCurrentTime } from '../common/ChainHeight';
@@ -326,7 +325,7 @@ export default class DealReplicationWorker extends BaseService {
             this.logger.warn(`${provider} already been dealt with ${dealsMadePerSP} deals.`);
           }
         }
-        const retryWait = config.get<number>('deal_replication_worker.min_retry_wait_ms'); // 30s, 60s, 120s ...
+        let retryWait = config.get<number>('deal_replication_worker.min_retry_wait_ms'); // 30s, 60s, 120s ...
         for (let j = 0; j < cars.length; j++) {
           const carFile = cars[j];
           // check if file belongs to fileList
@@ -411,16 +410,17 @@ export default class DealReplicationWorker extends BaseService {
             this.logger.error(`Deal CMD generation failed`, error);
             return;
           }
-          let {
+          const {
             dealCid,
             errorMsg,
             state,
             retryTimeout
           } = await this.makeDeal(dealCmd, carFile.pieceCid!, provider, dealsMadePerSP, useLotus, retryWait);
+          retryWait = retryTimeout;
           if (state === 'proposed') {
             dealsMadePerSP++;
-            if (retryTimeout > config.get<number>('deal_replication_worker.min_retry_wait_ms')) {
-              retryTimeout /= 2; // expoential back "on"
+            if (retryWait > config.get<number>('deal_replication_worker.min_retry_wait_ms')) {
+              retryWait = retryWait /= 2; // expoential back "on"
             }
           }
           await Datastore.DealStateModel.create({
