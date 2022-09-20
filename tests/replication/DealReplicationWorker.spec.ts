@@ -7,7 +7,7 @@ import cron from 'node-cron';
 import * as childprocess from 'promisify-child-process';
 import axios from 'axios';
 
-fdescribe('DealReplicationWorker', () => {
+describe('DealReplicationWorker', () => {
   let worker: DealReplicationWorker;
   let defaultTimeout: number;
 
@@ -25,6 +25,7 @@ fdescribe('DealReplicationWorker', () => {
 
   beforeEach(async () => {
     await Datastore.ScanningRequestModel.deleteMany();
+    await Datastore.ReplicationRequestModel.deleteMany();
     await Datastore.GenerationRequestModel.deleteMany();
     await Datastore.InputFileListModel.deleteMany();
     await Datastore.OutputFileListModel.deleteMany();
@@ -305,6 +306,82 @@ fdescribe('DealReplicationWorker', () => {
       const result = await worker['checkAndMarkCompletion'](request, 100);
       expect(result).toBeFalse();
       expect((await Datastore.ReplicationRequestModel.findById(request.id))!.status).toEqual('active');
+    })
+  })
+  describe('makeDeal', () => {
+    it('should throw error if lotus command failed', async () => {
+      spyOn(childprocess, 'spawn').and.resolveTo({
+        stdout: '',
+        stderr: 'error'
+      })
+      const {dealCid, errorMsg, state, retryTimeout} = await worker['makeDeal']('cmd', 'piece_cid', 'provider',
+          10, true, 10);
+      expect(dealCid).toEqual('unknown');
+      expect(errorMsg).toEqual('error');
+      expect(state).toEqual('error');
+      expect(retryTimeout).toEqual(80);
+    })
+
+    it ('should make deal if lotus command succeeds', async () => {
+        spyOn(childprocess, 'spawn').and.resolveTo({
+            stdout: 'bafy',
+            stderr: ''
+        })
+        const {dealCid, errorMsg, state, retryTimeout} = await worker['makeDeal']('cmd', 'piece_cid', 'provider',
+            10, true, 10);
+        expect(dealCid).toEqual('bafy');
+        expect(errorMsg).toEqual('');
+        expect(state).toEqual('proposed');
+        expect(retryTimeout).toEqual(10);
+    })
+
+    it('should throw error if lotus command failed with provider collateral warning', async () => {
+        spyOn(childprocess, 'spawn').and.resolveTo({
+            stdout: '',
+            stderr: 'proposed provider collateral below minimum'
+        })
+        const {dealCid, errorMsg, state, retryTimeout} = await worker['makeDeal']('cmd', 'piece_cid', 'provider',
+            10, true, 10);
+        expect(dealCid).toEqual('unknown');
+        expect(errorMsg).toEqual('proposed provider collateral below minimum');
+        expect(state).toEqual('error');
+        expect(retryTimeout).toEqual(10);
+    })
+
+    it('should throw error if boost command failed', async () => {
+        spyOn(childprocess, 'spawn').and.resolveTo({
+            stdout: '',
+            stderr: 'error'
+        })
+        const {dealCid, errorMsg, state, retryTimeout} = await worker['makeDeal']('cmd', 'piece_cid', 'provider',
+            10, false, 10);
+        expect(dealCid).toEqual('unknown');
+        expect(errorMsg).toEqual('error');
+        expect(state).toEqual('error');
+        expect(retryTimeout).toEqual(80);
+    })
+
+    it('should make deal if boost command succeeds', async () => {
+        spyOn(childprocess, 'spawn').and.resolveTo({
+            stdout: 'deal uuid: bafy',
+            stderr: ''
+        })
+        const {dealCid, errorMsg, state, retryTimeout} = await worker['makeDeal']('cmd', 'piece_cid', 'provider',
+            10, false, 10);
+        expect(dealCid).toEqual('bafy');
+        expect(errorMsg).toEqual('');
+        expect(state).toEqual('proposed');
+        expect(retryTimeout).toEqual(10);
+    })
+
+    it('should throw error if spawn throws error', async () => {
+      spyOn(childprocess, 'spawn').and.throwError('error')
+      const {dealCid, errorMsg, state, retryTimeout} = await worker['makeDeal']('cmd', 'piece_cid', 'provider',
+          10, false, 10);
+      expect(dealCid).toEqual('unknown');
+      expect(errorMsg).toEqual('Error: error');
+      expect(state).toEqual('error');
+      expect(retryTimeout).toEqual(80);
     })
   })
 })

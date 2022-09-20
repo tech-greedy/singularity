@@ -12,10 +12,11 @@ import config from '../common/Config';
 import { AbortSignal } from '../common/AbortSignal';
 // no TS support
 import { spawn } from 'promisify-child-process';
+import { sleep } from '../common/Util';
+import { HeightFromCurrentTime } from '../common/ChainHeight';
 
 const mathconfig = {};
 const math = create(all, mathconfig);
-const exec: any = require('await-exec');
 
 export default class DealReplicationWorker extends BaseService {
   private readonly lotusCMD: string;
@@ -182,11 +183,6 @@ export default class DealReplicationWorker extends BaseService {
     }
   }
 
-  public static async getCurrentChainHeight (lotusCmd: string): Promise<number> {
-    const cmdOut = await exec(`${lotusCmd} chain list --count 1 --format "<height>"`);
-    return parseInt(cmdOut.stdout);
-  }
-
   private async createDealCmd (
     useLotus: boolean,
     provider: string,
@@ -278,6 +274,7 @@ export default class DealReplicationWorker extends BaseService {
    * Main function of deal making
    * @param replicationRequest
    */
+  /* istanbul ignore next */
   private async replicate (replicationRequest: ReplicationRequest): Promise<void> {
     this.logger.info(`Start replication ${replicationRequest.id}`);
     let breakOuter = false; // set this to true will terminate all concurrent deal making thread
@@ -291,7 +288,6 @@ export default class DealReplicationWorker extends BaseService {
         this.logger.error(`Read fileListPath failed from ${replicationRequest.fileListPath}`, error);
       }
     }
-    const boostResultUUIDMatcher = /deal uuid: (\S+)/;
     try {
       const providers = DealReplicationWorker.generateProvidersList(replicationRequest.storageProviders);
       // Find cars that are finished generation
@@ -405,7 +401,7 @@ export default class DealReplicationWorker extends BaseService {
           }
 
           const startDelay = replicationRequest.startDelay ? replicationRequest.startDelay : 20160;
-          const currentHeight = await DealReplicationWorker.getCurrentChainHeight(this.lotusCMD);
+          const currentHeight = HeightFromCurrentTime();
           const startEpoch = startDelay + currentHeight;
           this.logger.debug(`Calculated start epoch startDelay: ${startDelay} + currentHeight: ${currentHeight} = ${startEpoch}`);
           let dealCmd = '';
@@ -420,7 +416,7 @@ export default class DealReplicationWorker extends BaseService {
             errorMsg,
             state,
             retryTimeout
-          } = await this.makeDeal(dealCmd, carFile.pieceCid!, provider, dealsMadePerSP, useLotus, boostResultUUIDMatcher, retryWait);
+          } = await this.makeDeal(dealCmd, carFile.pieceCid!, provider, dealsMadePerSP, useLotus, retryWait);
           if (state === 'proposed') {
             dealsMadePerSP++;
             if (retryTimeout > config.get<number>('deal_replication_worker.min_retry_wait_ms')) {
@@ -468,8 +464,8 @@ export default class DealReplicationWorker extends BaseService {
     provider: string,
     dealsMadePerSP: number,
     useLotus: boolean,
-    boostResultUUIDMatcher: RegExp,
     retryTimeout: number) {
+    const boostResultUUIDMatcher = /deal uuid: (\S+)/;
     this.logger.debug(dealCmd);
     let dealCid = 'unknown';
     let errorMsg = '';
@@ -477,21 +473,21 @@ export default class DealReplicationWorker extends BaseService {
     let retryCount = 0;
     do {
       try {
-        const cmdOut = await exec(dealCmd);
+        const cmdOut = await spawn(dealCmd, { encoding: 'utf8' });
         this.logger.info(`Dealt ${pieceCid} with ${provider} (#${dealsMadePerSP}), output: ${cmdOut.stdout}`);
         if (useLotus) {
-          if (cmdOut.stdout.startsWith('baf')) {
-            dealCid = cmdOut.stdout.trim(); // remove trailing line break
+          if (cmdOut?.stdout?.toString().startsWith('baf')) {
+            dealCid = cmdOut?.stdout?.toString().trim(); // remove trailing line break
             // If there was a retry, these values could be in error state, need reset
             errorMsg = '';
             state = 'proposed';
             break; // success, break from while loop
           } else {
-            errorMsg = cmdOut.stdout + cmdOut.stderr;
+            errorMsg = (cmdOut?.stdout?.toString() ?? '') + (cmdOut?.stderr?.toString() ?? '');
             state = 'error';
           }
         } else {
-          const match = boostResultUUIDMatcher.exec(cmdOut.stdout);
+          const match = boostResultUUIDMatcher.exec(cmdOut?.stdout?.toString() ?? '');
           if (match != null && match.length > 1) {
             dealCid = match[1];
             // If there was a retry, these values could be in error state, need reset
@@ -499,7 +495,7 @@ export default class DealReplicationWorker extends BaseService {
             state = 'proposed';
             break; // success, break from while loop
           } else {
-            errorMsg = cmdOut.stdout + cmdOut.stderr;
+            errorMsg = (cmdOut?.stdout?.toString() ?? '') + (cmdOut?.stderr?.toString() ?? '');
             state = 'error';
           }
         }
@@ -509,7 +505,7 @@ export default class DealReplicationWorker extends BaseService {
         state = 'error';
       }
       this.logger.info(`Waiting ${retryTimeout} ms to retry`);
-      await new Promise(resolve => setTimeout(resolve, retryTimeout));
+      await sleep(retryTimeout);
       if (errorMsg.includes('proposed provider collateral below minimum')) {
         this.logger.warn(`Keep retry on this error without expoential back off. These can usually resolve itself within timely manner.`);
       } else {
