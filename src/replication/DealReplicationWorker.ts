@@ -4,14 +4,18 @@ import Datastore from '../common/Datastore';
 import { Category } from '../common/Logger';
 import ReplicationRequest from '../common/model/ReplicationRequest';
 import axios from 'axios';
-import { create, all, Unit } from 'mathjs';
+import { create, all } from 'mathjs';
 import GenerationRequest from '../common/model/GenerationRequest';
 import cron, { ScheduledTask } from 'node-cron';
 import fs from 'fs-extra';
 import config from '../common/Config';
+import { AbortSignal } from '../common/AbortSignal';
+// no TS support
+import { spawn } from 'promisify-child-process';
+
 const mathconfig = {};
 const math = create(all, mathconfig);
-const exec: any = require('await-exec');// no TS support
+const exec: any = require('await-exec');
 
 export default class DealReplicationWorker extends BaseService {
   private readonly lotusCMD: string;
@@ -38,14 +42,20 @@ export default class DealReplicationWorker extends BaseService {
   }
 
   private readonly PollInterval = 5000;
+  private readonly ImmediatePollInterval = 1;
 
   private async startPollWork (): Promise<void> {
+    let workDone = false;
     try {
-      await this.pollWork();
+      workDone = await this.pollWork();
     } catch (err) {
       this.logger.error('Pool work error', err);
     }
-    setTimeout(this.startPollWork, this.PollInterval);
+    if (workDone) {
+      setTimeout(this.startPollWork, this.ImmediatePollInterval);
+    } else {
+      setTimeout(this.startPollWork, this.PollInterval);
+    }
   }
 
   private async pollWork (): Promise<boolean> {
@@ -62,19 +72,15 @@ export default class DealReplicationWorker extends BaseService {
       status: 'active'
     });
 
-    for (let i = 0; i < activeCronWorks.length; i++) {
-      const request2Check = activeCronWorks[i];
+    for (const request2Check of activeCronWorks) {
       if (this.cronRefArray.has(request2Check.id)) {
         const [schedule, taskRef] = this.cronRefArray.get(request2Check.id)!;
         if (schedule !== request2Check.cronSchedule) {
           // cron schedule changed from update request
           taskRef.stop();
           this.cronRefArray.delete(request2Check.id);
-          await Datastore.ReplicationRequestModel.findOneAndUpdate({
-            _id: request2Check.id
-          }, {
-            workerId: null
-          }); // will be picked up again by the immediate pollReplicationWork
+          await Datastore.ReplicationRequestModel.findByIdAndUpdate(
+            request2Check.id, { workerId: null }); // will be picked up again by the immediate pollReplicationWork
           this.logger.info(`Cron changed, restarting schedule. (${request2Check.id})`);
         }
       }
@@ -114,7 +120,7 @@ export default class DealReplicationWorker extends BaseService {
    * @param storageProviders
    * @returns
    */
-  public static async generateProvidersList (storageProviders: string): Promise<Array<string>> {
+  public static generateProvidersList (storageProviders: string): Array<string> {
     return storageProviders.split(',');
   }
 
@@ -128,11 +134,11 @@ export default class DealReplicationWorker extends BaseService {
     let useLotus = true;
     // use boost libp2p command to check whether provider supports boost
     const versionQueryCmd = `${this.boostCMD} provider libp2p-info ${provider}`;
-    const cmdOut = await exec(versionQueryCmd);
-    if (cmdOut.stdout.includes('/fil/storage/mk/1.2.0')) {
+    const cmdOut = await spawn(versionQueryCmd, { encoding: 'utf8' });
+    if (cmdOut?.stdout?.toString()?.includes('/fil/storage/mk/1.2.0')) {
       useLotus = false;
       this.logger.debug(`SP ${provider} supports boost.`);
-    } else if (cmdOut.stdout.includes('/fil/storage/mk/1.1.0')) {
+    } else if (cmdOut?.stdout?.toString()?.includes('/fil/storage/mk/1.1.0')) {
       this.logger.debug(`SP ${provider} supports lotus.`);
     } else {
       throw new Error(JSON.stringify(cmdOut));
@@ -140,29 +146,25 @@ export default class DealReplicationWorker extends BaseService {
     return useLotus;
   }
 
-  private static calculatePriceWithSize (price: number, pieceSize: number): Unit {
+  private static calculatePriceWithSize (price: number, pieceSize: number): string {
+    let unit;
     if (price > 0) {
-      return math.unit(price * (pieceSize || 0) / 1073741824, 'm');
+      unit = math.unit(price * (pieceSize || 0) / 1073741824, 'm');
     } else {
-      return math.unit(0, 'm');
+      unit = math.unit(0, 'm');
     }
+    return math.format(unit.toNumber(), { notation: 'fixed' });
   }
 
-  /**
-   * TODO: assemble URL with builtin hosting service
-   * @param model
-   * @param carFile
-   * @returns
-   */
-  private static assembleDownloadUrl (model: ReplicationRequest, carFile: GenerationRequest) {
-    let downloadUrl = model.urlPrefix;
+  private static assembleDownloadUrl (urlPrefix: string, pieceCid?: string, filenameOverride?: string) {
+    let downloadUrl = urlPrefix;
     if (!downloadUrl.endsWith('/')) {
       downloadUrl += '/';
     }
-    let carFilename = carFile.pieceCid + '.car';
-    if (carFile.filenameOverride) {
-      carFilename = carFile.filenameOverride;
-      if (!carFile.filenameOverride.endsWith('.car')) {
+    let carFilename = pieceCid! + '.car';
+    if (filenameOverride) {
+      carFilename = filenameOverride;
+      if (!filenameOverride.endsWith('.car')) {
         carFilename += '.car';
       }
     }
@@ -170,7 +172,7 @@ export default class DealReplicationWorker extends BaseService {
     return downloadUrl;
   }
 
-  private async checkUrlReachability (url: string): Promise<boolean> {
+  private async isUrlReachable (url: string): Promise<boolean> {
     try {
       await axios.head(url);
       return true;
@@ -185,12 +187,15 @@ export default class DealReplicationWorker extends BaseService {
     return parseInt(cmdOut.stdout);
   }
 
-  private async createDealCmd (useLotus: boolean, provider: string, replicationRequest: ReplicationRequest,
-    carFile: GenerationRequest, startEpoch: number): Promise<string> {
+  private async createDealCmd (
+    useLotus: boolean,
+    provider: string,
+    replicationRequest: ReplicationRequest,
+    carFile: GenerationRequest,
+    startEpoch: number): Promise<string> {
     if (useLotus) {
       if (replicationRequest.isOffline) {
-        const priceInFilWithSize = math.format(DealReplicationWorker.calculatePriceWithSize(replicationRequest.maxPrice, carFile.pieceSize!).toNumber(),
-          { notation: 'fixed' });
+        const priceInFilWithSize = DealReplicationWorker.calculatePriceWithSize(replicationRequest.maxPrice, carFile.pieceSize!);
         const unpaddedSize = carFile.pieceSize! * 127 / 128;
         const manualStateless = replicationRequest.maxPrice > 0 ? '' : '--manual-stateless-deal';// only zero priced deal support manual stateless deal
         // TODO consider implement something similar to this to get rid of collateral below minimum error when proposing with lotus
@@ -203,9 +208,9 @@ export default class DealReplicationWorker extends BaseService {
       }
     } else {
       // determine car download link
-      const downloadUrl = DealReplicationWorker.assembleDownloadUrl(replicationRequest, carFile);
+      const downloadUrl = DealReplicationWorker.assembleDownloadUrl(replicationRequest.urlPrefix, carFile.pieceCid, carFile.filenameOverride);
       // check if download URL is reachable if necessary
-      if (!replicationRequest.isOffline && !(await this.checkUrlReachability(downloadUrl))) {
+      if (!replicationRequest.isOffline && !(await this.isUrlReachable(downloadUrl))) {
         throw new Error(`${downloadUrl} is not reachable`);
       }
       const priceInAttoWithoutSize = math.format(math.unit(replicationRequest.maxPrice, 'm').toNumber('am'), { notation: 'fixed' });
@@ -230,7 +235,7 @@ export default class DealReplicationWorker extends BaseService {
 
   private async checkAndMarkCompletion (request2Check: ReplicationRequest, carCount: number): Promise<boolean> {
     let isComplete = false;
-    const numberOfSPs = (await DealReplicationWorker.generateProvidersList(request2Check.storageProviders)).length;
+    const numberOfSPs = DealReplicationWorker.generateProvidersList(request2Check.storageProviders).length;
     if (!request2Check.cronSchedule) {
       isComplete = true; // Non-cron, perform quick check
     } else {
@@ -244,6 +249,7 @@ export default class DealReplicationWorker extends BaseService {
         }
       });
       this.logger.debug(`checkAndMarkCompletion ${request2Check.id} max: ${maxNumberOfDeals} actual: ${actualDealsCount}`);
+      // TODO Below two conditions are not a precise way to determine if a cron job is complete
       if (maxNumberOfDeals != null && maxNumberOfDeals > 0 && actualDealsCount >= (maxNumberOfDeals! * numberOfSPs)) {
         this.logger.debug(`Actual deals over limit`);
         isComplete = true;
@@ -287,7 +293,7 @@ export default class DealReplicationWorker extends BaseService {
     }
     const boostResultUUIDMatcher = /deal uuid: (\S+)/;
     try {
-      const providers = await DealReplicationWorker.generateProvidersList(replicationRequest.storageProviders);
+      const providers = DealReplicationWorker.generateProvidersList(replicationRequest.storageProviders);
       // Find cars that are finished generation
       const cars = await Datastore.GenerationRequestModel.find({
         datasetId: replicationRequest.datasetId,
@@ -324,7 +330,7 @@ export default class DealReplicationWorker extends BaseService {
             this.logger.warn(`${provider} already been dealt with ${dealsMadePerSP} deals.`);
           }
         }
-        let retryTimeout = config.get<number>('deal_replication_worker.min_retry_wait_ms'); // 30s, 60s, 120s ...
+        const retryWait = config.get<number>('deal_replication_worker.min_retry_wait_ms'); // 30s, 60s, 120s ...
         for (let j = 0; j < cars.length; j++) {
           const carFile = cars[j];
           // check if file belongs to fileList
@@ -409,54 +415,12 @@ export default class DealReplicationWorker extends BaseService {
             this.logger.error(`Deal CMD generation failed`, error);
             return;
           }
-
-          this.logger.debug(dealCmd);
-          let dealCid = 'unknown';
-          let errorMsg = '';
-          let state = 'proposed';
-          let retryCount = 0;
-          do {
-            try {
-              const cmdOut = await exec(dealCmd);
-              this.logger.info(`Dealt ${carFile.pieceCid} with ${provider} (#${dealsMadePerSP}), output: ${cmdOut.stdout}`);
-              if (useLotus) {
-                if (cmdOut.stdout.startsWith('baf')) {
-                  dealCid = cmdOut.stdout.trim(); // remove trailing line break
-                  // If there was a retry, these values could be in error state, need reset
-                  errorMsg = '';
-                  state = 'proposed';
-                  break; // success, break from while loop
-                } else {
-                  errorMsg = cmdOut.stdout + cmdOut.stderr;
-                  state = 'error';
-                }
-              } else {
-                const match = boostResultUUIDMatcher.exec(cmdOut.stdout);
-                if (match != null && match.length > 1) {
-                  dealCid = match[1];
-                  // If there was a retry, these values could be in error state, need reset
-                  errorMsg = '';
-                  state = 'proposed';
-                  break; // success, break from while loop
-                } else {
-                  errorMsg = cmdOut.stdout + cmdOut.stderr;
-                  state = 'error';
-                }
-              }
-            } catch (error) {
-              this.logger.error('Deal making failed', error);
-              errorMsg = '' + error;
-              state = 'error';
-            }
-            this.logger.info(`Waiting ${retryTimeout} ms to retry`);
-            await new Promise(resolve => setTimeout(resolve, retryTimeout));
-            if (errorMsg.includes('proposed provider collateral below minimum')) {
-              this.logger.warn(`Keep retry on this error without expoential back off. These can usually resolve itself within timely manner.`);
-            } else {
-              retryTimeout *= 2; // expoential back off
-            }
-            retryCount++;
-          } while (retryCount < config.get<number>('deal_replication_worker.max_retry_count'));
+          let {
+            dealCid,
+            errorMsg,
+            state,
+            retryTimeout
+          } = await this.makeDeal(dealCmd, carFile.pieceCid!, provider, dealsMadePerSP, useLotus, boostResultUUIDMatcher, retryWait);
           if (state === 'proposed') {
             dealsMadePerSP++;
             if (retryTimeout > config.get<number>('deal_replication_worker.min_retry_wait_ms')) {
@@ -498,9 +462,75 @@ export default class DealReplicationWorker extends BaseService {
     }
   }
 
-  private async startHealthCheck (): Promise<void> {
+  private async makeDeal (
+    dealCmd: string,
+    pieceCid: string,
+    provider: string,
+    dealsMadePerSP: number,
+    useLotus: boolean,
+    boostResultUUIDMatcher: RegExp,
+    retryTimeout: number) {
+    this.logger.debug(dealCmd);
+    let dealCid = 'unknown';
+    let errorMsg = '';
+    let state = 'proposed';
+    let retryCount = 0;
+    do {
+      try {
+        const cmdOut = await exec(dealCmd);
+        this.logger.info(`Dealt ${pieceCid} with ${provider} (#${dealsMadePerSP}), output: ${cmdOut.stdout}`);
+        if (useLotus) {
+          if (cmdOut.stdout.startsWith('baf')) {
+            dealCid = cmdOut.stdout.trim(); // remove trailing line break
+            // If there was a retry, these values could be in error state, need reset
+            errorMsg = '';
+            state = 'proposed';
+            break; // success, break from while loop
+          } else {
+            errorMsg = cmdOut.stdout + cmdOut.stderr;
+            state = 'error';
+          }
+        } else {
+          const match = boostResultUUIDMatcher.exec(cmdOut.stdout);
+          if (match != null && match.length > 1) {
+            dealCid = match[1];
+            // If there was a retry, these values could be in error state, need reset
+            errorMsg = '';
+            state = 'proposed';
+            break; // success, break from while loop
+          } else {
+            errorMsg = cmdOut.stdout + cmdOut.stderr;
+            state = 'error';
+          }
+        }
+      } catch (error) {
+        this.logger.error('Deal making failed', error);
+        errorMsg = '' + error;
+        state = 'error';
+      }
+      this.logger.info(`Waiting ${retryTimeout} ms to retry`);
+      await new Promise(resolve => setTimeout(resolve, retryTimeout));
+      if (errorMsg.includes('proposed provider collateral below minimum')) {
+        this.logger.warn(`Keep retry on this error without expoential back off. These can usually resolve itself within timely manner.`);
+      } else {
+        retryTimeout *= 2; // expoential back off
+      }
+      retryCount++;
+    } while (retryCount < config.get<number>('deal_replication_worker.max_retry_count'));
+    return {
+      dealCid,
+      errorMsg,
+      state,
+      retryTimeout
+    };
+  }
+
+  private async startHealthCheck (abortSignal?: AbortSignal): Promise<void> {
+    if (abortSignal && await abortSignal()) {
+      return;
+    }
     await this.healthCheck();
-    setTimeout(this.startHealthCheck, 5000);
+    setTimeout(async () => this.startHealthCheck(abortSignal), 5000);
   }
 
   private async healthCheck (): Promise<void> {
