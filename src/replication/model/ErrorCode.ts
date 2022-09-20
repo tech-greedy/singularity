@@ -17,7 +17,7 @@ export const ErrorMessage = {
   [ErrorCode.CHANGE_STATE_INVALID]: 'Replication request already completed or has error and cannot be updated',
   [ErrorCode.INVALID_OBJECT_ID]: 'Replication request cannot be found by the specified id',
   [ErrorCode.INTERNAL_ERROR]: 'Replication request cannot be found by the specified id',
-  [ErrorCode.NOT_CRON_JOB]: 'Replication request was not a cron job and cannot be changed',
+  [ErrorCode.NOT_CRON_JOB]: 'Replication request was not a cron job and cannot be changed'
 };
 
 export default ErrorCode;
