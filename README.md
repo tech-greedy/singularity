@@ -296,7 +296,7 @@ Once you have the lite node setup, you can import your wallet key for the verifi
 
 #### Setup Boost Cli
 
-If your target SP runs on Boost, [boost executable](https://boost.filecoin.io/getting-started/boost-client) is 
+If your target SP runs on Boost, [boost executable](https://boost.filecoin.io/getting-started/boost-client) is
 also needed to be able to make deal.
 
 Once you have the boost cli initialized, you can import your wallet key for the verified client address.
