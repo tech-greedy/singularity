@@ -1,3 +1,5 @@
+import DealState from '../../common/model/DealState';
+
 export default interface GetReplicationDetailsResponse {
     id: string,
     datasetId: string,
@@ -24,5 +26,6 @@ export default interface GetReplicationDetailsResponse {
     dealsProposalExpired?: number,
     dealsExpired?: number,
     dealsSlashed?: number,
-    dealsError?: number
+    dealsError?: number,
+    deals?: Array<DealState>
   }

@@ -634,17 +634,18 @@ replication.command('start')
 replication.command('status')
   .description('Check the status of a deal replication request')
   .argument('<id>', 'A unique id of the dataset')
+  .option('-v, --verbose', 'Also print list of deals in this request', false)
   .action(async (id, options) => {
     await initializeConfig(false, false);
     let response!: AxiosResponse;
     try {
       const url: string = config.get('connection.deal_replication_service');
-      response = await axios.get(`${url}/replication/${id}`);
+      response = await axios.get(`${url}/replication/${id}?verbose=${options.verbose}`);
     } catch (error) {
       CliUtil.renderErrorAndExit(error);
     }
 
-    CliUtil.renderResponse(response.data, options.json);
+    CliUtil.renderResponse(response.data, options.verbose);
   });
 
 replication.command('list')
@@ -662,7 +663,7 @@ replication.command('list')
     CliUtil.renderResponse(response.data, options.json);
   });
 
-replication.command('schedule')
+replication.command('reschedule')
   .description('Change an existing deal replication request\'s cron schedule.')
   .argument('<id>', 'Existing ID of deal replication request.')
   .argument('<schedule>', 'Updated cron schedule.')
@@ -728,11 +729,12 @@ replication.command('csv').description('Write a deal replication result as csv.'
   .action(async (id, outDir) => {
     let msg = '';
     try {
+      fs.mkdirpSync(outDir);
       await initializeConfig(false, false);
       const mongoose = await Datastore.connect();
       const replicationRequest = await Datastore.ReplicationRequestModel.findById(id);
       if (replicationRequest) {
-        const providers = await DealReplicationWorker.generateProvidersList(replicationRequest.storageProviders);
+        const providers = DealReplicationWorker.generateProvidersList(replicationRequest.storageProviders);
         for (let j = 0; j < providers.length; j++) {
           const provider = providers[j];
           const deals = await Datastore.DealStateModel.find({
@@ -763,7 +765,7 @@ replication.command('csv').description('Write a deal replication result as csv.'
             if (replicationRequest.fileListPath) {
               fileListFilename += '_' + path.parse(replicationRequest.fileListPath).name;
             }
-            const filename = `${outDir}${path.sep}${provider}${fileListFilename}_${id}.csv`;
+            const filename = path.join(outDir, `${provider}${fileListFilename}_${id}.csv`);
             await csv.toDisk(filename);
             msg += `CSV saved to ${filename}\n`;
           } else {

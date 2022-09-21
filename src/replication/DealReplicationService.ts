@@ -49,8 +49,10 @@ export default class DealReplicationService extends BaseService {
     }
 
     private async handleGetReplicationRequest (request: Request, response: Response) {
-      this.logger.info(`Received request to get details of dataset replication request "${request.params['id']}".`);
-      const found = await Datastore.findReplicationRequest(request.params['id']);
+      const id = request.params['id'];
+      this.logger.info(`Received request to get details of dataset replication request "${id}".`);
+      const found = await Datastore.findReplicationRequest(id);
+      const verbose = request.query['verbose'] === 'true';
       if (!found) {
         this.sendError(response, ErrorCode.REPLICATION_NOT_FOUND);
         return;
@@ -106,6 +108,9 @@ export default class DealReplicationService extends BaseService {
         dealsError: error,
         dealsTotal: total
       };
+      if (verbose) {
+        result.deals = await Datastore.DealStateModel.find({ replicationRequestId: id });
+      }
       response.end(JSON.stringify(result));
     }
 
@@ -122,6 +127,11 @@ export default class DealReplicationService extends BaseService {
           client: r.client,
           maxNumberOfDeals: r.maxNumberOfDeals,
           status: r.status,
+          cronSchedule: r.cronSchedule,
+          cronMaxDeals: r.cronMaxDeals,
+          cronMaxPendingDeals: r.cronMaxPendingDeals,
+          fileListPath: r.fileListPath,
+          notes: r.notes,
           errorMessage: r.errorMessage
         };
         result.push(obj);

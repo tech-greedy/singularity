@@ -294,6 +294,13 @@ use with the tool.
 
 Once you have the lite node setup, you can import your wallet key for the verified client address.
 
+#### Setup Boost Cli
+
+If your target SP runs on Boost, [boost executable](https://boost.filecoin.io/getting-started/boost-client) is
+also needed to be able to make deal.
+
+Once you have the boost cli initialized, you can import your wallet key for the verified client address.
+
 #### Deal making
 
 ```shell
@@ -319,6 +326,8 @@ Options:
   -c, --cron-schedule <cronschedule>                   Optional cron to send deals at interval. Use double quote to wrap the format containing spaces.
   -x, --cron-max-deals <cronmaxdeals>                  When cron schedule specified, limit the total number of deals across entire cron, per SP.
   -xp, --cron-max-pending-deals <cronmaxpendingdeals>  When cron schedule specified, limit the total number of pending deals determined by dealtracking service, per SP.
+  -l, --file-list-path <filelistpath>                  Absolute path to a txt file that will limit to replicate only from the list. Must be visible by deal replication worker.
+  -n, --notes <notes>                                  Any notes or tag want to store along the replication request, for tracking purpose.
   -h, --help                                           display help for command
 ```
 
