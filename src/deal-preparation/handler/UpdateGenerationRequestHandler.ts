@@ -37,35 +37,43 @@ export default async function handleUpdateGenerationRequest (this: DealPreparati
     resume: {
       condition: { status: 'paused' },
       update: {
-        status: 'active',
-        workerId: null
+        $set: {
+          status: 'active',
+          workerId: null
+        }
       }
     },
     pause: {
       condition: { status: 'active' },
       update: {
-        status: 'paused',
-        workerId: null
+        $set: {
+          status: 'paused',
+          workerId: null
+        }
       }
     },
     retry: {
       condition: { status: 'error' },
       update: {
-        status: 'active',
+        $set: {
+          status: 'active',
+          workerId: null
+        },
         $unset: {
           errorMessage: 1
-        },
-        workerId: null
+        }
       }
     },
     forceRetry: {
       condition: { status: { $in: ['completed', 'error'] } },
       update: {
-        status: 'active',
+        $set: {
+          status: 'active',
+          workerId: null
+        },
         $unset: {
           errorMessage: 1
-        },
-        workerId: null
+        }
       }
     }
   };

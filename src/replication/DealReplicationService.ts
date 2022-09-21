@@ -166,9 +166,11 @@ export default class DealReplicationService extends BaseService {
             ]
           }
         }, {
-          cronSchedule,
-          cronMaxDeals,
-          cronMaxPendingDeals
+          $set: {
+            cronSchedule,
+            cronMaxDeals,
+            cronMaxPendingDeals
+          }
         }, {
           new: true
         });
@@ -186,8 +188,10 @@ export default class DealReplicationService extends BaseService {
             ]
           }
         }, {
-          status,
-          workerId: null
+          $set: {
+            status,
+            workerId: null
+          }
         }, {
           new: true
         });

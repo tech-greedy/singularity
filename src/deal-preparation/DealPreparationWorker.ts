@@ -32,7 +32,9 @@ export default class DealPreparationWorker extends BaseService {
       workerId: null,
       status: 'active'
     }, {
-      workerId: this.workerId
+      $set: {
+        workerId: this.workerId
+      }
     });
     if (newScanningWork) {
       this.logger.info(`${this.workerId} - Polled a new scanning request.`, { name: newScanningWork.name, id: newScanningWork.id });
@@ -64,8 +66,10 @@ export default class DealPreparationWorker extends BaseService {
       workerId: null,
       status: 'active'
     }, {
-      workerId: this.workerId,
-      generatedFileList: []
+      $set: {
+        workerId: this.workerId,
+        generatedFileList: []
+      }
     }, {
       new: true
     });
@@ -84,7 +88,7 @@ export default class DealPreparationWorker extends BaseService {
         }
       } catch (error) {
         if (error instanceof Error) {
-          await Datastore.GenerationRequestModel.findOneAndUpdate({ _id: newGenerationWork.id, status: 'active' }, { status: 'error', errorMessage: error.message, workerId: null });
+          await Datastore.GenerationRequestModel.findOneAndUpdate({ _id: newGenerationWork.id, status: 'active' }, { $set: { status: 'error', errorMessage: error.message, workerId: null } });
         }
         this.logger.error(`${this.workerId} - Encountered an error.`, error);
       } finally {

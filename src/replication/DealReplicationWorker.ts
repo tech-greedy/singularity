@@ -74,7 +74,9 @@ export default class DealReplicationWorker extends BaseService {
           await Datastore.ReplicationRequestModel.findOneAndUpdate({
             _id: request2Check.id
           }, {
-            workerId: null
+            $set: {
+              workerId: null
+            }
           }); // will be picked up again by the immediate pollReplicationWork
           this.logger.info(`Cron changed, restarting schedule. (${request2Check.id})`);
         }
@@ -87,7 +89,9 @@ export default class DealReplicationWorker extends BaseService {
       workerId: null,
       status: 'active'
     }, {
-      workerId: this.workerId
+      $set: {
+        workerId: this.workerId
+      }
     });
     if (newReplicationWork) {
       this.logger.info(`${this.workerId} - Received a new request - id ${newReplicationWork.id} dataset: ${newReplicationWork.datasetId}`);
@@ -256,8 +260,10 @@ export default class DealReplicationWorker extends BaseService {
       await Datastore.ReplicationRequestModel.findOneAndUpdate({
         _id: request2Check.id
       }, {
-        status: 'completed',
-        workerId: null
+        $set: {
+          status: 'completed',
+          workerId: null
+        }
       });
       this.stopCronIfExist(request2Check.id);
       this.logger.info(`Mark as complete. To print CSV: singularity repl csv ${request2Check.id} /tmp`);
