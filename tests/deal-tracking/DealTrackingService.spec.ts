@@ -20,7 +20,7 @@ describe('DealTrackingService', () => {
       expect(trackingSpy).toHaveBeenCalled()
     })
   })
-  describe('markExpired', () => {
+  describe('markExpiredDeals', () => {
     it('should mark expired deals', async () => {
       await Datastore.DealStateModel.create({
         dealId: 1,
@@ -34,7 +34,7 @@ describe('DealTrackingService', () => {
         state: 'active',
         expiration: 1,
       });
-      await service['markExpired']('f0xxxx');
+      await service['markExpiredDeals']('f0xxxx');
       const deal1 = await Datastore.DealStateModel.findOne({ dealId: 1 });
       const deal2 = await Datastore.DealStateModel.findOne({ dealId: 2 });
       expect(deal1?.state).toEqual('proposal_expired');
