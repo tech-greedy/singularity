@@ -39,9 +39,7 @@ export default class DealTrackingService extends BaseService {
       try {
         await this.updateDealFromLotus(client);
         // only clean up expired deals when updateDealFromLotus update success
-        if (config.get('deal_replication_worker.enabled')) {
-          await this.markExpired(client);
-        }
+        await this.markExpiredDeals(client);
       } catch (error) {
         this.logger.error('Encountered an error when updating deals from lotus', error);
       }
@@ -88,22 +86,22 @@ export default class DealTrackingService extends BaseService {
             this.logger.info('Reached to the last checked deal.');
             break;
           }
-          const publishedDeal = await Datastore.DealStateModel.findOne({
+          const existingDeal = await Datastore.DealStateModel.findOne({
             dealId: deal['dealid']
           });
-          if (publishedDeal) {
+          if (existingDeal) { // Deal state will be updated later by updateDealFromLotus
             continue;
           }
-          const proposedDeal = await Datastore.DealStateModel.findOne({
+          const newlyProposedDeal = await Datastore.DealStateModel.findOne({
             pieceCid: deal['piece_cid'],
             provider: deal['provider'],
             client: deal['client'],
             state: 'proposed'
           });
 
-          if (proposedDeal) {
+          if (newlyProposedDeal) {
             await Datastore.DealStateModel.updateOne({
-              _id: proposedDeal._id
+              _id: newlyProposedDeal._id
             }, {
               $set: {
                 dealId: deal['dealid'],
@@ -196,7 +194,7 @@ export default class DealTrackingService extends BaseService {
     } while (response.data['deals'].length > 0);
   }
   */
-  private async markExpired (client: string): Promise<void> {
+  private async markExpiredDeals (client: string): Promise<void> {
     const chainHeight = HeightFromCurrentTime() - 120;
     let modified = (await Datastore.DealStateModel.updateMany({
       client,

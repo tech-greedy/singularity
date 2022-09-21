@@ -9,6 +9,7 @@ import GenerationRequest from '../common/model/GenerationRequest';
 import cron, { ScheduledTask } from 'node-cron';
 import fs from 'fs-extra';
 import config from '../common/Config';
+import { sleep } from '../common/Util';
 const mathconfig = {};
 const math = create(all, mathconfig);
 const exec: any = require('await-exec');// no TS support
@@ -109,12 +110,11 @@ export default class DealReplicationWorker extends BaseService {
 
   /**
    * Create providers list by storageProviders. Currently it is just a list of providers separated by comma.
-   * TODO marking this function as async pending future Pando integration
    *
    * @param storageProviders
    * @returns
    */
-  public static async generateProvidersList (storageProviders: string): Promise<Array<string>> {
+  public static generateProvidersList (storageProviders: string): Array<string> {
     return storageProviders.split(',');
   }
 
@@ -230,7 +230,7 @@ export default class DealReplicationWorker extends BaseService {
 
   private async checkAndMarkCompletion (request2Check: ReplicationRequest, carCount: number): Promise<boolean> {
     let isComplete = false;
-    const numberOfSPs = (await DealReplicationWorker.generateProvidersList(request2Check.storageProviders)).length;
+    const numberOfSPs = DealReplicationWorker.generateProvidersList(request2Check.storageProviders).length;
     if (!request2Check.cronSchedule) {
       isComplete = true; // Non-cron, perform quick check
     } else {
@@ -275,11 +275,12 @@ export default class DealReplicationWorker extends BaseService {
   private async replicate (replicationRequest: ReplicationRequest): Promise<void> {
     this.logger.info(`Start replication ${replicationRequest.id}`);
     let breakOuter = false; // set this to true will terminate all concurrent deal making thread
-    let fileList = '';
+    let fileList: Array<string> = [];
     if (replicationRequest.fileListPath) {
       try {
-        fileList = await fs.readFile(replicationRequest.fileListPath, 'utf-8');
-        this.logger.info(`Replication is limited to content in ${replicationRequest.fileListPath}`);
+        const fileListStr = await fs.readFile(replicationRequest.fileListPath, 'utf-8');
+        fileList = fileListStr.split(/\r?\n/);
+        this.logger.info(`Replication is limited to content in ${replicationRequest.fileListPath}, found ${fileList.length} lines.`);
       } catch (error) {
         breakOuter = true;
         this.logger.error(`Read fileListPath failed from ${replicationRequest.fileListPath}`, error);
@@ -287,7 +288,7 @@ export default class DealReplicationWorker extends BaseService {
     }
     const boostResultUUIDMatcher = /deal uuid: (\S+)/;
     try {
-      const providers = await DealReplicationWorker.generateProvidersList(replicationRequest.storageProviders);
+      const providers = DealReplicationWorker.generateProvidersList(replicationRequest.storageProviders);
       // Find cars that are finished generation
       const cars = await Datastore.GenerationRequestModel.find({
         datasetId: replicationRequest.datasetId,
@@ -328,8 +329,15 @@ export default class DealReplicationWorker extends BaseService {
         for (let j = 0; j < cars.length; j++) {
           const carFile = cars[j];
           // check if file belongs to fileList
-          if (fileList !== '' && carFile.pieceCid) {
-            if (fileList.indexOf(carFile.pieceCid) === -1) {
+          if (fileList.length > 0 && carFile.pieceCid) {
+            let matched = false;
+            for (let k = 0; k < fileList.length; k++) {
+              if (fileList[k].endsWith(carFile.pieceCid + '.car')) {
+                matched = true;
+                break;
+              }
+            }
+            if (!matched) {
               this.logger.debug(`File ${carFile.pieceCid} is not on the list`);
               continue;
             }
@@ -393,7 +401,7 @@ export default class DealReplicationWorker extends BaseService {
             continue; // go to next file
           }
           if (existingDeals.length >= existingRec.maxReplicas) {
-            this.logger.warn(`This pieceCID ${carFile.pieceCid} has reached enough ` +
+            this.logger.debug(`This pieceCID ${carFile.pieceCid} has reached enough ` +
               `replica (${existingRec.maxReplicas}) planned by the request ${existingRec.id}.`);
             continue; // go to next file
           }
@@ -418,7 +426,8 @@ export default class DealReplicationWorker extends BaseService {
           do {
             try {
               const cmdOut = await exec(dealCmd);
-              this.logger.info(`Dealt ${carFile.pieceCid} with ${provider} (#${dealsMadePerSP}), output: ${cmdOut.stdout}`);
+              this.logger.info(`Dealt ${carFile.pieceCid} with ${provider} (#${dealsMadePerSP}, ` +
+                `existing replica ${existingDeals.length}), output: ${cmdOut.stdout}`);
               if (useLotus) {
                 if (cmdOut.stdout.startsWith('baf')) {
                   dealCid = cmdOut.stdout.trim(); // remove trailing line break
@@ -449,7 +458,7 @@ export default class DealReplicationWorker extends BaseService {
               state = 'error';
             }
             this.logger.info(`Waiting ${retryTimeout} ms to retry`);
-            await new Promise(resolve => setTimeout(resolve, retryTimeout));
+            await sleep(retryTimeout);
             if (errorMsg.includes('proposed provider collateral below minimum')) {
               this.logger.warn(`Keep retry on this error without expoential back off. These can usually resolve itself within timely manner.`);
             } else {

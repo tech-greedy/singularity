@@ -8,7 +8,6 @@ import ErrorCode from './model/ErrorCode';
 import GetReplicationDetailsResponse from './model/GetReplicationDetailsResponse';
 import { GetReplicationsResponse, GetReplicationsResponseItem } from './model/GetReplicationsResponse';
 import UpdateReplicationRequest from './model/UpdateReplicationRequest';
-import { ObjectId } from 'mongodb';
 import config from '../common/Config';
 
 export default class DealReplicationService extends BaseService {
@@ -50,10 +49,7 @@ export default class DealReplicationService extends BaseService {
 
     private async handleGetReplicationRequest (request: Request, response: Response) {
       const id = request.params['id'];
-      if (!ObjectId.isValid(id)) {
-        this.sendError(response, ErrorCode.INVALID_OBJECT_ID);
-        return;
-      }
+      const verbose = request.query['verbose'] === 'true';
       this.logger.info(`Received request to get details of dataset replication request "${id}".`);
       const found = await Datastore.ReplicationRequestModel.findById(id);
       if (!found) {
@@ -75,13 +71,13 @@ export default class DealReplicationService extends BaseService {
           }
         }
       ]);
-      const proposed = dealStateStats.find(s => s._id.status === 'proposed')?.count ?? 0;
-      const published = dealStateStats.find(s => s._id.status === 'published')?.count ?? 0;
-      const active = dealStateStats.find(s => s._id.status === 'active')?.count ?? 0;
-      const proposalExpired = dealStateStats.find(s => s._id.status === 'proposal_expired')?.count ?? 0;
-      const expired = dealStateStats.find(s => s._id.status === 'expired')?.count ?? 0;
-      const slashed = dealStateStats.find(s => s._id.status === 'slashed')?.count ?? 0;
-      const error = dealStateStats.find(s => s._id.status === 'error')?.count ?? 0;
+      const proposed = dealStateStats.find(s => s._id.state === 'proposed')?.count ?? 0;
+      const published = dealStateStats.find(s => s._id.state === 'published')?.count ?? 0;
+      const active = dealStateStats.find(s => s._id.state === 'active')?.count ?? 0;
+      const proposalExpired = dealStateStats.find(s => s._id.state === 'proposal_expired')?.count ?? 0;
+      const expired = dealStateStats.find(s => s._id.state === 'expired')?.count ?? 0;
+      const slashed = dealStateStats.find(s => s._id.state === 'slashed')?.count ?? 0;
+      const error = dealStateStats.find(s => s._id.state === 'error')?.count ?? 0;
       const total = dealStateStats.reduce((acc, s) => acc + s.count, 0);
       const result: GetReplicationDetailsResponse = {
         id: found.id,
@@ -111,6 +107,9 @@ export default class DealReplicationService extends BaseService {
         dealsError: error,
         dealsTotal: total
       };
+      if (verbose) {
+        result.deals = await Datastore.DealStateModel.find({ replicationRequestId: id });
+      }
       response.end(JSON.stringify(result));
     }
 
@@ -127,6 +126,11 @@ export default class DealReplicationService extends BaseService {
           client: r.client,
           maxNumberOfDeals: r.maxNumberOfDeals,
           status: r.status,
+          cronSchedule: r.cronSchedule,
+          cronMaxDeals: r.cronMaxDeals,
+          cronMaxPendingDeals: r.cronMaxPendingDeals,
+          fileListPath: r.fileListPath,
+          notes: r.notes,
           errorMessage: r.errorMessage
         };
         result.push(obj);
@@ -136,10 +140,6 @@ export default class DealReplicationService extends BaseService {
 
     private async handleUpdateReplicationRequest (request: Request, response: Response) {
       const id = request.params['id'];
-      if (!ObjectId.isValid(id)) {
-        this.sendError(response, ErrorCode.INVALID_OBJECT_ID);
-        return;
-      }
       const { status, cronSchedule, cronMaxDeals, cronMaxPendingDeals } = <UpdateReplicationRequest>request.body;
       this.logger.info(`Received request to update replication request "${id}" with ` +
       `status: "${status}", cron schedule: ${cronSchedule} and cronMaxDeal: ${cronMaxDeals}.`);
