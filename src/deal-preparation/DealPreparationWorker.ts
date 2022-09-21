@@ -51,7 +51,8 @@ export default class DealPreparationWorker extends BaseService {
         }
         throw err;
       } finally {
-        await Datastore.HealthCheckModel.findOneAndUpdate({ workerId: this.workerId }, { $set: { state: 'idle' } });
+        const modified = await Datastore.HealthCheckModel.findOneAndUpdate({ workerId: this.workerId }, { $set: { state: 'idle' } }, { new: true });
+        this.logger.info(`[${this.workerId}] Set worker state to idle`, { modified });
       }
     }
 
@@ -87,7 +88,8 @@ export default class DealPreparationWorker extends BaseService {
         }
         this.logger.error(`${this.workerId} - Encountered an error.`, error);
       } finally {
-        await Datastore.HealthCheckModel.findOneAndUpdate({ workerId: this.workerId }, { $set: { state: 'idle' } });
+        const modified = await Datastore.HealthCheckModel.findOneAndUpdate({ workerId: this.workerId }, { $set: { state: 'idle' } }, { new: true });
+        this.logger.info(`[${this.workerId}] Set worker state to idle`, { modified });
         if (tmpDir) {
           await fs.rm(tmpDir, { recursive: true });
         }
@@ -119,7 +121,7 @@ export default class DealPreparationWorker extends BaseService {
     this.logger.debug(`${this.workerId} - Polling for work`);
     const health = await Datastore.HealthCheckModel.findOne({ workerId: this.workerId });
     if (health?.state !== 'idle') {
-      this.logger.info(`${this.workerId} - Not ready yet.`);
+      this.logger.info(`${this.workerId} - Not ready yet.`, { health });
       return false;
     }
     let hasDoneWork = await this.pollScanningWork();

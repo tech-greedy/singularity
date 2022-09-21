@@ -73,7 +73,6 @@ program.command('daemon')
         let indexService: IndexService;
         await Datastore.init(false);
         await Datastore.connect();
-        await Datastore.HealthCheckModel.deleteMany();
         const workers: [Worker, string][] = [];
         let readied = 0;
         cluster.on('message', _ => {
@@ -85,6 +84,7 @@ program.command('daemon')
           }
         });
         if (config.get('deal_preparation_service.enabled')) {
+          await Datastore.HealthCheckModel.deleteMany();
           if (config.get('deal_preparation_service.enable_cleanup')) {
             await DealPreparationService.cleanupIncompleteFiles(Logger.getLogger(Category.Default));
           }
