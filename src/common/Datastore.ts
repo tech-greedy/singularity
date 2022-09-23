@@ -302,6 +302,14 @@ export default class Datastore {
     return mongoose;
   }
 
+  public static async findReplicationRequest (id: string) {
+    if (ObjectId.isValid(id)) {
+      return Datastore.ReplicationRequestModel.findById(id);
+    }
+
+    return null;
+  }
+
   public static async findScanningRequest (idOrName: string) {
     return await Datastore.ScanningRequestModel.findOne({ name: idOrName }) ??
       (ObjectId.isValid(idOrName) ? await Datastore.ScanningRequestModel.findById(idOrName) : null);
