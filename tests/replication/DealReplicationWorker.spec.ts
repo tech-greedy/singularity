@@ -35,6 +35,14 @@ describe('DealReplicationWorker', () => {
     worker['cronRefArray'].clear();
   });
 
+  describe('exec', () => {
+    it('should work with long running command', async () => {
+      const command = 'KEY=VVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV ls aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+      const cmdOut = await childprocess.exec(command);
+      expect(cmdOut.stderr).toContain('cannot access');
+    })
+  })
+
   describe('startPollWork', () => {
     it('should immediately start next job if work finishes', async () => {
       const spy = spyOn(global, 'setTimeout');
@@ -130,17 +138,17 @@ describe('DealReplicationWorker', () => {
 
   describe('isUsingLotus', () => {
     it('should return true if using lotus', async () => {
-      const cmdSpy = spyOn<any>(childprocess, 'spawn').and.resolveTo({ stdout: '/fil/storage/mk/1.1.0' });
+      const cmdSpy = spyOn<any>(childprocess, 'exec').and.resolveTo({ stdout: '/fil/storage/mk/1.1.0' });
       await expectAsync(worker['isUsingLotus']('provider')).toBeResolvedTo(true);
-      expect(cmdSpy).toHaveBeenCalledWith('boost provider libp2p-info provider', { encoding: 'utf8' });
+      expect(cmdSpy).toHaveBeenCalledWith('boost provider libp2p-info provider');
     })
     it('should return false if using boost', async () => {
-      const cmdSpy = spyOn<any>(childprocess, 'spawn').and.resolveTo({ stdout: '/fil/storage/mk/1.2.0' });
+      const cmdSpy = spyOn<any>(childprocess, 'exec').and.resolveTo({ stdout: '/fil/storage/mk/1.2.0' });
       await expectAsync(worker['isUsingLotus']('provider')).toBeResolvedTo(false);
-      expect(cmdSpy).toHaveBeenCalledWith('boost provider libp2p-info provider', { encoding: 'utf8' });
+      expect(cmdSpy).toHaveBeenCalledWith('boost provider libp2p-info provider');
     })
     it('should throw error if command fails', async () => {
-      spyOn<any>(childprocess, 'spawn').and.resolveTo({ stdout: 'unknown' });
+      spyOn<any>(childprocess, 'exec').and.resolveTo({ stdout: 'unknown' });
       await expectAsync(worker['isUsingLotus']('provider')).toBeRejectedWithError('{"stdout":"unknown"}');
     })
   })
@@ -310,7 +318,7 @@ describe('DealReplicationWorker', () => {
   })
   describe('makeDeal', () => {
     it('should throw error if lotus command failed', async () => {
-      spyOn(childprocess, 'spawn').and.resolveTo({
+      spyOn(childprocess, 'exec').and.resolveTo({
         stdout: '',
         stderr: 'error'
       })
@@ -323,7 +331,7 @@ describe('DealReplicationWorker', () => {
     })
 
     it ('should make deal if lotus command succeeds', async () => {
-        spyOn(childprocess, 'spawn').and.resolveTo({
+        spyOn(childprocess, 'exec').and.resolveTo({
             stdout: 'bafy',
             stderr: ''
         })
@@ -336,7 +344,7 @@ describe('DealReplicationWorker', () => {
     })
 
     it('should throw error if lotus command failed with provider collateral warning', async () => {
-        spyOn(childprocess, 'spawn').and.resolveTo({
+        spyOn(childprocess, 'exec').and.resolveTo({
             stdout: '',
             stderr: 'proposed provider collateral below minimum'
         })
@@ -349,7 +357,7 @@ describe('DealReplicationWorker', () => {
     })
 
     it('should throw error if boost command failed', async () => {
-        spyOn(childprocess, 'spawn').and.resolveTo({
+        spyOn(childprocess, 'exec').and.resolveTo({
             stdout: '',
             stderr: 'error'
         })
@@ -362,7 +370,7 @@ describe('DealReplicationWorker', () => {
     })
 
     it('should make deal if boost command succeeds', async () => {
-        spyOn(childprocess, 'spawn').and.resolveTo({
+        spyOn(childprocess, 'exec').and.resolveTo({
             stdout: 'deal uuid: bafy',
             stderr: ''
         })
@@ -374,8 +382,8 @@ describe('DealReplicationWorker', () => {
         expect(retryTimeout).toEqual(10);
     })
 
-    it('should throw error if spawn throws error', async () => {
-      spyOn(childprocess, 'spawn').and.throwError('error')
+    it('should throw error if exec throws error', async () => {
+      spyOn(childprocess, 'exec').and.throwError('error')
       const {dealCid, errorMsg, state, retryTimeout} = await worker['makeDeal']('cmd', 'piece_cid', 'provider',
           10, false, 10);
       expect(dealCid).toEqual('unknown');
