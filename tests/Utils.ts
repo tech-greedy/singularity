@@ -8,7 +8,9 @@ export default class Utils {
       ConfigInitializer.initialize();
       Utils.initialized = true;
       await Datastore.init(true);
-      await Datastore.connect();
+      const uri = Datastore['mongoMemoryServer'].getUri();
+      await Datastore.connectMongoDb(uri);
+      Datastore['setupDataModels']();
     }
   }
 }
