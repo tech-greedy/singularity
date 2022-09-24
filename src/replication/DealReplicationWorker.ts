@@ -9,7 +9,7 @@ import cron, { ScheduledTask } from 'node-cron';
 import fs from 'fs-extra';
 import config from '../common/Config';
 import { AbortSignal } from '../common/AbortSignal';
-import { exec } from 'promisify-child-process';
+import { spawn } from 'promisify-child-process';
 import { sleep } from '../common/Util';
 import { HeightFromCurrentTime } from '../common/ChainHeight';
 
@@ -132,7 +132,7 @@ export default class DealReplicationWorker extends BaseService {
     let useLotus = true;
     // use boost libp2p command to check whether provider supports boost
     const versionQueryCmd = `${this.boostCMD} provider libp2p-info ${provider}`;
-    const cmdOut = await exec(versionQueryCmd);
+    const cmdOut = await spawn(versionQueryCmd, { encoding: 'utf8' });
     if (cmdOut?.stdout?.toString()?.includes('/fil/storage/mk/1.2.0')) {
       useLotus = false;
       this.logger.debug(`SP ${provider} supports boost.`);
@@ -479,7 +479,7 @@ export default class DealReplicationWorker extends BaseService {
     let retryCount = 0;
     do {
       try {
-        const cmdOut = await exec(dealCmd);
+        const cmdOut = await spawn(dealCmd, { encoding: 'utf8' });
         this.logger.info(`Dealt ${pieceCid} with ${provider} (#${dealsMadePerSP}), output: ${cmdOut.stdout}`);
         if (useLotus) {
           if (cmdOut?.stdout?.toString().startsWith('baf')) {
