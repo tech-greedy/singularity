@@ -1,7 +1,7 @@
 import config, { ConfigInitializer } from '../../src/common/Config';
 import fs from 'fs-extra';
 import { sleep } from '../../src/common/Util';
-fdescribe('Config', () => {
+describe('Config', () => {
   afterAll(() => {
     ConfigInitializer.unwatchFile();
     ConfigInitializer['initialized'] = false;
