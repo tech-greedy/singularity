@@ -5,7 +5,7 @@ describe('Config', () => {
   afterAll(() => {
     ConfigInitializer.unwatchFile();
     ConfigInitializer['initialized'] = false;
-    ConfigInitializer.initialize();
+    ConfigInitializer.initialize(true);
   })
   describe('config', () => {
     describe('get', () => {
