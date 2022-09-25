@@ -79,14 +79,14 @@ export class ConfigInitializer {
     }
   }
 
-  public static initialize (): void {
+  public static initialize (useDefault = false): void {
     if (ConfigInitializer.initialized) {
       return;
     }
     const configDir = getConfigDir();
     const configPath = path.join(configDir, 'default.toml');
     let fileString: string;
-    if (fs.pathExistsSync(configPath)) {
+    if (!useDefault && fs.pathExistsSync(configPath)) {
       fileString = fs.readFileSync(configPath, 'utf8');
       ConfigInitializer.updateValues(fileString);
     } else {
