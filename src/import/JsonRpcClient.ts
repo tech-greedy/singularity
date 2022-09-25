@@ -1,5 +1,4 @@
 import axios, { AxiosRequestConfig } from 'axios';
-import { randomUUID } from 'crypto';
 
 export class JsonRpcError implements Error {
   name = 'JsonRpcError';
@@ -13,7 +12,7 @@ export class JsonRpcError implements Error {
 }
 
 export type JsonRpcResult<T> = {
-  id: string;
+  id: number;
   jsonrpc: '2.0';
   result?: T;
   error?: Error;
@@ -27,7 +26,7 @@ export default class JsonRpcClient {
       const response = await axios.post<JsonRpcResult<R>>(
         this.url,
         {
-          id: randomUUID(),
+          id: 1,
           jsonrpc: '2.0',
           method: (this.prefix ?? '') + method,
           params: params

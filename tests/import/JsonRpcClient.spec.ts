@@ -19,14 +19,14 @@ describe('JsonRpcClient', () => {
       const client = new JsonRpcClient('http://localhost:3000/api', 'prefix', config);
       const postSpy = spyOn(axios, 'post').and.resolveTo({
         data: {
-          id: 'id',
+          id: 1,
           jsonrpc: '2.0',
           result: 'result',
         }
       });
       const result = await client.call('test', params);
       expect(result).toEqual({
-        id: 'id',
+        id: 1,
         jsonrpc: '2.0',
         result: 'result',
       });
