@@ -288,15 +288,15 @@ export default class DealReplicationWorker extends BaseService {
     }
     try {
       const providers = DealReplicationWorker.generateProvidersList(replicationRequest.storageProviders);
-      // Find cars that are finished generation
-      const cars = await Datastore.GenerationRequestModel.find({
-        datasetId: replicationRequest.datasetId,
-        status: 'completed'
-      })
-        .sort({
-          pieceCid: 1
-        });
       const makeDealAll = providers.map(async (provider) => {
+        // Find cars that are finished generation
+        const cars = await Datastore.GenerationRequestModel.find({
+          datasetId: replicationRequest.datasetId,
+          status: 'completed'
+        })
+          .sort({
+            pieceCid: 1
+          });
         if (breakOuter) {
           this.stopCronIfExist(replicationRequest.id);
           return;
@@ -450,7 +450,11 @@ export default class DealReplicationWorker extends BaseService {
       await Promise.all(makeDealAll);
       this.logger.debug(`Finished all files in the dataset. Checking completion.`);
       const reRead = await Datastore.ReplicationRequestModel.findById(replicationRequest.id);
-      await this.checkAndMarkCompletion(reRead!, cars.length);
+      const carCount = await Datastore.GenerationRequestModel.count({
+        datasetId: reRead?.datasetId,
+        status: 'completed'
+      });
+      await this.checkAndMarkCompletion(reRead!, carCount);
     } catch (err) {
       this.stopCronIfExist(replicationRequest.id);
       if (err instanceof Error) {
