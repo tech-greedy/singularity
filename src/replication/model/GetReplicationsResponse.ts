@@ -11,6 +11,7 @@ export interface GetReplicationsResponseItem {
     cronMaxPendingDeals?: number,
     fileListPath?: string,
     notes?: string,
+    csvOutputDir?: string,
     errorMessage?: string
   }
 

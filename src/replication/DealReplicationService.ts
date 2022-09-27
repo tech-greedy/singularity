@@ -99,6 +99,7 @@ export default class DealReplicationService extends BaseService {
         cronMaxPendingDeals: found.cronMaxPendingDeals,
         fileListPath: found.fileListPath,
         notes: found.notes,
+        csvOutputDir: found.csvOutputDir,
         dealsProposed: proposed,
         dealsPublished: published,
         dealsActive: active,
@@ -132,6 +133,7 @@ export default class DealReplicationService extends BaseService {
           cronMaxPendingDeals: r.cronMaxPendingDeals,
           fileListPath: r.fileListPath,
           notes: r.notes,
+          csvOutputDir: r.csvOutputDir,
           errorMessage: r.errorMessage
         };
         result.push(obj);
@@ -219,7 +221,8 @@ export default class DealReplicationService extends BaseService {
         cronMaxDeals,
         cronMaxPendingDeals,
         fileListPath,
-        notes
+        notes,
+        csvOutputDir
       } = <CreateReplicationRequest>request.body;
       this.logger.info(`Received request to replicate dataset "${datasetId}" from client "${client}.`);
       const scanning = await Datastore.findScanningRequest(datasetId);
@@ -255,6 +258,7 @@ export default class DealReplicationService extends BaseService {
       replicationRequest.cronMaxPendingDeals = cronMaxPendingDeals;
       replicationRequest.fileListPath = fileListPath;
       replicationRequest.notes = notes;
+      replicationRequest.csvOutputDir = csvOutputDir;
       try {
         await replicationRequest.save();
         // Create a deal tracking request if not exist

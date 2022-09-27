@@ -12,6 +12,7 @@ import { AbortSignal } from '../common/AbortSignal';
 import { exec } from 'promisify-child-process';
 import { sleep } from '../common/Util';
 import { HeightFromCurrentTime } from '../common/ChainHeight';
+import GenerateCsv from '../common/GenerateCsv';
 
 const mathconfig = {};
 const math = create(all, mathconfig);
@@ -259,7 +260,12 @@ export default class DealReplicationWorker extends BaseService {
         workerId: null
       });
       this.stopCronIfExist(request2Check.id);
-      this.logger.info(`Mark as complete. To print CSV: singularity repl csv ${request2Check.id} /tmp`);
+      if (request2Check.csvOutputDir) {
+        const csvMsg = await GenerateCsv.generate(request2Check.id, request2Check.csvOutputDir);
+        this.logger.info(`Mark as complete. ${csvMsg}`);
+      } else {
+        this.logger.info(`Mark as complete. To print CSV: singularity repl csv ${request2Check.id} /tmp`);
+      }
       return true;
     } else {
       this.logger.debug(`Not yet complete`);

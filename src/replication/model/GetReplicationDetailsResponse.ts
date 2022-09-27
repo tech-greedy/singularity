@@ -19,6 +19,7 @@ export default interface GetReplicationDetailsResponse {
     cronMaxPendingDeals?: number,
     fileListPath?: string,
     notes?: string,
+    csvOutputDir?: string,
     dealsTotal?: number,
     dealsProposed?: number,
     dealsPublished?: number,
