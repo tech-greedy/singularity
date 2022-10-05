@@ -12,6 +12,7 @@ export interface GetReplicationsResponseItem {
     fileListPath?: string,
     notes?: string,
     csvOutputDir?: string,
+    isForced: boolean,
     errorMessage?: string
   }
 

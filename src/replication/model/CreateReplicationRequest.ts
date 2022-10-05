@@ -15,5 +15,6 @@ export default interface CreateReplicationRequest {
     cronMaxPendingDeals?: number,
     fileListPath?: string,
     notes?: string,
-    csvOutputDir?: string
+    csvOutputDir?: string,
+    isForced: boolean
   }

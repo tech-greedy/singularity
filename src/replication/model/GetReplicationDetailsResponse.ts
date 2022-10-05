@@ -20,6 +20,7 @@ export default interface GetReplicationDetailsResponse {
     fileListPath?: string,
     notes?: string,
     csvOutputDir?: string,
+    isForced: boolean,
     dealsTotal?: number,
     dealsProposed?: number,
     dealsPublished?: number,

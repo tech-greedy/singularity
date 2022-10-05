@@ -388,27 +388,29 @@ export default class DealReplicationWorker extends BaseService {
             return;
           }
 
-          // check if the car has already dealt or have enough replica
-          const existingDeals = await Datastore.DealStateModel.find({
-            pieceCid: carFile.pieceCid,
-            state: { $nin: ['slashed', 'error', 'expired', 'proposal_expired'] }
-          });
-          let alreadyDealt = false;
-          for (let k = 0; k < existingDeals.length; k++) {
-            const deal = existingDeals[k];
-            if (deal.provider === provider) {
-              this.logger.debug(`This pieceCID ${carFile.pieceCid} has already been dealt with ${provider}. ` +
-                `Deal CID ${deal.dealCid}. Moving on to next file.`);
-              alreadyDealt = true;
+          if (!existingRec.isForced) {
+            // check if the car has already dealt or have enough replica
+            const existingDeals = await Datastore.DealStateModel.find({
+              pieceCid: carFile.pieceCid,
+              state: { $nin: ['slashed', 'error', 'expired', 'proposal_expired'] }
+            });
+            let alreadyDealt = false;
+            for (let k = 0; k < existingDeals.length; k++) {
+              const deal = existingDeals[k];
+              if (deal.provider === provider) {
+                this.logger.debug(`This pieceCID ${carFile.pieceCid} has already been dealt with ${provider}. ` +
+                  `Deal CID ${deal.dealCid}. Moving on to next file.`);
+                alreadyDealt = true;
+              }
             }
-          }
-          if (alreadyDealt) {
-            continue; // go to next file
-          }
-          if (existingDeals.length >= existingRec.maxReplicas) {
-            this.logger.debug(`This pieceCID ${carFile.pieceCid} has reached enough ` +
-              `replica (${existingRec.maxReplicas}) planned by the request ${existingRec.id}.`);
-            continue; // go to next file
+            if (alreadyDealt) {
+              continue; // go to next file
+            }
+            if (existingDeals.length >= existingRec.maxReplicas) {
+              this.logger.debug(`This pieceCID ${carFile.pieceCid} has reached enough ` +
+                `replica (${existingRec.maxReplicas}) planned by the request ${existingRec.id}.`);
+              continue; // go to next file
+            }
           }
 
           const startDelay = replicationRequest.startDelay ? replicationRequest.startDelay : 20160;

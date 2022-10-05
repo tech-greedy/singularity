@@ -170,6 +170,7 @@ export default class Datastore {
       fileListPath: Schema.Types.String,
       notes: Schema.Types.String,
       csvOutputDir: Schema.Types.String,
+      isForced: Schema.Types.Boolean,
       errorMessage: Schema.Types.String
     }, {
       timestamps: true

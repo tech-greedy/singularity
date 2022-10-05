@@ -593,6 +593,7 @@ replication.command('start')
   .option('-l, --file-list-path <filelistpath>', 'Absolute path to a txt file that will limit to replicate only from the list. Must be visible by deal replication worker.')
   .option('-n, --notes <notes>', 'Any notes or tag want to store along the replication request, for tracking purpose.')
   .option('-csv, --output-csv <outputCsv>', 'Print CSV to specified folder after done. Folder must exist on worker.')
+  .option('-f, --force', 'Force resend even if this pieceCID have been proposed / active by the provider.', false)
   .action(async (datasetid, storageProviders, client, replica, options) => {
     await initializeConfig(false, false);
     let response!: AxiosResponse;
@@ -624,7 +625,8 @@ replication.command('start')
         cronMaxPendingDeals: options.cronMaxPendingDeals ? options.cronMaxPendingDeals : undefined,
         fileListPath: options.fileListPath ? options.fileListPath : undefined,
         notes: options.notes ? options.notes : undefined,
-        csvOutputDir: options.outputCsv ? options.outputCsv : undefined
+        csvOutputDir: options.outputCsv ? options.outputCsv : undefined,
+        isForced: options.force
       });
     } catch (error) {
       CliUtil.renderErrorAndExit(error);

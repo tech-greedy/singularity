@@ -328,6 +328,8 @@ Options:
   -xp, --cron-max-pending-deals <cronmaxpendingdeals>  When cron schedule specified, limit the total number of pending deals determined by dealtracking service, per SP.
   -l, --file-list-path <filelistpath>                  Absolute path to a txt file that will limit to replicate only from the list. Must be visible by deal replication worker.
   -n, --notes <notes>                                  Any notes or tag want to store along the replication request, for tracking purpose.
+  -csv, --output-csv <outputCsv>                       Print CSV to specified folder after done. Folder must exist on worker.
+  -f, --force                                          Force resend even if this pieceCID have been proposed / active by the provider. (default: false)
   -h, --help                                           display help for command
 ```
 
