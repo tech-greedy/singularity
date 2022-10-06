@@ -32,7 +32,7 @@ describe('ImportUtil', () => {
       },
       CreationTime: new Date().toISOString(),
       State: 18,
-      Refs: {
+      Ref: {
         Root: {
           '/': 'data_cid'
         },
@@ -282,7 +282,7 @@ describe('ImportUtil', () => {
           dryRun: false,
           removeImported: true
         };
-        const client = createSpyObj('client', ['call']);
+        const client = createSpyObj('client', { call: Promise.resolve({}) });
         const spySem = createSpyObj('sem', ['acquire', 'release']);
         await fs.createFile('./test.car');
         await ImportUtil['importDeal']('./test.car', { '/': 'bafg' }, client, options, spySem);
@@ -350,8 +350,8 @@ describe('ImportUtil', () => {
         const deal1 = cloneDeep(defaultDeal)
         const deal2 = cloneDeep(defaultDeal)
         const deals = { result: [deal1, deal2] };
-        deal1.Refs.Root['/'] = 'data_cid1';
-        deal2.Refs.PieceCid['/'] = 'piece_cid2';
+        deal1.Ref.Root['/'] = 'data_cid1';
+        deal2.Ref.PieceCid['/'] = 'piece_cid2';
         const client = createSpyObj('client', {
           call: Promise.resolve(deals)
         });
@@ -376,8 +376,8 @@ describe('ImportUtil', () => {
       const deal1 = cloneDeep(defaultDeal)
       const deal2 = cloneDeep(defaultDeal)
       const deals = { result: [deal1, deal2] };
-      deal2.Refs.Root['/'] = 'data_cid2';
-      deal2.Refs.PieceCid['/'] = 'piece_cid2';
+      deal2.Ref.Root['/'] = 'data_cid2';
+      deal2.Ref.PieceCid['/'] = 'piece_cid2';
       const client = createSpyObj('client', {
         call: Promise.resolve(deals)
       });

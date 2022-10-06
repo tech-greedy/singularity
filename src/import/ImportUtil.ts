@@ -15,6 +15,7 @@ export default class ImportUtil {
   }
 
   private static async validateImportOptions (options: ImportOptions): Promise<JsonRpcClient> {
+    console.log(options);
     if (!process.env.LOTUS_MINER_PATH &&
       !process.env.LOTUS_MARKETS_PATH &&
       !process.env.MINER_API_INFO &&
@@ -132,7 +133,10 @@ export default class ImportUtil {
     try {
       await importSemaphore.acquire();
       if (!options.dryRun) {
-        await client.call('DealsImportData', [proposalCid, path.resolve(existingPath)]);
+        const response = await client.call('DealsImportData', [proposalCid, path.resolve(existingPath)]);
+        if (response.error) {
+          throw response.error;
+        }
         if (options.removeImported) {
           await fs.rm(existingPath);
         }
@@ -169,8 +173,8 @@ export default class ImportUtil {
       // Check if the file already exists in --path.
       if (options.path) {
         for (const p of options.path) {
-          const dataCidFile = path.join(p, deal.Refs.Root['/'] + '.car');
-          const pieceCidFile = path.join(p, deal.Refs.PieceCid['/'] + '.car');
+          const dataCidFile = path.join(p, deal.Ref.Root['/'] + '.car');
+          const pieceCidFile = path.join(p, deal.Ref.PieceCid['/'] + '.car');
           if (await fs.pathExists(pieceCidFile)) {
             existingPath = pieceCidFile;
             break;
@@ -197,10 +201,10 @@ export default class ImportUtil {
       }
 
       // Download the file to specified download folder
-      const pieceCidFile = path.join(options.downloadFolder!, deal.Refs.Root['/'] + '.car');
+      const pieceCidFile = path.join(options.downloadFolder!, deal.Ref.Root['/'] + '.car');
       const url = options.urlTemplate
-        .replace('{pieceCid}', deal.Refs.PieceCid['/'])
-        .replace('{dataCid}', deal.Refs.Root['/']);
+        .replace('{pieceCid}', deal.Ref.PieceCid['/'])
+        .replace('{dataCid}', deal.Ref.Root['/']);
       if (started) {
         do {
           await sleep(options.interval * 1000);
