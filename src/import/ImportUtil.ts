@@ -15,7 +15,7 @@ export default class ImportUtil {
   }
 
   private static async validateImportOptions (options: ImportOptions): Promise<JsonRpcClient> {
-          console.log(options)
+    console.log(options);
     if (!process.env.LOTUS_MINER_PATH &&
       !process.env.LOTUS_MARKETS_PATH &&
       !process.env.MINER_API_INFO &&
