@@ -282,7 +282,7 @@ describe('ImportUtil', () => {
           dryRun: false,
           removeImported: true
         };
-        const client = createSpyObj('client', ['call']);
+        const client = createSpyObj('client', { call: Promise.resolve({}) });
         const spySem = createSpyObj('sem', ['acquire', 'release']);
         await fs.createFile('./test.car');
         await ImportUtil['importDeal']('./test.car', { '/': 'bafg' }, client, options, spySem);
