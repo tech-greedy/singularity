@@ -303,7 +303,7 @@ preparation.command('list').description('List all deal preparation requests')
 preparation.command('upload-manifest').description('Upload manifest to web3.storage')
   .argument('<dataset>', 'The dataset id or name, as in "singularity prep list"')
   .argument('<slugName>', 'The slug name of the dataset, as shown on "My Claimed Datasets" page')
-  .addOption(new Option('-j, --concurrency <concurrency>', 'Number of concurrent uploads').default(2).argParser(parseInt))
+  .addOption(new Option('-j, --concurrency <concurrency>', 'Number of concurrent uploads').default(2).argParser(Number))
   .action(async (dataset, slugName, options) => {
     await initializeConfig(false, false);
     const mongoose = await Datastore.connect();
