@@ -20,7 +20,7 @@ export default interface MinerDeal {
   Proposal: Proposal,
   ProposalCid: Cid,
   State: number,
-  Refs: {
+  Ref: {
     Root: Cid,
     PieceCid: Cid,
     PieceSize: number
