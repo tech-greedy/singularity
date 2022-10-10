@@ -3,6 +3,8 @@ import Datastore from '../../common/Datastore';
 import { FileInfo } from '../../common/model/InputFileList';
 import Scanner from '../scanner/Scanner';
 import winston from 'winston';
+import MetricEmitter from '../../common/metrics/MetricEmitter';
+import { performance } from 'perf_hooks';
 
 async function deletePendingGenerationRequests (request: ScanningRequest, logger: winston.Logger) {
   for (const createdGenerationRequest of await Datastore.GenerationRequestModel.find({
@@ -103,6 +105,7 @@ export default async function scan (logger: winston.Logger, request: ScanningReq
     index,
     lastFileInfo
   } = await findLastGeneration(request, logger);
+  const checkpoint = performance.now();
   for await (const fileList of scanner.scan(request.path, request.minSize, request.maxSize, lastFileInfo, logger, request.skipInaccessibleFiles)) {
     if (!await Datastore.ScanningRequestModel.findById(request.id)) {
       logger.info('The scanning request has been removed. Scanning stopped.', {
@@ -121,9 +124,20 @@ export default async function scan (logger: winston.Logger, request: ScanningReq
       return;
     }
   }
-  await Datastore.ScanningRequestModel.findByIdAndUpdate(request.id, {
+  const timeSpendInMs = performance.now() - checkpoint;
+  const updated = await Datastore.ScanningRequestModel.findByIdAndUpdate(request.id, {
     status: 'completed',
     workerId: null
+  }, { new: true });
+  await MetricEmitter.Instance().emit({
+    type: 'complete_scanning',
+    values: {
+      datasetId: updated?.id,
+      datasetName: updated?.name,
+      scanned: updated?.scanned,
+      generationTasks: index,
+      timeSpendInMs
+    }
   });
   logger.info(`Finished scanning. Marking scanning to completed. Inserted ${index} generation tasks.`);
 }

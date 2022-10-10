@@ -1,6 +1,6 @@
 export default interface Metric {
   type: string,
-  values: {[key: string]: string | number | boolean }
+  values: {[key: string]: any }
 }
 
 export interface MetricEvent {
@@ -8,6 +8,5 @@ export interface MetricEvent {
   ip: string,
   instance: string,
   type: string,
-  key: string,
-  value: string
+  values: {[key: string]: any },
 }
