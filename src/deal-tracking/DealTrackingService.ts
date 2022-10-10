@@ -276,6 +276,7 @@ export default class DealTrackingService extends BaseService {
             type: 'deal_active',
             values: {
               pieceCid: dealState.pieceCid,
+              pieceSize: dealState.pieceSize,
               dataCid: dealState.dataCid,
               provider: dealState.provider,
               client: dealState.client,
