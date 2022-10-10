@@ -71,10 +71,3 @@ export default class MetricEmitter {
     return MetricEmitter.instance;
   }
 }
-
-export function getMetricEmitter (): MetricEmitter {
-  if (config.getOrDefault('metrics.enabled', true)) {
-    return new LambdaMetricEmitter(config.get('metrics.url'));
-  }
-  return new NoopMetricEmitter();
-}

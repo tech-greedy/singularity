@@ -56,6 +56,8 @@ describe('Config', () => {
       it ('should initialize the config with default values', async () => {
         await ConfigInitializer.initialize();
         expect(config.logging.console_level).toEqual('info');
+        expect(ConfigInitializer.instanceId).toEqual('unknown');
+        expect(ConfigInitializer.publicIp).not.toEqual('unknown');
       })
       it('should initialize using the config defined in environment variable and watch file change', async () => {
         process.env.SINGULARITY_PATH = '/tmp';

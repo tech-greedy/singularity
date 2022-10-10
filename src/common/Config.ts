@@ -3,7 +3,7 @@ import path from 'path';
 import { homedir } from 'os';
 import fs from 'fs-extra';
 import { FSWatcher } from 'fs';
-import { publicIpv4 } from 'public-ip';
+import { v4 } from 'public-ip';
 
 interface Config {
   [key: string]: any;
@@ -103,7 +103,7 @@ export class ConfigInitializer {
     }
 
     try {
-      ConfigInitializer.publicIp = await publicIpv4();
+      ConfigInitializer.publicIp = await v4();
     } catch (e) {
       console.error('Cannot determine public IP: ', e);
     }

@@ -98,7 +98,7 @@
     "picomatch": "^2.3.1",
     "pidusage": "^3.0.0",
     "promisify-child-process": "^4.1.1",
-    "public-ip": "^6.0.1",
+    "public-ip": "^4.0.4",
     "semaphore-async-await": "^1.5.1",
     "winston": "^3.6.0",
     "xbytes": "^1.7.0"
