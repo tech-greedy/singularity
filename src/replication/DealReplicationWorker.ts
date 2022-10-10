@@ -470,6 +470,7 @@ export default class DealReplicationWorker extends BaseService {
             dealCid: dealCid,
             dataCid: carFile.dataCid,
             pieceCid: carFile.pieceCid,
+            pieceSize: carFile.pieceSize,
             startEpoch: startEpoch,
             expiration: startEpoch + replicationRequest.duration,
             duration: replicationRequest.duration,

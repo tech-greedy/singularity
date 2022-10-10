@@ -46,7 +46,7 @@ export default class LambdaMetricEmitter implements Emitter {
     }
     const release = await this.mutex.acquire();
     try {
-      this.logger.info(`Publishing ${this.events.length} events to ${this.url}`);
+      this.logger.debug(`Publishing ${this.events.length} events to ${this.url}`);
       const json = JSON.stringify(this.events);
       const compressed = await compress(Buffer.from(json, 'utf8'));
       await axios.post(this.url, compressed.toString('base64'), {

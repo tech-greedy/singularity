@@ -127,7 +127,8 @@ export default async function handleCreatePreparationRequest (this: DealPreparat
       minSize,
       maxSize,
       useS3: path.startsWith('s3://'),
-      useTmp: tmpDir !== undefined
+      useTmp: tmpDir !== undefined,
+      skipInaccessibleFiles: skipInaccessibleFiles
     }
   });
 
