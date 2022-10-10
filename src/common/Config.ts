@@ -12,7 +12,7 @@ interface Config {
   has (key: string): boolean;
 }
 
-const config: Config = {
+export const config: Config = {
   get<T> (key: string): T {
     let value: any = config;
     for (const k of key.split('.')) {
