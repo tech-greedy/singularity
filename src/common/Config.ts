@@ -3,7 +3,6 @@ import path from 'path';
 import { homedir } from 'os';
 import fs from 'fs-extra';
 import { FSWatcher } from 'fs';
-import { v4 } from 'public-ip';
 
 interface Config {
   [key: string]: any;
@@ -12,7 +11,7 @@ interface Config {
   has (key: string): boolean;
 }
 
-export const config: Config = {
+const config: Config = {
   get<T> (key: string): T {
     let value: any = config;
     for (const k of key.split('.')) {
@@ -95,17 +94,6 @@ export class ConfigInitializer {
     } else {
       fileString = await fs.readFile(path.join(__dirname, '..', '..', 'config', 'default.toml'), 'utf8');
       ConfigInitializer.updateValues(fileString);
-    }
-
-    const instancePath = path.join(configDir, 'instance.txt');
-    if (await fs.pathExists(instancePath)) {
-      ConfigInitializer.instanceId = await fs.readFile(instancePath, 'utf8');
-    }
-
-    try {
-      ConfigInitializer.publicIp = await v4();
-    } catch (e) {
-      console.error('Cannot determine public IP: ', e);
     }
   }
 

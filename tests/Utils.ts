@@ -1,5 +1,5 @@
 import Datastore from '../src/common/Datastore';
-import { ConfigInitializer, config } from '../src/common/Config';
+import config, { ConfigInitializer } from '../src/common/Config';
 
 export default class Utils {
   private static initialized = false;
@@ -11,7 +11,7 @@ export default class Utils {
       const uri = Datastore['mongoMemoryServer'].getUri();
       await Datastore.connectMongoDb(uri);
       Datastore['setupDataModels']();
-      config.set('metrics.enabled', false);
+      config['metrics.enabled'] = false;
     }
   }
 }

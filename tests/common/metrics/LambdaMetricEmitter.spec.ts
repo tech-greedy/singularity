@@ -4,7 +4,7 @@ import axios from 'axios';
 describe('LambdaMetricEmitter', ()=> {
   describe('emit', ()=> {
     it('should push new metrics to the queue', ()=> {
-        const emitter = new LambdaMetricEmitter('http://localhost:8080');
+        const emitter = new LambdaMetricEmitter('http://localhost:8080', false);
         emitter.emit({
             type: 'test',
             values: {
