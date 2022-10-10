@@ -3,6 +3,7 @@ import path from 'path';
 import { homedir } from 'os';
 import fs from 'fs-extra';
 import { FSWatcher } from 'fs';
+import { publicIpv4 } from 'public-ip';
 
 interface Config {
   [key: string]: any;
@@ -50,6 +51,8 @@ export function getConfigDir (): string {
 }
 
 export class ConfigInitializer {
+  public static instanceId = 'unknown';
+  public static publicIp = 'unknown';
   private static initialized = false;
   private static fsWatcher: FSWatcher;
 
@@ -79,19 +82,30 @@ export class ConfigInitializer {
     }
   }
 
-  public static initialize (useDefault = false): void {
+  public static async initialize (useDefault = false): Promise<void> {
     if (ConfigInitializer.initialized) {
       return;
     }
     const configDir = getConfigDir();
     const configPath = path.join(configDir, 'default.toml');
     let fileString: string;
-    if (!useDefault && fs.pathExistsSync(configPath)) {
-      fileString = fs.readFileSync(configPath, 'utf8');
+    if (!useDefault && await fs.pathExists(configPath)) {
+      fileString = await fs.readFile(configPath, 'utf8');
       ConfigInitializer.updateValues(fileString);
     } else {
-      fileString = fs.readFileSync(path.join(__dirname, '..', '..', 'config', 'default.toml'), 'utf8');
+      fileString = await fs.readFile(path.join(__dirname, '..', '..', 'config', 'default.toml'), 'utf8');
       ConfigInitializer.updateValues(fileString);
+    }
+
+    const instancePath = path.join(configDir, 'instance.txt');
+    if (await fs.pathExists(instancePath)) {
+      ConfigInitializer.instanceId = await fs.readFile(instancePath, 'utf8');
+    }
+
+    try {
+      ConfigInitializer.publicIp = await publicIpv4();
+    } catch (e) {
+      console.error('Cannot determine public IP: ', e);
     }
   }
 
@@ -115,5 +129,3 @@ export class ConfigInitializer {
     }
   }
 }
-
-ConfigInitializer.initialize();

@@ -5,7 +5,7 @@ export default class Utils {
   private static initialized = false;
   public static async initDatabase() {
     if (!Utils.initialized) {
-      ConfigInitializer.initialize(true);
+      await ConfigInitializer.initialize(true);
       Utils.initialized = true;
       await Datastore.init(true);
       const uri = Datastore['mongoMemoryServer'].getUri();

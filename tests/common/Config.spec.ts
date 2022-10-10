@@ -2,10 +2,10 @@ import config, { ConfigInitializer } from '../../src/common/Config';
 import fs from 'fs-extra';
 import { sleep } from '../../src/common/Util';
 describe('Config', () => {
-  afterAll(() => {
+  afterAll(async () => {
     ConfigInitializer.unwatchFile();
     ConfigInitializer['initialized'] = false;
-    ConfigInitializer.initialize(true);
+    await ConfigInitializer.initialize(true);
   })
   describe('config', () => {
     describe('get', () => {
@@ -53,15 +53,15 @@ describe('Config', () => {
         ConfigInitializer.unwatchFile();
         delete process.env.SINGULARITY_PATH;
       })
-      it ('should initialize the config with default values', () => {
-        ConfigInitializer.initialize();
+      it ('should initialize the config with default values', async () => {
+        await ConfigInitializer.initialize();
         expect(config.logging.console_level).toEqual('info');
       })
       it('should initialize using the config defined in environment variable and watch file change', async () => {
         process.env.SINGULARITY_PATH = '/tmp';
         fs.writeFileSync('/tmp/default.toml', "[logging]\n" +
           "console_level = 'error'");
-        ConfigInitializer.initialize();
+        await ConfigInitializer.initialize();
         ConfigInitializer.watchFile();
         ConfigInitializer.watchFile();
         expect(config.logging.console_level).toEqual('error');
@@ -74,7 +74,7 @@ describe('Config', () => {
         process.env.SINGULARITY_PATH = '/tmp';
         fs.writeFileSync('/tmp/default.toml', "[logging]\n" +
           "console_level = 'error'");
-        ConfigInitializer.initialize();
+        await ConfigInitializer.initialize();
         ConfigInitializer.watchFile();
         expect(config.logging.console_level).toEqual('error');
         // Rename does nothing

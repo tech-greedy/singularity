@@ -34,6 +34,7 @@ import progress from 'cli-progress';
 import asyncRetry from 'async-retry';
 import pAll from 'p-all';
 import ObjectsToCsv from 'objects-to-csv';
+import { randomUUID } from 'crypto';
 
 const logger = Logger.getLogger(Category.Default);
 const version = packageJson.version;
@@ -46,7 +47,13 @@ async function initializeConfig (copyDefaultConfig: boolean, watchFile = false):
     await fs.copyFile(path.join(__dirname, '../config/default.toml'), path.join(configDir, 'default.toml'));
     logger.info(`Please check ${path.join(configDir, 'default.toml')}`);
   }
-  ConfigInitializer.initialize();
+  if (!await fs.pathExists(path.join(configDir, 'instance.txt'))) {
+    logger.info(`Assigning a new instance id ...`);
+    await fs.mkdirp(configDir);
+    const instance = randomUUID();
+    await fs.writeFile(path.join(configDir, 'instance.txt'), instance);
+  }
+  await ConfigInitializer.initialize();
   if (watchFile) {
     ConfigInitializer.watchFile();
   }

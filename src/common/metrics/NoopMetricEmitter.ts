@@ -1,7 +1,7 @@
 import Metric from './Metric';
-import MetricEmitter from './MetricEmitter';
+import { Emitter } from './MetricEmitter';
 
-export default class NoopMetricEmitter implements MetricEmitter {
+export default class NoopMetricEmitter implements Emitter {
   public emit (_metric: Metric): Promise<void> {
     return Promise.resolve();
   }
