@@ -15,7 +15,7 @@ describe('LambdaMetricEmitter', ()=> {
     });
   })
   describe('flush', ()=> {
-    fit('should post all metrics to the API', async ()=> {
+    it('should post all metrics to the API', async ()=> {
         const emitter = new LambdaMetricEmitter('http://localhost:8080', false);
         emitter.emit({
             type: 'test1',
