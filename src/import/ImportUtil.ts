@@ -14,6 +14,8 @@ export default class ImportUtil {
     throw new Error(message);
   }
 
+  public static knownBadProposalCids: string[] = [];
+
   private static async validateImportOptions (options: ImportOptions): Promise<JsonRpcClient> {
     console.log(options);
     if (!process.env.LOTUS_MINER_PATH &&
@@ -143,7 +145,8 @@ export default class ImportUtil {
       }
     } catch (e) {
       console.error(e);
-      throw e;
+      ImportUtil.knownBadProposalCids.push(proposalCid['/']);
+      console.log(`Will no longer handle this proposal: ${proposalCid['/']}`);
     } finally {
       importSemaphore.release();
     }
@@ -167,6 +170,9 @@ export default class ImportUtil {
         continue;
       }
       if (Date.now() - Date.parse(deal.CreationTime) > options.since * 1000) {
+        continue;
+      }
+      if (ImportUtil.knownBadProposalCids.includes(deal.ProposalCid['/'])) {
         continue;
       }
       let existingPath: string | undefined;
