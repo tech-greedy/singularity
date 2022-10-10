@@ -13,6 +13,7 @@ export default class LambdaMetricEmitter implements Emitter {
   private events: MetricEvent[] = [];
   private mutex;
 
+  /* istanbul ignore next */
   constructor (url: string, start = true) {
     this.url = url;
     this.logger = Logger.getLogger(Category.MetricEmitter);

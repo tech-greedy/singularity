@@ -7,6 +7,7 @@ export interface Emitter {
   emit(metric: Metric): Promise<void>;
 }
 
+/* istanbul ignore next */
 export default class MetricEmitter {
   private static instance: Emitter | undefined;
   public static Instance (): Emitter {

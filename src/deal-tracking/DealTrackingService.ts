@@ -117,7 +117,7 @@ export default class DealTrackingService extends BaseService {
               dealId: deal['dealid'],
               dealCid: deal['cid'],
               pieceCid: deal['piece_cid'],
-              pieceSize: Number(deal['piece_size']),
+              pieceSize: Number.isInteger(deal['piece_size']) ? Number(deal['piece_size']) : 0,
               startEpoch: deal['start_epoch'],
               expiration: deal['end_epoch'],
               duration: deal['end_epoch'] - deal['start_epoch'],

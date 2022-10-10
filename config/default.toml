@@ -1,6 +1,3 @@
-[metrics]
-enabled = true
-
 [logging]
 console_level = 'info'
 file_level = 'debug'

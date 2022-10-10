@@ -32,7 +32,8 @@ describe('LambdaMetricEmitter', ()=> {
         const axiosSpy = spyOn<any>(axios, 'post').and.callFake((_: any, data: string) => { console.log(data); return Promise.resolve(); });
         await emitter.flush();
         expect(emitter['events'].length).toBe(0);
-        expect(axiosSpy).toHaveBeenCalledWith('http://localhost:8080', jasmine.any(String));
+        expect(axiosSpy).toHaveBeenCalledWith('http://localhost:8080', jasmine.any(String),
+          { headers: { 'Content-Type': 'text/plain' } });
     })
   });
 })
