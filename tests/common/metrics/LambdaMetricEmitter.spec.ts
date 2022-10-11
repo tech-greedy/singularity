@@ -1,7 +1,14 @@
 import LambdaMetricEmitter from '../../../src/common/metrics/LambdaMetricEmitter';
 import axios from 'axios';
+import { ConfigInitializer } from '../../../src/common/Config';
 
 describe('LambdaMetricEmitter', ()=> {
+  beforeAll(() => {
+    ConfigInitializer.instanceId = 'test';
+  })
+  afterAll(() => {
+    ConfigInitializer.instanceId = 'unknown';
+  })
   describe('emit', ()=> {
     it('should push new metrics to the queue', ()=> {
         const emitter = new LambdaMetricEmitter('http://localhost:8080', false);

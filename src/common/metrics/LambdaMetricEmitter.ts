@@ -66,6 +66,10 @@ export default class LambdaMetricEmitter implements Emitter {
   public async emit (metric: Metric): Promise<void> {
     const timestamp = Math.floor(Date.now() / 1000);
     const instance = ConfigInitializer.instanceId;
+    if (instance === 'unknown') {
+      this.logger.warn('Instance ID is unknown. Not emitting metric');
+      return;
+    }
     this.events.push({
       timestamp,
       instance,
