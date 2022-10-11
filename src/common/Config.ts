@@ -51,7 +51,6 @@ export function getConfigDir (): string {
 
 export class ConfigInitializer {
   public static instanceId = 'unknown';
-  public static publicIp = 'unknown';
   private static initialized = false;
   private static fsWatcher: FSWatcher;
 

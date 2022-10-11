@@ -66,10 +66,8 @@ export default class LambdaMetricEmitter implements Emitter {
   public async emit (metric: Metric): Promise<void> {
     const timestamp = Math.floor(Date.now() / 1000);
     const instance = ConfigInitializer.instanceId;
-    const ip = ConfigInitializer.publicIp;
     this.events.push({
       timestamp,
-      ip,
       instance,
       type: metric.type,
       values: metric.values

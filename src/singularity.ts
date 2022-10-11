@@ -35,7 +35,6 @@ import asyncRetry from 'async-retry';
 import pAll from 'p-all';
 import ObjectsToCsv from 'objects-to-csv';
 import { randomUUID } from 'crypto';
-import { v4 } from 'public-ip';
 
 const logger = Logger.getLogger(Category.Default);
 const version = packageJson.version;
@@ -62,12 +61,6 @@ async function initializeConfig (copyDefaultConfig: boolean, watchFile = false):
   const instancePath = path.join(configDir, 'instance.txt');
   if (await fs.pathExists(instancePath)) {
     ConfigInitializer.instanceId = await fs.readFile(instancePath, 'utf8');
-  }
-
-  try {
-    ConfigInitializer.publicIp = await v4();
-  } catch (e) {
-    console.error('Cannot determine public IP: ', e);
   }
 }
 
