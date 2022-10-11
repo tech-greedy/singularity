@@ -11,7 +11,7 @@ export default class Utils {
       const uri = Datastore['mongoMemoryServer'].getUri();
       await Datastore.connectMongoDb(uri);
       Datastore['setupDataModels']();
-      config['metrics.enabled'] = false;
+      config['metrics'] = { enabled: false };
     }
   }
 }
