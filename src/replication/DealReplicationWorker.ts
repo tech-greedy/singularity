@@ -12,6 +12,7 @@ import { AbortSignal } from '../common/AbortSignal';
 import { exec } from 'promisify-child-process';
 import { sleep } from '../common/Util';
 import { HeightFromCurrentTime } from '../common/ChainHeight';
+import MetricEmitter from '../common/metrics/MetricEmitter';
 
 const mathconfig = {};
 const math = create(all, mathconfig);
@@ -428,13 +429,48 @@ export default class DealReplicationWorker extends BaseService {
             if (retryWait > config.get<number>('deal_replication_worker.min_retry_wait_ms')) {
               retryWait = retryWait /= 2; // expoential back "on"
             }
+            await MetricEmitter.Instance().emit({
+              type: 'deal_proposed',
+              values: {
+                protocol: useLotus ? 'lotus' : 'boost',
+                pieceCid: carFile.pieceCid,
+                dataCid: carFile.dataCid,
+                pieceSize: carFile.pieceSize,
+                carSize: carFile.carSize,
+                provider: provider,
+                client: replicationRequest.client,
+                verified: replicationRequest.isVerfied,
+                duration: replicationRequest.duration,
+                price: replicationRequest.maxPrice,
+                proposalCid: dealCid
+              }
+            });
+          } else {
+            await MetricEmitter.Instance().emit({
+              type: 'deal_proposal_failed',
+              values: {
+                protocol: useLotus ? 'lotus' : 'boost',
+                pieceCid: carFile.pieceCid,
+                dataCid: carFile.dataCid,
+                pieceSize: carFile.pieceSize,
+                carSize: carFile.carSize,
+                provider: provider,
+                client: replicationRequest.client,
+                verified: replicationRequest.isVerfied,
+                duration: replicationRequest.duration,
+                price: replicationRequest.maxPrice,
+                errorMsg: errorMsg
+              }
+            });
           }
+
           await Datastore.DealStateModel.create({
             client: replicationRequest.client,
             provider: provider,
             dealCid: dealCid,
             dataCid: carFile.dataCid,
             pieceCid: carFile.pieceCid,
+            pieceSize: carFile.pieceSize,
             startEpoch: startEpoch,
             expiration: startEpoch + replicationRequest.duration,
             duration: replicationRequest.duration,

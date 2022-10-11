@@ -50,6 +50,8 @@ export function getConfigDir (): string {
 }
 
 export class ConfigInitializer {
+  public static instanceId = 'unknown';
+  public static publicIp = 'unknown';
   private static initialized = false;
   private static fsWatcher: FSWatcher;
 
@@ -79,18 +81,18 @@ export class ConfigInitializer {
     }
   }
 
-  public static initialize (useDefault = false): void {
+  public static async initialize (useDefault = false): Promise<void> {
     if (ConfigInitializer.initialized) {
       return;
     }
     const configDir = getConfigDir();
     const configPath = path.join(configDir, 'default.toml');
     let fileString: string;
-    if (!useDefault && fs.pathExistsSync(configPath)) {
-      fileString = fs.readFileSync(configPath, 'utf8');
+    if (!useDefault && await fs.pathExists(configPath)) {
+      fileString = await fs.readFile(configPath, 'utf8');
       ConfigInitializer.updateValues(fileString);
     } else {
-      fileString = fs.readFileSync(path.join(__dirname, '..', '..', 'config', 'default.toml'), 'utf8');
+      fileString = await fs.readFile(path.join(__dirname, '..', '..', 'config', 'default.toml'), 'utf8');
       ConfigInitializer.updateValues(fileString);
     }
   }
@@ -115,5 +117,3 @@ export class ConfigInitializer {
     }
   }
 }
-
-ConfigInitializer.initialize();

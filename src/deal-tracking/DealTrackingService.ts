@@ -4,6 +4,7 @@ import Datastore from '../common/Datastore';
 import axios, { AxiosRequestHeaders } from 'axios';
 import config from '../common/Config';
 import { HeightFromCurrentTime } from '../common/ChainHeight';
+import MetricEmitter from '../common/metrics/MetricEmitter';
 
 export default class DealTrackingService extends BaseService {
   public constructor () {
@@ -116,6 +117,7 @@ export default class DealTrackingService extends BaseService {
               dealId: deal['dealid'],
               dealCid: deal['cid'],
               pieceCid: deal['piece_cid'],
+              pieceSize: Number.isInteger(deal['piece_size']) ? Number(deal['piece_size']) : 0,
               startEpoch: deal['start_epoch'],
               expiration: deal['end_epoch'],
               duration: deal['end_epoch'] - deal['start_epoch'],
@@ -269,6 +271,21 @@ export default class DealTrackingService extends BaseService {
           pieceCid, expiration, state: 'active'
         });
         this.logger.info(`Deal ${dealState.dealId} is active on chain.`);
+        if (dealState.dealCid && dealState.dealCid !== '') {
+          await MetricEmitter.Instance().emit({
+            type: 'deal_active',
+            values: {
+              pieceCid: dealState.pieceCid,
+              pieceSize: dealState.pieceSize,
+              dataCid: dealState.dataCid,
+              provider: dealState.provider,
+              client: dealState.client,
+              verified: dealState.verified,
+              duration: dealState.duration,
+              price: dealState.price
+            }
+          });
+        }
       }
     }
   }

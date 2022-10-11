@@ -213,7 +213,7 @@ describe('ImportUtil', () => {
   })
   describe('downloadFile', () => {
     it('should throw if the file cannot be downloaded', async () => {
-      await expectAsync(ImportUtil['downloadFile']('http://127.0.0.1/none.txt', './none.txt', 4))
+      await expectAsync(ImportUtil['downloadFile']('http://127.0.0.1:9999/none.txt', '/tmp/none.txt', 4))
         .toBeRejectedWithError(/ECONNREFUSED/);
     })
     it('should be able to download a file with multithreading', async () => {

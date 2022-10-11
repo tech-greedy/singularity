@@ -13,6 +13,7 @@ import config from '../../common/Config';
 import { GeneratedFileList } from '../../common/model/OutputFileList';
 import TrafficMonitor from './TrafficMonitor';
 import DealPreparationWorker from '../DealPreparationWorker';
+import MetricEmitter from '../../common/metrics/MetricEmitter';
 
 export class GenerationProcessor {
   public static childProcessPid: number | undefined;
@@ -59,12 +60,13 @@ export async function processGeneration (
   }))
     .sort((a, b) => a.index - b.index)
     .map(r => r.fileList).flat();
-  let timeSpentInMs = performance.now();
   if (newGenerationWork.tmpDir) {
     returnValue.tmpDir = path.join(newGenerationWork.tmpDir, randomUUID());
   }
   await Datastore.HealthCheckModel.findOneAndUpdate({ workerId: worker.workerId }, { $set: { state: 'generation_moving_to_tmpdir' } });
+  let checkpoint = performance.now();
   const moveResult = await moveToTmpdir(logger, trafficMonitor, newGenerationWork, fileList, returnValue.tmpDir);
+  const timeSpendInMovingToTmpdirMs = performance.now() - checkpoint;
   if (moveResult.aborted) {
     return returnValue;
   }
@@ -73,8 +75,9 @@ export async function processGeneration (
     fileList = fileList.filter(f => !moveResult.skipped.has(f));
   }
   await Datastore.HealthCheckModel.findOneAndUpdate({ workerId: worker.workerId }, { $set: { state: 'generation_generating_car_and_commp' } });
+  checkpoint = performance.now();
   const result = await generate(logger, newGenerationWork, fileList, returnValue.tmpDir);
-  timeSpentInMs = performance.now() - timeSpentInMs;
+  const timeSpentInGenerationMs = performance.now() - checkpoint;
 
   const {
     stdout,
@@ -94,6 +97,18 @@ export async function processGeneration (
       errorMessage: stderr,
       workerId: null
     }, { projection: { _id: 1 } });
+
+    await MetricEmitter.Instance().emit({
+      type: 'generation_error',
+      values: {
+        datasetId: newGenerationWork.datasetId,
+        datasetName: newGenerationWork.datasetName,
+        generationId: newGenerationWork.id,
+        index: newGenerationWork.index,
+        statusCode: code,
+        errorMessage: stderr?.toString()
+      }
+    });
     return returnValue;
   }
 
@@ -159,12 +174,30 @@ export async function processGeneration (
     projection: { _id: 1 }
   });
 
+  await MetricEmitter.Instance().emit({
+    type: 'generation_complete',
+    values: {
+      datasetId: newGenerationWork.datasetId,
+      datasetName: newGenerationWork.datasetName,
+      generationId: newGenerationWork.id,
+      index: newGenerationWork.index,
+      dataCid: output.DataCid,
+      pieceSize: output.PieceSize,
+      pieceCid: output.PieceCid,
+      carSize: carFileStat.size,
+      numOfFiles: generatedFileList.length,
+      timeSpentInGenerationMs,
+      timeSpendInMovingToTmpdirMs
+    }
+  });
+
   logger.info(`${worker.workerId} Finished Generation of dataset.`,
     {
       id: newGenerationWork.id,
       datasetName: newGenerationWork.datasetName,
       index: newGenerationWork.index,
-      timeSpentInMs: timeSpentInMs
+      timeSpentInGenerationMs,
+      timeSpendInMovingToTmpdirMs
     });
   returnValue.finished = true;
   return returnValue;

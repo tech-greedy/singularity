@@ -13,6 +13,7 @@ export enum Category {
   DealTrackingService = 'deal_tracking_service',
   DealReplicationService = 'deal_replication_service',
   DealReplicationWorker = 'deal_replication_worker',
+  MetricEmitter = 'metric_emitter',
 }
 
 const container = new winston.Container();

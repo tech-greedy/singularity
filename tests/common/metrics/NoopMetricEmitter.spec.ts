@@ -4,7 +4,7 @@ describe('NoopMetricEmitter', () => {
   it('should emit metrics', async () => {
     const emitter = new NoopMetricEmitter();
     await emitter.emit({
-      name: 'name',
+      type: 'type',
       values: {
         key: 'value'
       }
