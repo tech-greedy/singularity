@@ -202,7 +202,7 @@ describe('DealTrackingService', () => {
 
     it('should handle duplicate deals', async () => {
       const deals = Array(25).fill(undefined).map((_, i) => (
-      { dealid: 100 + i, provider: 'provider1', start_epoch: 0, end_epoch: 0}));
+      { dealid: 100 + i, provider: 'provider1', start_epoch: 0, end_epoch: 0, piece_size: '16'}));
       const spy = spyOn(axios, 'post').and.returnValues(Promise.resolve({
         data: {
           result: {
@@ -215,7 +215,7 @@ describe('DealTrackingService', () => {
           deals: [
             {
               dealid: 100,
-              provider: 'provider2', start_epoch: 0, end_epoch: 0
+              provider: 'provider2', start_epoch: 0, end_epoch: 0, piece_size: '16'
             }
           ]}
         }
@@ -237,7 +237,7 @@ describe('DealTrackingService', () => {
 
     it('should store deals from last deal', async () => {
       const deals = Array(20).fill(undefined).map((_, i) => (
-          { dealid: 120 - i, provider: 'provider1', start_epoch: 0, end_epoch: 0}));
+          { dealid: 120 - i, provider: 'provider1', start_epoch: 0, end_epoch: 0, piece_size: '16'}));
       const spy = spyOn(axios, 'post').and.returnValues(Promise.resolve({
         data: {
           result: {deals}
@@ -265,7 +265,7 @@ describe('DealTrackingService', () => {
               start_epoch: 0,
                 end_epoch: 0,
               client: 'f0xxxx',
-              piece_cid: 'piece_cid'
+              piece_cid: 'piece_cid', piece_size: '16'
             }
           ]
         }}

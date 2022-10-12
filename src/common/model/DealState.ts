@@ -8,6 +8,7 @@ export default interface DealState {
   dealCid: string,
   dataCid: string,
   pieceCid: string,
+  pieceSize: number,
   startEpoch: number,
   expiration: number,
   duration: number,

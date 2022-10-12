@@ -1,5 +1,11 @@
 export default interface Metric {
-  name: string,
-  timestamp?: Date
-  values: {[key: string]: string | number | boolean }
+  type: string,
+  values: {[key: string]: any }
+}
+
+export interface MetricEvent {
+  timestamp: number,
+  instance: string,
+  type: string,
+  values: {[key: string]: any },
 }

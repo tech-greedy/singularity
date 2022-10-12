@@ -34,6 +34,7 @@ import progress from 'cli-progress';
 import asyncRetry from 'async-retry';
 import pAll from 'p-all';
 import GenerateCsv from './common/GenerateCsv';
+import { randomUUID } from 'crypto';
 
 const logger = Logger.getLogger(Category.Default);
 const version = packageJson.version;
@@ -46,9 +47,20 @@ async function initializeConfig (copyDefaultConfig: boolean, watchFile = false):
     await fs.copyFile(path.join(__dirname, '../config/default.toml'), path.join(configDir, 'default.toml'));
     logger.info(`Please check ${path.join(configDir, 'default.toml')}`);
   }
-  ConfigInitializer.initialize();
+  if (!await fs.pathExists(path.join(configDir, 'instance.txt'))) {
+    logger.info(`Assigning a new instance id ...`);
+    await fs.mkdirp(configDir);
+    const instance = randomUUID();
+    await fs.writeFile(path.join(configDir, 'instance.txt'), instance);
+  }
+  await ConfigInitializer.initialize();
   if (watchFile) {
     ConfigInitializer.watchFile();
+  }
+
+  const instancePath = path.join(configDir, 'instance.txt');
+  if (await fs.pathExists(instancePath)) {
+    ConfigInitializer.instanceId = await fs.readFile(instancePath, 'utf8');
   }
 }
 
@@ -303,7 +315,7 @@ preparation.command('list').description('List all deal preparation requests')
 preparation.command('upload-manifest').description('Upload manifest to web3.storage')
   .argument('<dataset>', 'The dataset id or name, as in "singularity prep list"')
   .argument('<slugName>', 'The slug name of the dataset, as shown on "My Claimed Datasets" page')
-  .addOption(new Option('-j, --concurrency <concurrency>', 'Number of concurrent uploads').default(2).argParser(parseInt))
+  .addOption(new Option('-j, --concurrency <concurrency>', 'Number of concurrent uploads').default(2).argParser(Number))
   .action(async (dataset, slugName, options) => {
     await initializeConfig(false, false);
     const mongoose = await Datastore.connect();

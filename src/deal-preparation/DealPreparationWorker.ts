@@ -7,6 +7,7 @@ import TrafficMonitor from './worker/TrafficMonitor';
 import { processGeneration } from './worker/GenerationProcessor';
 import { AbortSignal } from '../common/AbortSignal';
 import Scanner from './scanner/Scanner';
+import MetricEmitter from '../common/metrics/MetricEmitter';
 
 export default class DealPreparationWorker extends BaseService {
   public readonly trafficMonitor: TrafficMonitor;
@@ -47,6 +48,14 @@ export default class DealPreparationWorker extends BaseService {
         if (err instanceof Error) {
           this.logger.error(`${this.workerId} - Encountered an error.`, err);
           await Datastore.ScanningRequestModel.findByIdAndUpdate(newScanningWork.id, { status: 'error', errorMessage: err.message, workerId: null });
+          await MetricEmitter.Instance().emit({
+            type: 'scanning_error',
+            values: {
+              datasetId: newScanningWork.id,
+              datasetName: newScanningWork.name,
+              errorMessage: err.message
+            }
+          });
           return true;
         }
         throw err;

@@ -1,7 +1,6 @@
 import winston from 'winston';
 import Logger, { Category } from './Logger';
 import config from './Config';
-import MetricEmitter, { getMetricEmitter } from './metrics/MetricEmitter';
 import { randomUUID } from 'crypto';
 import pidusage from 'pidusage';
 import Datastore from './Datastore';
@@ -11,7 +10,6 @@ import { GenerationProcessor } from '../deal-preparation/worker/GenerationProces
 export default abstract class BaseService {
   public readonly workerId: string;
   public readonly type: string;
-  public metricEmitter: MetricEmitter;
   public logger: winston.Logger;
   protected enabled: boolean;
 
@@ -20,7 +18,6 @@ export default abstract class BaseService {
     this.type = category.toString();
     this.logger = Logger.getLogger(category);
     this.enabled = config.get(`${category}.enabled`);
-    this.metricEmitter = getMetricEmitter();
   }
 
   public abstract start (): void;

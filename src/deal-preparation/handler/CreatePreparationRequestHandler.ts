@@ -8,6 +8,7 @@ import fs from 'fs/promises';
 import { constants } from 'fs';
 import Datastore from '../../common/Datastore';
 import sendError from './ErrorHandler';
+import MetricEmitter from '../../common/metrics/MetricEmitter';
 
 export interface ValidationResult {
   errorCode?: ErrorCode,
@@ -117,6 +118,20 @@ export default async function handleCreatePreparationRequest (this: DealPreparat
     }
     throw e;
   }
+
+  await MetricEmitter.Instance().emit({
+    type: 'data_preparation_created',
+    values: {
+      datasetId: scanningRequest.id,
+      datasetName: scanningRequest.name,
+      minSize,
+      maxSize,
+      useS3: path.startsWith('s3://'),
+      useTmp: tmpDir !== undefined,
+      skipInaccessibleFiles: skipInaccessibleFiles
+    }
+  });
+
   response.end(JSON.stringify({
     id: scanningRequest.id,
     name,
