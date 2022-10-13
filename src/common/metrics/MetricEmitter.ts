@@ -4,7 +4,7 @@ import config from '../Config';
 import LambdaMetricEmitter from './LambdaMetricEmitter';
 
 export interface Emitter {
-  emit(metric: Metric): Promise<void>;
+  emit(metric: Metric, timeOverride?: Date): Promise<void>;
 }
 
 /* istanbul ignore next */
