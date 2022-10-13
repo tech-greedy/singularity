@@ -37,7 +37,7 @@ export default class LambdaMetricEmitter implements Emitter {
     this.logger.info('Starting metric emitter');
     while (true) {
       await this.flushAll();
-      await sleep(5 * 1000);
+      await sleep(60 * 1000);
     }
   }
 
