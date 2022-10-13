@@ -45,7 +45,7 @@ async function migrate (): Promise<void> {
   if (!instanceFound) {
     const configDir = getConfigDir();
     if (await fs.pathExists(path.join(configDir, 'instance.txt'))) {
-      logger.info('Migrating from v2.0.0-RC1 ...');
+      logger.info('Migrating from v2.0.0-RC1 ... This may take a while.');
       const instanceId = await fs.readFile(path.join(configDir, 'instance.txt'), 'utf8');
       const stat = await fs.stat(path.join(configDir, 'instance.txt'));
       const until = stat.mtime;
@@ -54,7 +54,7 @@ async function migrate (): Promise<void> {
       await Datastore.MiscModel.create({ key: 'migrated', value: false });
       await fs.remove(path.join(configDir, 'instance.txt'));
     } else {
-      logger.info('Migrating from v1.x ...');
+      logger.info('Migrating from v1.x ... This may take a while.');
       const instanceId = randomUUID();
       const until = Date.now();
       await Datastore.MiscModel.create({ key: 'instance', value: instanceId });

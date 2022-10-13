@@ -427,6 +427,12 @@ Meanwhile, IO may become the bottleneck if not using SSD.
 The repo `~/.singularity` or the folder specified by `SINGULARITY_PATH` contains all state of the service.
 To backup, simply backup the repo folder.
 
+## Usage Collection
+
+Starting version 2.0.0, anonymous data including error messages, data preparation and deal making statistics
+will be collected for us to better understand how the software is used and improve the software. To disable behavior,
+create and set `metrics.enabled` to `false` in `default.toml`.
+
 ## FAQ and common issues
 
 ### How to handle inaccessible files
