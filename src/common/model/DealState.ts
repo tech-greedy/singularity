@@ -18,5 +18,6 @@ export default interface DealState {
   replicationRequestId: string,
   datasetId: string,
   dealId?: number,
-  errorMessage?: string// any useful info returned by boost / lotus
+  errorMessage?: string// any useful info returned by boost / lotus,
+  updatedAt: Date,
 }

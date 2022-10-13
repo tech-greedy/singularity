@@ -19,16 +19,16 @@ export default class LambdaMetricEmitter implements Emitter {
     this.logger = Logger.getLogger(Category.MetricEmitter);
     this.mutex = new Mutex();
     if (start) {
-      this.run();
+      this.run.bind(this)();
     }
     process.on('SIGINT', async () => {
       console.error('SIGINT received. Flushing metrics...');
-      await this.flush();
+      await this.flushAll();
       process.exit();
     });
     process.on('SIGTERM', async () => {
       console.error('SIGTERM received. Flushing metrics...');
-      await this.flush();
+      await this.flushAll();
       process.exit();
     });
   }
@@ -36,8 +36,8 @@ export default class LambdaMetricEmitter implements Emitter {
   private async run () :Promise<void> {
     this.logger.info('Starting metric emitter');
     while (true) {
-      await this.flush();
-      await sleep(60 * 1000);
+      await this.flushAll();
+      await sleep(5 * 1000);
     }
   }
 
@@ -47,15 +47,16 @@ export default class LambdaMetricEmitter implements Emitter {
     }
     const release = await this.mutex.acquire();
     try {
-      this.logger.debug(`Publishing ${this.events.length} events to ${this.url}`);
-      const json = JSON.stringify(this.events);
+      const toPublish = this.events.slice(0, 1000);
+      this.logger.info(`Publishing ${toPublish.length} events`);
+      const json = JSON.stringify(toPublish);
       const compressed = await compress(Buffer.from(json, 'utf8'));
       await axios.post(this.url, compressed.toString('base64'), {
         headers: {
           'Content-Type': 'text/plain'
         }
       });
-      this.events = [];
+      this.events.splice(0, toPublish.length);
     } catch (e) {
       this.logger.warn(`Failed to publish ${this.events.length} events`, e);
     } finally {
@@ -63,8 +64,15 @@ export default class LambdaMetricEmitter implements Emitter {
     }
   }
 
-  public async emit (metric: Metric): Promise<void> {
-    const timestamp = Math.floor(Date.now() / 1000);
+  public async flushAll (): Promise<void> {
+    while (this.events.length > 0) {
+      await this.flush();
+    }
+  }
+
+  public async emit (metric: Metric, timeOverride?: Date): Promise<void> {
+    const date = timeOverride?.getTime() || Date.now();
+    const timestamp = Math.floor(date / 1000);
     const instance = ConfigInitializer.instanceId;
     if (instance === 'unknown') {
       this.logger.warn('Instance ID is unknown. Not emitting metric');

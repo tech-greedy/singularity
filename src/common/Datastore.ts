@@ -15,6 +15,7 @@ import config, { getConfigDir } from './Config';
 import HealthCheck from './model/HealthCheck';
 import { ObjectId } from 'mongodb';
 import ManifestUploadState from './model/ManifestUploadState';
+import Misc from './model/Misc';
 
 export default class Datastore {
   private static logger = Logger.getLogger(Category.Database);
@@ -40,6 +41,8 @@ export default class Datastore {
   public static OutputFileListModel: mongoose.Model<OutputFileList, {}, {}, {}>;
   // eslint-disable-next-line @typescript-eslint/ban-types
   public static ManifestUploadStateModel: mongoose.Model<ManifestUploadState, {}, {}, {}>;
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  public static MiscModel: mongoose.Model<Misc, {}, {}, {}>;
 
   private static DB_NAME = 'singularity';
 
@@ -76,6 +79,18 @@ export default class Datastore {
     this.setupInputFileListSchema();
     this.setupOutputFileListSchema();
     this.setupManifestUploadStateSchema();
+    this.setupMiscSchema();
+  }
+
+  private static setupMiscSchema () {
+    const schema = new Schema<Misc>({
+      key: {
+        type: Schema.Types.String,
+        unique: true
+      },
+      value: Schema.Types.Mixed
+    });
+    Datastore.MiscModel = mongoose.model<Misc>('Misc', schema);
   }
 
   private static setupManifestUploadStateSchema () {
