@@ -89,17 +89,6 @@ describe('DealReplicationService', () => {
         message: ErrorMessage[ErrorCode.REPLICATION_NOT_FOUND],
       })
     });
-    it('should return error if the replication request has already completed', async () => {
-      const request = await Datastore.ReplicationRequestModel.create({
-        status: 'completed',
-      });
-      const response = await supertest(service['app']).post(`/replication/${request.id}`);
-      expect(response.status).toEqual(400);
-      expect(response.body).toEqual({
-        error: ErrorCode.CHANGE_STATE_INVALID,
-        message: ErrorMessage[ErrorCode.CHANGE_STATE_INVALID],
-      });
-    })
     it('should return error if trying to change a replication request without cronschedule', async () => {
       const request = await Datastore.ReplicationRequestModel.create({
         status: 'active',
