@@ -153,10 +153,6 @@ export default class DealReplicationService extends BaseService {
         this.sendError(response, ErrorCode.REPLICATION_NOT_FOUND);
         return;
       }
-      if (!['active', 'paused'].includes(found.status)) {
-        this.sendError(response, ErrorCode.CHANGE_STATE_INVALID);
-        return;
-      }
       let responseObj;
       if (cronSchedule) {
         if (!found.cronSchedule) {
@@ -164,12 +160,7 @@ export default class DealReplicationService extends BaseService {
           return;
         }
         responseObj = await Datastore.ReplicationRequestModel.findOneAndUpdate({
-          _id: id,
-          status: {
-            $nin: [
-              'completed', 'error'
-            ]
-          }
+          _id: id
         }, {
           cronSchedule,
           cronMaxDeals,
@@ -178,18 +169,8 @@ export default class DealReplicationService extends BaseService {
           new: true
         });
       } else if (status) {
-        if (!['active', 'paused'].includes(status)) {
-          this.sendError(response, ErrorCode.CHANGE_STATE_INVALID);
-          return;
-        }
-
         responseObj = await Datastore.ReplicationRequestModel.findOneAndUpdate({
-          _id: id,
-          status: {
-            $nin: [
-              'completed', 'error'
-            ]
-          }
+          _id: id
         }, {
           status,
           workerId: null
