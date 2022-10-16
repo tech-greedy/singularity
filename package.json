@@ -1,6 +1,6 @@
 {
   "name": "@techgreedy/singularity",
-  "version": "1.2.2",
+  "version": "2.0.0-RC2",
   "description": "Large scale client tool with capabilities on onboard PB-scale data to Filecoin network",
   "main": "dist/source/start.js",
   "types": "dist/source/start.d.ts",

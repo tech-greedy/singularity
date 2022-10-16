@@ -35,9 +35,108 @@ import asyncRetry from 'async-retry';
 import pAll from 'p-all';
 import GenerateCsv from './common/GenerateCsv';
 import { randomUUID } from 'crypto';
+import MetricEmitter from './common/metrics/MetricEmitter';
 
 const logger = Logger.getLogger(Category.Default);
 const version = packageJson.version;
+
+async function migrate (): Promise<void> {
+  const instanceFound = await Datastore.MiscModel.findOne({ key: 'instance' });
+  if (!instanceFound) {
+    const configDir = getConfigDir();
+    if (await fs.pathExists(path.join(configDir, 'instance.txt'))) {
+      logger.info('Migrating from v2.0.0-RC1 ... This may take a while.');
+      const instanceId = await fs.readFile(path.join(configDir, 'instance.txt'), 'utf8');
+      const stat = await fs.stat(path.join(configDir, 'instance.txt'));
+      const until = stat.mtime;
+      await Datastore.MiscModel.create({ key: 'instance', value: instanceId });
+      await Datastore.MiscModel.create({ key: 'migrate_until', value: until });
+      await Datastore.MiscModel.create({ key: 'migrated', value: false });
+      await fs.remove(path.join(configDir, 'instance.txt'));
+    } else {
+      logger.info('Migrating from v1.x ... This may take a while.');
+      const instanceId = randomUUID();
+      const until = Date.now();
+      await Datastore.MiscModel.create({ key: 'instance', value: instanceId });
+      await Datastore.MiscModel.create({ key: 'migrate_until', value: until });
+      await Datastore.MiscModel.create({ key: 'migrated', value: false });
+    }
+  }
+
+  ConfigInitializer.instanceId = (await Datastore.MiscModel.findOne({ key: 'instance' }))!.value;
+  const migrated: boolean = (await Datastore.MiscModel.findOne({ key: 'migrated' }))!.value;
+  const until: Date = (await Datastore.MiscModel.findOne({ key: 'migrate_until' }))!.value;
+
+  if (!migrated && config.getOrDefault('metrics.enabled', true)) {
+    MetricEmitter.Instance();
+    logger.info('Migrating completed generations from previous version ...');
+    for (const generation of await Datastore.GenerationRequestModel.find({
+      status: 'completed',
+      updatedAt: { $lt: until }
+    })) {
+      let numOfFiles = 0;
+      for (const fileList of await Datastore.OutputFileListModel.aggregate([{ $match: { generationId: generation.id } }, {
+        $project: {
+          numOfFiles: { $size: '$generatedFileList' }
+        }
+      }])) {
+        numOfFiles += fileList.numOfFiles;
+      }
+      await MetricEmitter.Instance().emit({
+        type: 'generation_complete',
+        values: {
+          datasetId: generation.datasetId,
+          datasetName: generation.datasetName,
+          generationId: generation.id,
+          index: generation.index,
+          dataCid: generation.dataCid,
+          pieceSize: generation.pieceSize,
+          pieceCid: generation.pieceCid,
+          carSize: generation.carSize,
+          numOfFiles: numOfFiles
+        }
+      }, generation.updatedAt);
+    }
+
+    logger.info('Migrating deals from previous version ...');
+    for (const deal of await Datastore.DealStateModel.find({ replicationRequestId: { $exists: true }, updatedAt: { $lt: until } })) {
+      await MetricEmitter.Instance().emit({
+        type: 'deal_proposed',
+        values: {
+          protocol: 'unknown',
+          pieceCid: deal.pieceCid,
+          dataCid: deal.dataCid,
+          pieceSize: deal.pieceSize,
+          carSize: deal.pieceSize,
+          provider: deal.provider,
+          client: deal.client,
+          verified: deal.verified,
+          duration: deal.duration,
+          price: deal.price
+        }
+      }, deal.updatedAt);
+
+      if (deal.state === 'active') {
+        await MetricEmitter.Instance().emit({
+          type: 'deal_active',
+          values: {
+            pieceCid: deal.pieceCid,
+            pieceSize: deal.pieceSize,
+            dataCid: deal.dataCid,
+            provider: deal.provider,
+            client: deal.client,
+            verified: deal.verified,
+            duration: deal.duration,
+            price: deal.price
+          }
+        }, deal.updatedAt);
+      }
+    }
+
+    logger.info('Migration completed ...');
+    await Datastore.MiscModel.findOneAndUpdate({ key: 'migrated' }, { value: true });
+  }
+}
 
 async function initializeConfig (copyDefaultConfig: boolean, watchFile = false): Promise<void> {
   const configDir = getConfigDir();
@@ -47,20 +146,9 @@ async function initializeConfig (copyDefaultConfig: boolean, watchFile = false):
     await fs.copyFile(path.join(__dirname, '../config/default.toml'), path.join(configDir, 'default.toml'));
     logger.info(`Please check ${path.join(configDir, 'default.toml')}`);
   }
-  if (!await fs.pathExists(path.join(configDir, 'instance.txt'))) {
-    logger.info(`Assigning a new instance id ...`);
-    await fs.mkdirp(configDir);
-    const instance = randomUUID();
-    await fs.writeFile(path.join(configDir, 'instance.txt'), instance);
-  }
   await ConfigInitializer.initialize();
   if (watchFile) {
     ConfigInitializer.watchFile();
-  }
-
-  const instancePath = path.join(configDir, 'instance.txt');
-  if (await fs.pathExists(instancePath)) {
-    ConfigInitializer.instanceId = await fs.readFile(instancePath, 'utf8');
   }
 }
 
@@ -85,6 +173,8 @@ program.command('daemon')
         let indexService: IndexService;
         await Datastore.init(false);
         await Datastore.connect();
+        await migrate();
+        ConfigInitializer.instanceId = (await Datastore.MiscModel.findOne({ key: 'instance' }))!.value;
         const workers: [Worker, string][] = [];
         let readied = 0;
         cluster.on('message', _ => {
@@ -126,6 +216,7 @@ program.command('daemon')
         }
       } else if (cluster.isWorker) {
         await Datastore.connect();
+        ConfigInitializer.instanceId = (await Datastore.MiscModel.findOne({ key: 'instance' }))!.value;
         process.on('message', async (msg) => {
           switch (msg) {
             case 'deal_preparation_service':

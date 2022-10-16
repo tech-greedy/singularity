@@ -15,4 +15,5 @@ export default interface GenerationRequest {
   filenameOverride?: string, // when the car name is different from cid
   tmpDir?: string,
   skipInaccessibleFiles?: boolean,
+  updatedAt?: Date,
 }
