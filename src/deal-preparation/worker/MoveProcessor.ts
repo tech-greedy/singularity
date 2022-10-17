@@ -129,8 +129,13 @@ export async function moveFileList (logger: winston.Logger, fileList: FileList, 
       }
       fileInfo.path = dest;
     } catch (error: any) {
-      logger.warn(`Encountered an error when copying ${fileInfo.path} - ${error}`);
-      if (error.errno !== -13 || !skipInaccessibleFiles) {
+      logger.warn(`Encountered an error when copying ${fileInfo.path} - ${error} (errno: ${error.errno})`);
+      /**
+       * https://kernel.googlesource.com/pub/scm/linux/kernel/git/nico/archive/+/v0.97/include/linux/errno.h
+       * 2 - ENOENT - No such file or directory
+       * 13 - EACCES - Permission denied
+       */
+      if (![-2, -13].includes(error.errno) || !skipInaccessibleFiles) {
         throw error;
       }
       logger.info(`Skipped inaccessible file - ${fileInfo.path}`);

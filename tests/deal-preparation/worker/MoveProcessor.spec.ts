@@ -61,6 +61,17 @@ describe('MoveProcessor', () => {
       expect(fileList[1].path).toEqual(path.resolve(tmpDir + '/b/2.txt'));
       await fs.rm(tmpDir, { recursive: true, force: true });
     })
+    it('should skip moving inaccessible files for local move', async () => {
+      const fileList: FileList = [{
+        path: './not-existing-file',
+        size: 100
+      }];
+        const tmpDir = './moveFileList-tests-tmp3';
+        const moveResult = await moveFileList(Logger.getLogger(Category.Default), fileList, '.', tmpDir, true);
+        expect(moveResult.aborted).toEqual(false);
+        expect(moveResult.skipped.size).toEqual(1);
+        await fs.rm(tmpDir, { recursive: true, force: true });
+    })
   })
   describe('moveS3FileList', () => {
     it('should skip moving inaccessible files', async () => {
