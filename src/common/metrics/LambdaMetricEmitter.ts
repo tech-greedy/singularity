@@ -58,7 +58,7 @@ export default class LambdaMetricEmitter implements Emitter {
       });
       this.events.splice(0, toPublish.length);
     } catch (e) {
-      this.logger.warn(`Failed to publish ${this.events.length} events`, e);
+      this.logger.warn(`Failed to publish ${this.events.length} events`);
     } finally {
       release();
     }
