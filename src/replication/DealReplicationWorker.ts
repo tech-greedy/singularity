@@ -416,8 +416,8 @@ export default class DealReplicationWorker extends BaseService {
 
           const startDelay = replicationRequest.startDelay ? replicationRequest.startDelay : 20160;
           const currentHeight = HeightFromCurrentTime();
-          const startEpoch = startDelay + currentHeight + 10; // 5 min buffer time
-          this.logger.debug(`Calculated start epoch startDelay: ${startDelay} + currentHeight: ${currentHeight} + 10 = ${startEpoch}`);
+          const startEpoch = startDelay + currentHeight + 60; // 30 min buffer time
+          this.logger.debug(`Calculated start epoch startDelay: ${startDelay} + currentHeight: ${currentHeight} + 60 = ${startEpoch}`);
           let dealCmd = '';
           try {
             dealCmd = await this.createDealCmd(useLotus, provider, replicationRequest, carFile, startEpoch);
