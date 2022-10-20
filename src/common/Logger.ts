@@ -50,14 +50,13 @@ function getTransports (category : Category): Transport[] {
   return transports;
 }
 
-Object.values(Category).forEach(category => {
-  container.add(category, {
-    transports: getTransports(category)
-  });
-});
-
 export default class Logger {
   public static getLogger (category: Category) {
+    if (!container.has(category)) {
+      container.add(category, {
+        transports: getTransports(category)
+      });
+    }
     return container.get(category);
   }
 

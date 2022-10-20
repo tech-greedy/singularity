@@ -39,7 +39,6 @@ import MetricEmitter from './common/metrics/MetricEmitter';
 import boxen from 'boxen';
 import wrap from 'word-wrap';
 
-const logger = Logger.getLogger(Category.Default);
 const version = packageJson.version;
 const dataCollectionText = boxen(
   wrap(`By default, the usage of this software will be collected by the Slingshot Program to help improve the software. You can opt out by setting metrics.enabled to false in the config file ${path.join(getConfigDir(), 'default.toml')}.`,
@@ -51,12 +50,12 @@ async function migrate (): Promise<void> {
   const instanceFound = await Datastore.MiscModel.findOne({ key: 'instance' });
   if (!instanceFound) {
     if (!dataCollectionTextDisplayed) {
-      logger.info(dataCollectionText);
+      console.info(dataCollectionText);
       dataCollectionTextDisplayed = true;
     }
     const configDir = getConfigDir();
     if (await fs.pathExists(path.join(configDir, 'instance.txt'))) {
-      logger.info('Migrating from v2.0.0-RC1 ... This may take a while.');
+      console.info('Migrating from v2.0.0-RC1 ... This may take a while.');
       const instanceId = await fs.readFile(path.join(configDir, 'instance.txt'), 'utf8');
       const stat = await fs.stat(path.join(configDir, 'instance.txt'));
       const until = stat.mtime;
@@ -65,7 +64,7 @@ async function migrate (): Promise<void> {
       await Datastore.MiscModel.create({ key: 'migrated', value: false });
       await fs.remove(path.join(configDir, 'instance.txt'));
     } else {
-      logger.info('Migrating from v1.x ... This may take a while.');
+      console.info('Migrating from v1.x ... This may take a while.');
       const instanceId = randomUUID();
       const until = Date.now();
       await Datastore.MiscModel.create({ key: 'instance', value: instanceId });
@@ -80,7 +79,7 @@ async function migrate (): Promise<void> {
 
   if (!migrated && config.getOrDefault('metrics.enabled', true)) {
     MetricEmitter.Instance();
-    logger.info('Migrating completed generations from previous version ...');
+    console.info('Migrating completed generations from previous version ...');
     for (const generation of await Datastore.GenerationRequestModel.find({
       status: 'completed',
       updatedAt: { $lt: until }
@@ -109,7 +108,7 @@ async function migrate (): Promise<void> {
       }, generation.updatedAt);
     }
 
-    logger.info('Migrating deals from previous version ...');
+    console.info('Migrating deals from previous version ...');
     for (const deal of await Datastore.DealStateModel.find({ replicationRequestId: { $exists: true }, updatedAt: { $lt: until } })) {
       await MetricEmitter.Instance().emit({
         type: 'deal_proposed',
@@ -144,7 +143,7 @@ async function migrate (): Promise<void> {
       }
     }
 
-    logger.info('Migration completed ...');
+    console.info('Migration completed ...');
     await Datastore.MiscModel.findOneAndUpdate({ key: 'migrated' }, { value: true });
   }
 }
@@ -152,12 +151,12 @@ async function migrate (): Promise<void> {
 async function initializeConfig (copyDefaultConfig: boolean, watchFile = false): Promise<void> {
   const configDir = getConfigDir();
   if (!await fs.pathExists(path.join(configDir, 'default.toml')) && copyDefaultConfig) {
-    logger.info(`Initializing at ${configDir} ...`);
+    console.info(`Initializing at ${configDir} ...`);
     await fs.mkdirp(configDir);
     await fs.copyFile(path.join(__dirname, '../config/default.toml'), path.join(configDir, 'default.toml'));
-    logger.info(`Please check ${path.join(configDir, 'default.toml')}`);
+    console.info(`Please check ${path.join(configDir, 'default.toml')}`);
     if (!dataCollectionTextDisplayed) {
-      logger.info(dataCollectionText);
+      console.info(dataCollectionText);
       dataCollectionTextDisplayed = true;
     }
   }
@@ -343,11 +342,11 @@ preparation.command('create').description('Start deal preparation for a local da
   .action(async (name, p: string, outDir, options) => {
     await initializeConfig(false, false);
     if (!p.startsWith('s3://') && !await fs.pathExists(p)) {
-      logger.error(`Dataset path "${p}" does not exist.`);
+      console.error(`Dataset path "${p}" does not exist.`);
       process.exit(1);
     }
     if (p.startsWith('s3://') && !options.tmpDir) {
-      logger.error('tmp_dir needs to specified for S3 dataset');
+      console.error('tmp_dir needs to specified for S3 dataset');
       process.exit(1);
     }
     await fs.mkdirp(outDir);
@@ -426,12 +425,12 @@ preparation.command('upload-manifest').description('Upload manifest to web3.stor
     await initializeConfig(false, false);
     const mongoose = await Datastore.connect();
     if (!process.env.WEB3_STORAGE_TOKEN) {
-      logger.error('WEB3_STORAGE_TOKEN is not set');
+      console.error('WEB3_STORAGE_TOKEN is not set');
       process.exit(1);
     }
     const found = await Datastore.findScanningRequest(dataset);
     if (!found) {
-      logger.error(`Dataset ${dataset} not found`);
+      console.error(`Dataset ${dataset} not found`);
       process.exit(1);
     }
 
@@ -496,7 +495,7 @@ preparation.command('upload-manifest').description('Upload manifest to web3.stor
     await mongoose.disconnect();
     bar.stop();
     if (incomplete > 0) {
-      logger.warn(`${incomplete} generation requests are not completed`);
+      console.warn(`${incomplete} generation requests are not completed`);
     }
   });
 
