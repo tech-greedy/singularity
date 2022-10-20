@@ -36,13 +36,24 @@ import pAll from 'p-all';
 import GenerateCsv from './common/GenerateCsv';
 import { randomUUID } from 'crypto';
 import MetricEmitter from './common/metrics/MetricEmitter';
+import boxen from 'boxen';
+import wrap from 'word-wrap';
 
 const logger = Logger.getLogger(Category.Default);
 const version = packageJson.version;
+const dataCollectionText = boxen(
+  wrap(`By default, the usage of this software will be collected by the Slingshot Program to help improve the software. You can opt out by setting metrics.enabled to false in the config file ${path.join(getConfigDir(), 'default.toml')}.`,
+    { width: 60, indent: '', trim: true }),
+  { title: 'Usage Collection', padding: 1, margin: 1, borderStyle: 'double' });
+let dataCollectionTextDisplayed = false;
 
 async function migrate (): Promise<void> {
   const instanceFound = await Datastore.MiscModel.findOne({ key: 'instance' });
   if (!instanceFound) {
+    if (!dataCollectionTextDisplayed) {
+      logger.info(dataCollectionText);
+      dataCollectionTextDisplayed = true;
+    }
     const configDir = getConfigDir();
     if (await fs.pathExists(path.join(configDir, 'instance.txt'))) {
       logger.info('Migrating from v2.0.0-RC1 ... This may take a while.');
@@ -145,6 +156,10 @@ async function initializeConfig (copyDefaultConfig: boolean, watchFile = false):
     await fs.mkdirp(configDir);
     await fs.copyFile(path.join(__dirname, '../config/default.toml'), path.join(configDir, 'default.toml'));
     logger.info(`Please check ${path.join(configDir, 'default.toml')}`);
+    if (!dataCollectionTextDisplayed) {
+      logger.info(dataCollectionText);
+      dataCollectionTextDisplayed = true;
+    }
   }
   await ConfigInitializer.initialize();
   if (watchFile) {
