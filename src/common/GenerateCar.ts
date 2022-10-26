@@ -13,7 +13,11 @@ export default class GenerateCar {
         const p2 = path.join(dir, 'node_modules', 'bin', 'generate-car');
         const p3 = path.join(dir, '.bin', 'generate-car');
         const p4 = path.join(dir, 'bin', 'generate-car');
-        for (const p of [p1, p2, p3, p4]) {
+        const p5 = path.join(dir, 'node_modules', '.bin', 'generate-car.exe');
+        const p6 = path.join(dir, 'node_modules', 'bin', 'generate-car.exe');
+        const p7 = path.join(dir, '.bin', 'generate-car.exe');
+        const p8 = path.join(dir, 'bin', 'generate-car.exe');
+        for (const p of [p1, p2, p3, p4, p5, p6, p7, p8]) {
           logger.debug(`Checking ${p} for generate-car binary`);
           if (fs.existsSync(p)) {
             GenerateCar.path = p;
