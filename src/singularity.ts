@@ -771,12 +771,13 @@ replication.command('status')
 
 replication.command('list')
   .description('List all deal replication requests')
+  .option('-v, --verbose', 'Also print deal counts in this request', false)
   .action(async (options) => {
     await initializeConfig(false, false);
     let response!: AxiosResponse;
     try {
       const url: string = config.get('connection.deal_replication_service');
-      response = await axios.get(`${url}/replications`);
+      response = await axios.get(`${url}/replications?verbose=${options.verbose}`);
     } catch (error) {
       CliUtil.renderErrorAndExit(error);
     }
