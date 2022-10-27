@@ -828,6 +828,23 @@ replication.command('pause').description('Pause an active deal replication reque
     CliUtil.renderResponse(response.data, options.json);
   });
 
+replication.command('complete').description('Forcefully mark an active deal replication request as completed.')
+  .option('--json', 'Output with JSON format')
+  .argument('<id>', 'Existing ID of deal replication request.')
+  .action(async (id, options) => {
+    await initializeConfig(false, false);
+    let response!: AxiosResponse;
+    try {
+      const url: string = config.get('connection.deal_replication_service');
+      response = await axios.post(`${url}/replication/${id}`, {
+        status: 'completed'
+      });
+    } catch (error) {
+      CliUtil.renderErrorAndExit(error);
+    }
+    CliUtil.renderResponse(response.data, options.json);
+  });
+
 replication.command('resume').description('Resume a paused deal replication request.')
   .option('--json', 'Output with JSON format')
   .argument('<id>', 'Existing ID of deal replication request.')
