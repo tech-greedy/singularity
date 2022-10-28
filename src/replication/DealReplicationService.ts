@@ -48,19 +48,11 @@ export default class DealReplicationService extends BaseService {
     });
   }
 
-  private async handleGetReplicationRequest (request: Request, response: Response) {
-    const id = request.params['id'];
-    this.logger.info(`Received request to get details of dataset replication request "${id}".`);
-    const found = await Datastore.findReplicationRequest(id);
-    const verbose = request.query['verbose'] === 'true';
-    if (!found) {
-      this.sendError(response, ErrorCode.REPLICATION_NOT_FOUND);
-      return;
-    }
+  private async fillReplicationDealStats (detail: GetReplicationDetailsResponse | GetReplicationsResponseItem) {
     const dealStateStats = await Datastore.DealStateModel.aggregate([
       {
         $match: {
-          replicationRequestId: found.id
+          replicationRequestId: detail.id
         }
       },
       {
@@ -72,14 +64,25 @@ export default class DealReplicationService extends BaseService {
         }
       }
     ]);
-    const proposed = dealStateStats.find(s => s._id.state === 'proposed')?.count ?? 0;
-    const published = dealStateStats.find(s => s._id.state === 'published')?.count ?? 0;
-    const active = dealStateStats.find(s => s._id.state === 'active')?.count ?? 0;
-    const proposalExpired = dealStateStats.find(s => s._id.state === 'proposal_expired')?.count ?? 0;
-    const expired = dealStateStats.find(s => s._id.state === 'expired')?.count ?? 0;
-    const slashed = dealStateStats.find(s => s._id.state === 'slashed')?.count ?? 0;
-    const error = dealStateStats.find(s => s._id.state === 'error')?.count ?? 0;
-    const total = dealStateStats.reduce((acc, s) => acc + s.count, 0);
+    detail.dealsProposed = dealStateStats.find(s => s._id.state === 'proposed')?.count ?? 0;
+    detail.dealsPublished = dealStateStats.find(s => s._id.state === 'published')?.count ?? 0;
+    detail.dealsActive = dealStateStats.find(s => s._id.state === 'active')?.count ?? 0;
+    detail.dealsProposalExpired = dealStateStats.find(s => s._id.state === 'proposal_expired')?.count ?? 0;
+    detail.dealsExpired = dealStateStats.find(s => s._id.state === 'expired')?.count ?? 0;
+    detail.dealsSlashed = dealStateStats.find(s => s._id.state === 'slashed')?.count ?? 0;
+    detail.dealsError = dealStateStats.find(s => s._id.state === 'error')?.count ?? 0;
+    detail.dealsTotal = dealStateStats.reduce((acc, s) => acc + s.count, 0);
+  }
+
+  private async handleGetReplicationRequest (request: Request, response: Response) {
+    const id = request.params['id'];
+    this.logger.info(`Received request to get details of dataset replication request "${id}".`);
+    const found = await Datastore.findReplicationRequest(id);
+    const verbose = request.query['verbose'] === 'true';
+    if (!found) {
+      this.sendError(response, ErrorCode.REPLICATION_NOT_FOUND);
+      return;
+    }
     const result: GetReplicationDetailsResponse = {
       id: found.id,
       datasetId: found.datasetId,
@@ -100,16 +103,9 @@ export default class DealReplicationService extends BaseService {
       fileListPath: found.fileListPath,
       notes: found.notes,
       csvOutputDir: found.csvOutputDir,
-      isForced: found.isForced,
-      dealsProposed: proposed,
-      dealsPublished: published,
-      dealsActive: active,
-      dealsProposalExpired: proposalExpired,
-      dealsExpired: expired,
-      dealsSlashed: slashed,
-      dealsError: error,
-      dealsTotal: total
+      isForced: found.isForced
     };
+    await this.fillReplicationDealStats(result);
     if (verbose) {
       result.deals = await Datastore.DealStateModel.find({ replicationRequestId: id });
     }
@@ -140,29 +136,7 @@ export default class DealReplicationService extends BaseService {
         errorMessage: r.errorMessage
       };
       if (verbose) {
-        const dealStateStats = await Datastore.DealStateModel.aggregate([
-          {
-            $match: {
-              replicationRequestId: r.id
-            }
-          },
-          {
-            $group: {
-              _id: {
-                state: '$state'
-              },
-              count: { $sum: 1 }
-            }
-          }
-        ]);
-        obj.dealsProposed = dealStateStats.find(s => s._id.state === 'proposed')?.count ?? 0;
-        obj.dealsPublished = dealStateStats.find(s => s._id.state === 'published')?.count ?? 0;
-        obj.dealsActive = dealStateStats.find(s => s._id.state === 'active')?.count ?? 0;
-        obj.dealsProposalExpired = dealStateStats.find(s => s._id.state === 'proposal_expired')?.count ?? 0;
-        obj.dealsExpired = dealStateStats.find(s => s._id.state === 'expired')?.count ?? 0;
-        obj.dealsSlashed = dealStateStats.find(s => s._id.state === 'slashed')?.count ?? 0;
-        obj.dealsError = dealStateStats.find(s => s._id.state === 'error')?.count ?? 0;
-        obj.dealsTotal = dealStateStats.reduce((acc, s) => acc + s.count, 0);
+        await this.fillReplicationDealStats(obj);
       }
       result.push(obj);
     }

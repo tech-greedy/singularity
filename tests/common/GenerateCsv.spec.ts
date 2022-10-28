@@ -1,7 +1,15 @@
 import Datastore from '../../src/common/Datastore';
 import GenerateCsv from '../../src/common/GenerateCsv';
+import Utils from '../Utils';
 
 describe('GenerateCsv', () => {
+  beforeAll(async () => {
+    await Utils.initDatabase();
+  });
+  beforeEach(async () => {
+    await Datastore.ReplicationRequestModel.deleteMany();
+    await Datastore.DealStateModel.deleteMany();
+  });
   it ('should be able to gen with valid id', async () => {
     const request = await Datastore.ReplicationRequestModel.create({
       storageProviders: 'f01001',

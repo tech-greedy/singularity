@@ -338,7 +338,7 @@ export default class DealReplicationWorker extends BaseService {
           if (fileList.length > 0 && carFile.pieceCid) {
             let matched = false;
             for (let k = 0; k < fileList.length; k++) {
-              if (fileList[k].endsWith(carFile.pieceCid + '.car')) {
+              if (fileList[k].endsWith(carFile.pieceCid + '.car') || fileList[k].endsWith(carFile.dataCid + '.car')) {
                 matched = true;
                 break;
               }
