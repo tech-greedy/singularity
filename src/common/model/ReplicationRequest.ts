@@ -21,5 +21,7 @@ export default interface ReplicationRequest {
   cronMaxPendingDeals?: number, // per SP pending total with cron considered
   fileListPath?: string, // limit to replicate only from the list in a txt file
   notes?: string, // any notes or tag want to store along the replication request, for tracking purpose
+  csvOutputDir?: string, // folder to print CSV to, undefined to skip the CSV
+  isForced: boolean,
   errorMessage?: string
 }

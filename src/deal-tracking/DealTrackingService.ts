@@ -141,61 +141,6 @@ export default class DealTrackingService extends BaseService {
     } while (response.data['result']['deals'].length > 0);
   }
 
-  /**
-   * @param client
-   * @param lastDeal
-   */
-  /* Temporarily disabled in favor of filscan for more information
-  private async insertDealFromFilfox(client: string, lastDeal: number): Promise<void> {
-    this.logger.debug('Inserting new deals from filfox', { client, lastDeal });
-    let page = 0;
-    let response;
-    do {
-      let breakOuter = false;
-      // Exponential retry as filfox can throttle us
-      response = await retry(
-        async () => {
-          const url = `https://filfox.info/api/v1/deal/list?address=${client}&pageSize=100&page=${page}`;
-          this.logger.debug(`Fetching from ${url}`);
-          let r;
-          try {
-            r = await axios.get(url);
-          } catch (e) {
-            this.logger.warn(e);
-            throw e;
-          }
-          return r;
-        }, {
-        retries: 3,
-        minTimeout: 60_000
-      }
-      );
-      this.logger.debug(`Received ${response.data['deals'].length} deal entries.`);
-      for (const deal of response.data['deals']) {
-        if (deal['id'] <= lastDeal) {
-          breakOuter = true;
-          break;
-        }
-        await Datastore.DealStateModel.updateOne({
-          dealId: deal['id']
-        }, {
-          $setOnInsert: {
-            client,
-            provider: deal['provider'],
-            dealId: deal['id'],
-            state: 'published'
-          }
-        }, {
-          upsert: true
-        });
-      }
-      if (breakOuter) {
-        break;
-      }
-      page += 1;
-    } while (response.data['deals'].length > 0);
-  }
-  */
   private async markExpiredDeals (client: string): Promise<void> {
     const chainHeight = HeightFromCurrentTime() - 120;
     let modified = (await Datastore.DealStateModel.updateMany({
@@ -254,37 +199,37 @@ export default class DealTrackingService extends BaseService {
         await Datastore.DealStateModel.findByIdAndUpdate(dealState.id, {
           state: 'slashed'
         });
-        return;
-      }
-      const result = response.data.result;
-      const expiration: number = result.Proposal.EndEpoch;
-      const slashed = result.State.SlashEpoch > 0;
-      const pieceCid = result.Proposal.PieceCID['/'];
-      const dealActive = result.State.SectorStartEpoch > 0;
-      if (slashed) {
-        await Datastore.DealStateModel.findByIdAndUpdate(dealState.id, {
-          pieceCid, expiration, state: 'slashed'
-        });
-        this.logger.warn(`Deal ${dealState.dealId} is slashed.`);
-      } else if (dealActive) {
-        await Datastore.DealStateModel.findByIdAndUpdate(dealState.id, {
-          pieceCid, expiration, state: 'active'
-        });
-        this.logger.info(`Deal ${dealState.dealId} is active on chain.`);
-        if (dealState.dealCid && dealState.dealCid !== '') {
-          await MetricEmitter.Instance().emit({
-            type: 'deal_active',
-            values: {
-              pieceCid: dealState.pieceCid,
-              pieceSize: dealState.pieceSize,
-              dataCid: dealState.dataCid,
-              provider: dealState.provider,
-              client: dealState.client,
-              verified: dealState.verified,
-              duration: dealState.duration,
-              price: dealState.price
-            }
+      } else {
+        const result = response.data.result;
+        const expiration: number = result.Proposal.EndEpoch;
+        const slashed = result.State.SlashEpoch > 0;
+        const pieceCid = result.Proposal.PieceCID['/'];
+        const dealActive = result.State.SectorStartEpoch > 0;
+        if (slashed) {
+          await Datastore.DealStateModel.findByIdAndUpdate(dealState.id, {
+            pieceCid, expiration, state: 'slashed'
           });
+          this.logger.warn(`Deal ${dealState.dealId} is slashed.`);
+        } else if (dealActive) {
+          await Datastore.DealStateModel.findByIdAndUpdate(dealState.id, {
+            pieceCid, expiration, state: 'active'
+          });
+          this.logger.info(`Deal ${dealState.dealId} is active on chain.`);
+          if (dealState.dealCid && dealState.dealCid !== '') {
+            await MetricEmitter.Instance().emit({
+              type: 'deal_active',
+              values: {
+                pieceCid: dealState.pieceCid,
+                pieceSize: dealState.pieceSize,
+                dataCid: dealState.dataCid,
+                provider: dealState.provider,
+                client: dealState.client,
+                verified: dealState.verified,
+                duration: dealState.duration,
+                price: dealState.price
+              }
+            });
+          }
         }
       }
     }

@@ -11,7 +11,17 @@ export interface GetReplicationsResponseItem {
     cronMaxPendingDeals?: number,
     fileListPath?: string,
     notes?: string,
-    errorMessage?: string
+    csvOutputDir?: string,
+    isForced: boolean,
+    errorMessage?: string,
+    dealsTotal?: number,
+    dealsProposed?: number,
+    dealsPublished?: number,
+    dealsActive?: number,
+    dealsProposalExpired?: number,
+    dealsExpired?: number,
+    dealsSlashed?: number,
+    dealsError?: number
   }
 
 export type GetReplicationsResponse = GetReplicationsResponseItem[];

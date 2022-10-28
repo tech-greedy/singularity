@@ -12,6 +12,7 @@ import { AbortSignal } from '../common/AbortSignal';
 import { exec } from 'promisify-child-process';
 import { sleep } from '../common/Util';
 import { HeightFromCurrentTime } from '../common/ChainHeight';
+import GenerateCsv from '../common/GenerateCsv';
 import MetricEmitter from '../common/metrics/MetricEmitter';
 
 const mathconfig = {};
@@ -260,7 +261,12 @@ export default class DealReplicationWorker extends BaseService {
         workerId: null
       });
       this.stopCronIfExist(request2Check.id);
-      this.logger.info(`Mark as complete. To print CSV: singularity repl csv ${request2Check.id} /tmp`);
+      if (request2Check.csvOutputDir) {
+        const csvMsg = await GenerateCsv.generate(request2Check.id, request2Check.csvOutputDir);
+        this.logger.info(`Mark as complete. ${csvMsg}`);
+      } else {
+        this.logger.info(`Mark as complete. To print CSV: singularity repl csv ${request2Check.id} /tmp`);
+      }
       return true;
     } else {
       this.logger.debug(`Not yet complete`);
@@ -289,15 +295,15 @@ export default class DealReplicationWorker extends BaseService {
     }
     try {
       const providers = DealReplicationWorker.generateProvidersList(replicationRequest.storageProviders);
-      // Find cars that are finished generation
-      const cars = await Datastore.GenerationRequestModel.find({
-        datasetId: replicationRequest.datasetId,
-        status: 'completed'
-      })
-        .sort({
-          pieceCid: 1
-        });
       const makeDealAll = providers.map(async (provider) => {
+        // Find cars that are finished generation
+        const cars = await Datastore.GenerationRequestModel.find({
+          datasetId: replicationRequest.datasetId,
+          status: 'completed'
+        })
+          .sort({
+            pieceCid: 1
+          });
         if (breakOuter) {
           this.stopCronIfExist(replicationRequest.id);
           return;
@@ -332,7 +338,7 @@ export default class DealReplicationWorker extends BaseService {
           if (fileList.length > 0 && carFile.pieceCid) {
             let matched = false;
             for (let k = 0; k < fileList.length; k++) {
-              if (fileList[k].endsWith(carFile.pieceCid + '.car')) {
+              if (fileList[k].endsWith(carFile.pieceCid + '.car') || fileList[k].endsWith(carFile.dataCid + '.car')) {
                 matched = true;
                 break;
               }
@@ -383,33 +389,35 @@ export default class DealReplicationWorker extends BaseService {
             return;
           }
 
-          // check if the car has already dealt or have enough replica
-          const existingDeals = await Datastore.DealStateModel.find({
-            pieceCid: carFile.pieceCid,
-            state: { $nin: ['slashed', 'error', 'expired', 'proposal_expired'] }
-          });
-          let alreadyDealt = false;
-          for (let k = 0; k < existingDeals.length; k++) {
-            const deal = existingDeals[k];
-            if (deal.provider === provider) {
-              this.logger.debug(`This pieceCID ${carFile.pieceCid} has already been dealt with ${provider}. ` +
-                `Deal CID ${deal.dealCid}. Moving on to next file.`);
-              alreadyDealt = true;
+          if (!existingRec.isForced) {
+            // check if the car has already dealt or have enough replica
+            const existingDeals = await Datastore.DealStateModel.find({
+              pieceCid: carFile.pieceCid,
+              state: { $nin: ['slashed', 'error', 'expired', 'proposal_expired'] }
+            });
+            let alreadyDealt = false;
+            for (let k = 0; k < existingDeals.length; k++) {
+              const deal = existingDeals[k];
+              if (deal.provider === provider) {
+                this.logger.debug(`This pieceCID ${carFile.pieceCid} has already been dealt with ${provider}. ` +
+                  `Deal CID ${deal.dealCid}. Moving on to next file.`);
+                alreadyDealt = true;
+              }
             }
-          }
-          if (alreadyDealt) {
-            continue; // go to next file
-          }
-          if (existingDeals.length >= existingRec.maxReplicas) {
-            this.logger.debug(`This pieceCID ${carFile.pieceCid} has reached enough ` +
-              `replica (${existingRec.maxReplicas}) planned by the request ${existingRec.id}.`);
-            continue; // go to next file
+            if (alreadyDealt) {
+              continue; // go to next file
+            }
+            if (existingDeals.length >= existingRec.maxReplicas) {
+              this.logger.debug(`This pieceCID ${carFile.pieceCid} has reached enough ` +
+                `replica (${existingRec.maxReplicas}) planned by the request ${existingRec.id}.`);
+              continue; // go to next file
+            }
           }
 
           const startDelay = replicationRequest.startDelay ? replicationRequest.startDelay : 20160;
           const currentHeight = HeightFromCurrentTime();
-          const startEpoch = startDelay + currentHeight;
-          this.logger.debug(`Calculated start epoch startDelay: ${startDelay} + currentHeight: ${currentHeight} = ${startEpoch}`);
+          const startEpoch = startDelay + currentHeight + 60; // 30 min buffer time
+          this.logger.debug(`Calculated start epoch startDelay: ${startDelay} + currentHeight: ${currentHeight} + 60 = ${startEpoch}`);
           let dealCmd = '';
           try {
             dealCmd = await this.createDealCmd(useLotus, provider, replicationRequest, carFile, startEpoch);
@@ -486,7 +494,11 @@ export default class DealReplicationWorker extends BaseService {
       await Promise.all(makeDealAll);
       this.logger.debug(`Finished all files in the dataset. Checking completion.`);
       const reRead = await Datastore.ReplicationRequestModel.findById(replicationRequest.id);
-      await this.checkAndMarkCompletion(reRead!, cars.length);
+      const carCount = await Datastore.GenerationRequestModel.count({
+        datasetId: reRead?.datasetId,
+        status: 'completed'
+      });
+      await this.checkAndMarkCompletion(reRead!, carCount);
     } catch (err) {
       this.stopCronIfExist(replicationRequest.id);
       if (err instanceof Error) {

@@ -33,7 +33,7 @@ import { compress } from '@xingrz/cppzst';
 import progress from 'cli-progress';
 import asyncRetry from 'async-retry';
 import pAll from 'p-all';
-import ObjectsToCsv from 'objects-to-csv';
+import GenerateCsv from './common/GenerateCsv';
 import { randomUUID } from 'crypto';
 import MetricEmitter from './common/metrics/MetricEmitter';
 import boxen from 'boxen';
@@ -709,6 +709,8 @@ replication.command('start')
   .option('-xp, --cron-max-pending-deals <cronmaxpendingdeals>', 'When cron schedule specified, limit the total number of pending deals determined by dealtracking service, per SP.')
   .option('-l, --file-list-path <filelistpath>', 'Absolute path to a txt file that will limit to replicate only from the list. Must be visible by deal replication worker.')
   .option('-n, --notes <notes>', 'Any notes or tag want to store along the replication request, for tracking purpose.')
+  .option('-csv, --output-csv <outputCsv>', 'Print CSV to specified folder after done. Folder must exist on worker.')
+  .option('-f, --force', 'Force resend even if this pieceCID have been proposed / active by the provider.', false)
   .action(async (datasetid, storageProviders, client, replica, options) => {
     await initializeConfig(false, false);
     let response!: AxiosResponse;
@@ -739,7 +741,9 @@ replication.command('start')
         cronMaxDeals: options.cronMaxDeals ? options.cronMaxDeals : undefined,
         cronMaxPendingDeals: options.cronMaxPendingDeals ? options.cronMaxPendingDeals : undefined,
         fileListPath: options.fileListPath ? options.fileListPath : undefined,
-        notes: options.notes ? options.notes : undefined
+        notes: options.notes ? options.notes : undefined,
+        csvOutputDir: options.outputCsv ? options.outputCsv : undefined,
+        isForced: options.force
       });
     } catch (error) {
       CliUtil.renderErrorAndExit(error);
@@ -767,12 +771,13 @@ replication.command('status')
 
 replication.command('list')
   .description('List all deal replication requests')
+  .option('-v, --verbose', 'Also print deal counts in this request', false)
   .action(async (options) => {
     await initializeConfig(false, false);
     let response!: AxiosResponse;
     try {
       const url: string = config.get('connection.deal_replication_service');
-      response = await axios.get(`${url}/replications`);
+      response = await axios.get(`${url}/replications?verbose=${options.verbose}`);
     } catch (error) {
       CliUtil.renderErrorAndExit(error);
     }
@@ -823,6 +828,23 @@ replication.command('pause').description('Pause an active deal replication reque
     CliUtil.renderResponse(response.data, options.json);
   });
 
+replication.command('complete').description('Forcefully mark an active deal replication request as completed.')
+  .option('--json', 'Output with JSON format')
+  .argument('<id>', 'Existing ID of deal replication request.')
+  .action(async (id, options) => {
+    await initializeConfig(false, false);
+    let response!: AxiosResponse;
+    try {
+      const url: string = config.get('connection.deal_replication_service');
+      response = await axios.post(`${url}/replication/${id}`, {
+        status: 'completed'
+      });
+    } catch (error) {
+      CliUtil.renderErrorAndExit(error);
+    }
+    CliUtil.renderResponse(response.data, options.json);
+  });
+
 replication.command('resume').description('Resume a paused deal replication request.')
   .option('--json', 'Output with JSON format')
   .argument('<id>', 'Existing ID of deal replication request.')
@@ -846,52 +868,9 @@ replication.command('csv').description('Write a deal replication result as csv.'
   .action(async (id, outDir) => {
     let msg = '';
     try {
-      fs.mkdirpSync(outDir);
       await initializeConfig(false, false);
       const mongoose = await Datastore.connect();
-      const replicationRequest = await Datastore.ReplicationRequestModel.findById(id);
-      if (replicationRequest) {
-        const providers = DealReplicationWorker.generateProvidersList(replicationRequest.storageProviders);
-        for (let j = 0; j < providers.length; j++) {
-          const provider = providers[j];
-          const deals = await Datastore.DealStateModel.find({
-            replicationRequestId: id,
-            provider: provider,
-            state: { $nin: ['slashed', 'error', 'expired', 'proposal_expired'] }
-          });
-          let urlPrefix = replicationRequest.urlPrefix;
-          if (!urlPrefix.endsWith('/')) {
-            urlPrefix += '/';
-          }
-
-          if (deals.length > 0) {
-            const csvRow = [];
-            for (let i = 0; i < deals.length; i++) {
-              const deal = deals[i];
-              csvRow.push({
-                miner_id: deal.provider,
-                deal_cid: deal.dealCid,
-                filename: `${deal.pieceCid}.car`,
-                piece_cid: deal.pieceCid,
-                start_epoch: deal.startEpoch,
-                full_url: `${urlPrefix}${deal.pieceCid}.car`
-              });
-            }
-            const csv = new ObjectsToCsv(csvRow);
-            let fileListFilename = '';
-            if (replicationRequest.fileListPath) {
-              fileListFilename += '_' + path.parse(replicationRequest.fileListPath).name;
-            }
-            const filename = path.join(outDir, `${provider}${fileListFilename}_${id}.csv`);
-            await csv.toDisk(filename);
-            msg += `CSV saved to ${filename}\n`;
-          } else {
-            msg += `No deal found to export in ${id}\n`;
-          }
-        }
-      } else {
-        msg = `Replication request not found ${id}`;
-      }
+      msg = await GenerateCsv.generate(id, outDir);
       await mongoose.disconnect();
     } catch (error) {
       CliUtil.renderErrorAndExit(error);

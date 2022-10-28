@@ -120,3 +120,4 @@ outDir
 nunitresults.xml
 config/cars/
 
+.DS_Store
