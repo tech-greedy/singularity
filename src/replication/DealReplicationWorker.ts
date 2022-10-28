@@ -392,12 +392,16 @@ export default class DealReplicationWorker extends BaseService {
           if (!existingRec.isForced) {
             // check if the car has already dealt or have enough replica
             const existingDeals = await Datastore.DealStateModel.find({
-              pieceCid: carFile.pieceCid,
+              // due to unknown bug, DealState can have mismatch piece/data CID
+              $or: [{ pieceCid: carFile.pieceCid }, { dataCid: carFile.dataCid }],
               state: { $nin: ['slashed', 'error', 'expired', 'proposal_expired'] }
             });
             let alreadyDealt = false;
             for (let k = 0; k < existingDeals.length; k++) {
               const deal = existingDeals[k];
+              if (deal.pieceCid !== carFile.pieceCid) {
+                this.logger.warn(`This deal has mismatch pieceCID ${deal.dealCid}`);
+              }
               if (deal.provider === provider) {
                 this.logger.debug(`This pieceCID ${carFile.pieceCid} has already been dealt with ${provider}. ` +
                   `Deal CID ${deal.dealCid}. Moving on to next file.`);
