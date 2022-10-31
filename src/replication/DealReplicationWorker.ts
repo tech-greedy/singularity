@@ -400,7 +400,7 @@ export default class DealReplicationWorker extends BaseService {
             for (let k = 0; k < existingDeals.length; k++) {
               const deal = existingDeals[k];
               if (deal.pieceCid !== carFile.pieceCid) {
-                this.logger.warn(`This deal ${deal._id.toString()} has mismatch pieceCID ${deal.dealCid}. It should have been ${carFile.pieceCid}.`);
+                this.logger.warn(`This dealCID ${deal.dealCid} has mismatch pieceCID ${deal.pieceCid}. It should have been ${carFile.pieceCid}.`);
               }
               if (deal.provider === provider) {
                 this.logger.debug(`This pieceCID ${carFile.pieceCid} has already been dealt with ${provider}. ` +
