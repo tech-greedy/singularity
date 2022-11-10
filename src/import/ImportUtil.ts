@@ -179,7 +179,7 @@ export default class ImportUtil {
       //Skip over already expired deals
       let currentHeight = HeightFromCurrentTime();
       if (deal.StartEpoch < currentHeight) {
-        console.log(`Proposal has expired, skipping: ${proposalCid['/']}`);
+        console.log(`Proposal has expired, skipping: ${deal.proposalCid['/']}`);
         ImportUtil.knownBadProposalCids.push(deal.proposalCid['/']);
         continue;
       }
