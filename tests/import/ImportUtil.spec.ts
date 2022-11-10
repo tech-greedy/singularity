@@ -32,6 +32,7 @@ describe('ImportUtil', () => {
       },
       CreationTime: new Date().toISOString(),
       State: 18,
+      StartEpoch: 99999999999,
       Ref: {
         Root: {
           '/': 'data_cid'
