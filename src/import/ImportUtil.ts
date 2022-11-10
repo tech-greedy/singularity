@@ -8,6 +8,7 @@ import { sleep } from '../common/Util';
 import MultipartDownloader from 'multipart-download';
 import { ErrorMessage } from './ErrorMessage';
 import { AbortSignal } from '../common/AbortSignal';
+import { HeightFromCurrentTime } from '../common/ChainHeight';
 
 export default class ImportUtil {
   public static throwError (message: string) {
@@ -173,6 +174,13 @@ export default class ImportUtil {
         continue;
       }
       if (ImportUtil.knownBadProposalCids.includes(deal.ProposalCid['/'])) {
+        continue;
+      }
+      //Skip over already expired deals
+      let currentHeight = HeightFromCurrentTime();
+      if (deal.StartEpoch < currentHeight) {
+        console.log(`Proposal has expired, skipping: ${proposalCid['/']}`);
+        ImportUtil.knownBadProposalCids.push(deal.proposalCid['/']);
         continue;
       }
       let existingPath: string | undefined;
