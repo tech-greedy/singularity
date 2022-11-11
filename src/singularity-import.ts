@@ -15,6 +15,9 @@ program.option('-c, --client <addresses...>', 'List of client addresses to filte
   .option('-p, --path <paths...>', 'List of paths to find the CAR files')
   .option('-s, --since <seconds_ago>',
     'Import deals that are proposed since this many seconds old and skip those that are older', Number, 86400)
+  .option('-sd, --sealing-duration <seconds>',
+    'Import deals whose start time is more than this many seconds in the future to account for time spent for sealing. Otherwise, ' +
+    'sealing will fail if it does not finish before the start time of the deal', Number, 6 * 3600)
   .option('-u, --url-template <url_template>',
     'The URL template to download CAR files, if it cannot be found from the specified paths.' +
     ' i.e. https://www.download.org/{dataCid}.car, https://www.download.org/{pieceCid}.car')

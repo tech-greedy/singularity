@@ -8,6 +8,7 @@ import { sleep } from '../common/Util';
 import MultipartDownloader from 'multipart-download';
 import { ErrorMessage } from './ErrorMessage';
 import { AbortSignal } from '../common/AbortSignal';
+import { CurrentTimestamp, HeightToTimestamp } from '../common/ChainHeight';
 
 export default class ImportUtil {
   public static throwError (message: string) {
@@ -26,6 +27,9 @@ export default class ImportUtil {
     }
     if (options.since <= 0) {
       ImportUtil.throwError(ErrorMessage.SINCE_LESS_THAN_0);
+    }
+    if (options.sealingDuration < 4 * 3600) {
+      ImportUtil.throwError(ErrorMessage.SEALING_DURATION_TOO_SHORT);
     }
     if (!options.path && !options.urlTemplate) {
       ImportUtil.throwError(ErrorMessage.PATH_OR_URL_TEMPLATE_REQUIRED);
@@ -173,6 +177,12 @@ export default class ImportUtil {
         continue;
       }
       if (ImportUtil.knownBadProposalCids.includes(deal.ProposalCid['/'])) {
+        continue;
+      }
+      // Skip over deals that are about to expire
+      if (HeightToTimestamp(deal.Proposal.StartEpoch!) - options.sealingDuration < CurrentTimestamp()) {
+        console.log(`Proposal has expired or is about to expire, skipping: ${deal.ProposalCid['/']}`);
+        ImportUtil.knownBadProposalCids.push(deal.ProposalCid['/']);
         continue;
       }
       let existingPath: string | undefined;

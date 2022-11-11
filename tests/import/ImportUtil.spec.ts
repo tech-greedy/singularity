@@ -13,6 +13,7 @@ describe('ImportUtil', () => {
     process.env.MARKETS_API_INFO = 'eyJ:/ip4/1.1.1.1/tcp/1111/http';
   })
   const defaultOptions: ImportOptions = {
+    sealingDuration: 14400,
     since: 86400,
     urlTemplate: 'http://www.download.org/{dataCid}.car',
     downloadThreads: 4,
@@ -23,7 +24,7 @@ describe('ImportUtil', () => {
     downloadConcurrency: 2,
     importConcurrency: 2,
     dryRun: false,
-    loop: false,
+    loop: false
   };
   const defaultDeal: MinerDeal =
     {
@@ -43,6 +44,7 @@ describe('ImportUtil', () => {
       },
       Proposal: {
         Client: 'f1client',
+        StartEpoch: 1_000_000_000,
         Provider: 'f0miner'
       }
     };
@@ -297,6 +299,22 @@ describe('ImportUtil', () => {
   })
 
   describe('startImport', () => {
+    it('should skip deals that is about to expire', async () => {
+      const deal = cloneDeep(defaultDeal)
+      const deals = { result: [deal] };
+      const client = createSpyObj('client', {
+        call: Promise.resolve(deals)
+      });
+      const options = {
+        ...defaultOptions,
+        sealingDuration: 30_000_000_000
+      }
+      const downloadSpy = spyOn<any>(ImportUtil, 'download');
+      const importSpy = spyOn<any>(ImportUtil, 'importDeal');
+      await ImportUtil['startImport'](options, client);
+      expect(downloadSpy).not.toHaveBeenCalled();
+      expect(importSpy).not.toHaveBeenCalled();
+    })
     it('should skip deals that does not match the client', async () => {
       const deal = cloneDeep(defaultDeal)
       const deals = { result: [deal] };
