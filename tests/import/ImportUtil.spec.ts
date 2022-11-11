@@ -11,6 +11,7 @@ import cloneDeep from 'lodash/cloneDeep';
 describe('ImportUtil', () => {
   beforeEach(() => {
     process.env.MARKETS_API_INFO = 'eyJ:/ip4/1.1.1.1/tcp/1111/http';
+    ImportUtil.knownBadProposalCids = [];
   })
   const defaultOptions: ImportOptions = {
     sealingDuration: 14400,
