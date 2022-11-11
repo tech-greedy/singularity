@@ -10,4 +10,5 @@ export enum ErrorMessage {
   IMPORT_CONCURRENCY_GREATER_THAN_1 = 'The import concurrency is greater than 1.' +
     ' Make sure you have enough system resources to import multiple deals concurrently.',
   LOOP_AND_DRY_RUN = '--loop and --dry-run cannot be used together. Loop will be disabled.',
+  SEALING_DURATION_TOO_SHORT = '--sealing-duration must be greater than 4 hours (14400 seconds)',
 }
