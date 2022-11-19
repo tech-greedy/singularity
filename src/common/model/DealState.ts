@@ -20,4 +20,5 @@ export default interface DealState {
   dealId?: number,
   errorMessage?: string// any useful info returned by boost / lotus,
   updatedAt: Date,
+  dataCidBeforeCorrection?: string // backup information on dataCid correction
 }
