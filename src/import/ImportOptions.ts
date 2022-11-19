@@ -2,6 +2,7 @@ export default interface ImportOptions {
   client?: string[],
   path?: string[],
   since: number,
+  sealingDuration: number,
   urlTemplate?: string,
   downloadThreads: number,
   downloadFolder?: string,

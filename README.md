@@ -435,6 +435,40 @@ Starting version 2.0.0, anonymous data including error messages, data preparatio
 will be collected for us to better understand how the software is used and improve the software. To disable behavior,
 create and set `metrics.enabled` to `false` in `default.toml`.
 
+## Working with Docker [Experimental]
+
+```shell
+docker pull techgreedy/singularity
+docker tag techgreedy/singularity singularity
+
+# Initialize the repo config [optional]
+docker run \
+  -v ~/.singularity:/root/.singularity \
+  singularity init
+
+# Start daemon service in background
+# Use ~/.singularity as the repo for config, database and logs
+# Use /mnt/storage as the storage
+docker run -d \
+  -v ~/.singularity:/root/.singularity \
+  -v /mnt/storage:/app/storage \
+  -p 7001:7001 \
+  singularity daemon
+  
+# Stop daemon service
+docker ps | grep singularity | cut -d' ' -f1 | xargs docker kill
+
+# Interact with the daemon with native singularity CLI
+singularity prep create --force testData /app/storage/dataset /app/storage/output
+
+# Interact with the daemon with dockerized singularity CLI
+docker run -it --rm --network=host \
+  singularity prep create --force testData /app/storage/dataset /app/storage/output
+ 
+# Interact with the daemon with HTTP API directly
+curl http://localhost:7001/preparations
+```
+
 ## FAQ and common issues
 
 ### How to handle inaccessible files
