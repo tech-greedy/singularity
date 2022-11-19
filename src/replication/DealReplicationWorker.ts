@@ -421,8 +421,8 @@ export default class DealReplicationWorker extends BaseService {
                         method: 'Filecoin.StateMarketStorageDeal',
                         params: [deal.dealId, null]
                       }, { headers });
-                      if (response.data && response.data.Proposal) {
-                        const pieceCidOnChain = response.data.Proposal.PieceCID['/'];
+                      if (response.data && response.data && response.data.result && response.data.result.Proposal) {
+                        const pieceCidOnChain = response.data.result.Proposal.PieceCID['/'];
                         if (deal.pieceCid === pieceCidOnChain) {
                           this.logger.warn(`This dealCID ${deal.dealCid} pieceCid is correct, dataCid need to be fixed.`);
                           // find the correct dataCid from replicationrequest.
