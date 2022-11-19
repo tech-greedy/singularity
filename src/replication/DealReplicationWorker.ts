@@ -395,6 +395,7 @@ export default class DealReplicationWorker extends BaseService {
             let correctionPerformed = false;
             let existingDeals = [];
             do {
+              alreadyDealt = false;
               correctionPerformed = false;
               existingDeals = await Datastore.DealStateModel.find({
                 // due to unknown bug, DealState can have mismatch piece/data CID
@@ -454,8 +455,8 @@ export default class DealReplicationWorker extends BaseService {
                   } else {
                     this.logger.warn(`Deal tracking service not enabled. Stop.`);
                   }
-                  break;
-                } else if (deal.provider === provider) {
+                }
+                if (deal.provider === provider) {
                   this.logger.debug(`This pieceCID ${carFile.pieceCid} has already been dealt with ${provider}. ` +
                     `Deal CID ${deal.dealCid}. Moving on to next file.`);
                   alreadyDealt = true;
