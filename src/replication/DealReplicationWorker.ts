@@ -438,6 +438,7 @@ export default class DealReplicationWorker extends BaseService {
                               }
                             });
                             correctionPerformed = true;
+                            this.logger.warn(`This dealCID ${deal.dealCid} dataCid is corrected from ${deal.dataCid} to ${correctCar.dataCid}`);
                           } else {
                             this.logger.warn(`This dealCID ${deal.dealCid} pieceCid on chain cannot be found locally. Stop.`);
                           }
