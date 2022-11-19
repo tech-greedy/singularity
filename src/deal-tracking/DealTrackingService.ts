@@ -111,6 +111,7 @@ export default class DealTrackingService extends BaseService {
             });
             this.logger.debug(`Deal ${deal['dealid']} was proposed through singularity. Filling in deal ID.`);
           } else {
+            /* Stop insert outside deals as filscan dealID can be incorrect
             await Datastore.DealStateModel.create({
               client,
               provider: deal['provider'],
@@ -124,6 +125,7 @@ export default class DealTrackingService extends BaseService {
               state: 'published'
             });
             this.logger.debug(`Deal ${deal['dealid']} inserted as published.`);
+            */
           }
         }
         if (jsonResult['deals'].length < DealTrackingService.FilscanPagination) {
