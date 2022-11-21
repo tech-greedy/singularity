@@ -392,77 +392,23 @@ export default class DealReplicationWorker extends BaseService {
           if (!existingRec.isForced) {
             // check if the car has already dealt or have enough replica
             let alreadyDealt = false;
-            let correctionPerformed = false;
-            let existingDeals = [];
-            do {
-              alreadyDealt = false;
-              correctionPerformed = false;
-              existingDeals = await Datastore.DealStateModel.find({
-                // due to unknown bug, DealState can have mismatch piece/data CID
-                $or: [{ pieceCid: carFile.pieceCid }, { dataCid: carFile.dataCid }],
-                state: { $nin: ['slashed', 'error', 'expired', 'proposal_expired'] }
-              });
-              for (let k = 0; k < existingDeals.length; k++) {
-                const deal = existingDeals[k];
-                if (deal.pieceCid !== carFile.pieceCid) {
-                  this.logger.warn(`This dealCID ${deal.dealCid} has mismatch pieceCID or dataCID, attempting to correct.`);
-                  if (config.get('deal_tracking_service.enabled')) {
-                    if (deal.dealId) {
-                      const api = config.get<string>('deal_tracking_service.lotus_api');
-                      const token = config.get<string>('deal_tracking_service.lotus_token');
-                      const headers: AxiosRequestHeaders = {};
-                      if (token !== '') {
-                        headers['Authorization'] = `Bearer ${token}`;
-                      }
-                      this.logger.debug(`Fetching from ${api}`, { dealId: deal.dealId });
-                      const response = await axios.post(api, {
-                        id: 1,
-                        jsonrpc: '2.0',
-                        method: 'Filecoin.StateMarketStorageDeal',
-                        params: [deal.dealId, null]
-                      }, { headers });
-                      if (response.data && response.data && response.data.result && response.data.result.Proposal) {
-                        const pieceCidOnChain = response.data.result.Proposal.PieceCID['/'];
-                        if (deal.pieceCid === pieceCidOnChain) {
-                          this.logger.warn(`This dealCID ${deal.dealCid} pieceCid is correct, dataCid need to be fixed.`);
-                          // find the correct dataCid from replicationrequest.
-                          const correctCar = await Datastore.GenerationRequestModel.findOne({
-                            pieceCid: pieceCidOnChain
-                          });
-                          if (correctCar) {
-                            await Datastore.DealStateModel.updateOne({
-                              dealId: deal.dealId
-                            }, {
-                              $set: {
-                                dataCid: correctCar.dataCid,
-                                dataCidBeforeCorrection: deal.dataCid
-                              }
-                            });
-                            correctionPerformed = true;
-                            this.logger.warn(`This dealCID ${deal.dealCid} dataCid is corrected from ${deal.dataCid} to ${correctCar.dataCid}`);
-                          } else {
-                            this.logger.warn(`This dealCID ${deal.dealCid} pieceCid on chain cannot be found locally. Stop.`);
-                          }
-                        } else {
-                          this.logger.warn(`This dealCID ${deal.dealCid} pieceCid on chain is incorrect. Stop.`);
-                        }
-                      } else {
-                        this.logger.warn(`Data returned from Filecoin.StateMarketStorageDeal is invalid. Stop.`);
-                      }
-                    } else {
-                      this.logger.warn(`Deal ID empty. Stop.`);
-                    }
-                  } else {
-                    this.logger.warn(`Deal tracking service not enabled. Stop.`);
-                  }
-                }
-                if (deal.provider === provider) {
-                  this.logger.debug(`This pieceCID ${carFile.pieceCid} has already been dealt with ${provider}. ` +
-                    `Deal CID ${deal.dealCid}. Moving on to next file.`);
-                  alreadyDealt = true;
-                }
+            let existingDeals = await Datastore.DealStateModel.find({
+              // due to unknown bug, DealState can have mismatch piece/data CID
+              // 2022-11-20: bug might related to filscan reorg cause incorrect deal ID info
+              $or: [{ pieceCid: carFile.pieceCid }, { dataCid: carFile.dataCid }],
+              state: { $nin: ['slashed', 'error', 'expired', 'proposal_expired'] }
+            });
+            for (let k = 0; k < existingDeals.length; k++) {
+              const deal = existingDeals[k];
+              if (deal.pieceCid !== carFile.pieceCid) {
+                this.logger.warn(`This dealCID ${deal.dealCid} has mismatch pieceCID or dataCID, means DealID is probably incorrect ${deal.dealId}.`);
               }
-            } while (correctionPerformed);
+              if (deal.provider === provider) {
+                this.logger.debug(`This pieceCID ${carFile.pieceCid} has already been dealt with ${provider}. ` +
+                  `Deal CID ${deal.dealCid}. Moving on to next file.`);
+                alreadyDealt = true;
+              }
+            }
             if (alreadyDealt) {
               continue; // go to next file
             }
