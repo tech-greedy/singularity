@@ -2,7 +2,7 @@ import BaseService from '../common/BaseService';
 import Datastore from '../common/Datastore';
 import { Category } from '../common/Logger';
 import ReplicationRequest from '../common/model/ReplicationRequest';
-import axios, { AxiosRequestHeaders } from 'axios';
+import axios from 'axios';
 import { create, all } from 'mathjs';
 import GenerationRequest from '../common/model/GenerationRequest';
 import cron, { ScheduledTask } from 'node-cron';
@@ -392,7 +392,7 @@ export default class DealReplicationWorker extends BaseService {
           if (!existingRec.isForced) {
             // check if the car has already dealt or have enough replica
             let alreadyDealt = false;
-            let existingDeals = await Datastore.DealStateModel.find({
+            const existingDeals = await Datastore.DealStateModel.find({
               // due to unknown bug, DealState can have mismatch piece/data CID
               // 2022-11-20: bug might related to filscan reorg cause incorrect deal ID info
               $or: [{ pieceCid: carFile.pieceCid }, { dataCid: carFile.dataCid }],
