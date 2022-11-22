@@ -33,7 +33,7 @@ export default class DealTrackingService extends BaseService {
       const client = clientState.stateKey;
       const lastDeal = await Datastore.DealStateModel.find({ client }).sort({ dealId: -1 }).limit(1);
       try {
-        await this.insertDealFromFilscan(client, lastDeal.length > 0 ? lastDeal[0].dealId! : 0);
+        await this.insertDealFromFilscan(client, lastDeal.length > 0 ? lastDeal[0].dealId! : 16000000);
       } catch (error) {
         this.logger.error('Encountered an error when importing deals from filescan', error);
       }
@@ -57,46 +57,89 @@ export default class DealTrackingService extends BaseService {
    */
   private async insertDealFromFilscan (client: string, lastDeal: number): Promise<void> {
     this.logger.debug('updating deals from filscan', { client, lastDeal });
-    let page = 0;
-    let response;
-    do {
-      const offset = page * DealTrackingService.FilscanPagination;
-      let breakOuter = false;
+    let url = 'https://api.filscan.io:8700/rpc/v1';
+    if (client.startsWith('t')) {
+      url = 'https://calibration.filscan.io:8700/rpc/v1';
+    }
 
-      let url = 'https://api.filscan.io:8700/rpc/v1';
-      if (client.startsWith('t')) {
-        url = 'https://calibration.filscan.io:8700/rpc/v1';
+    /**
+     * Find the corresponding f012345 client ID of the client address
+     */
+    const lotusApi = config.get<string>('deal_tracking_service.lotus_api');
+    const lotusToken = config.get<string>('deal_tracking_service.lotus_token');
+    const headers: AxiosRequestHeaders = {};
+    if (lotusToken !== '') {
+      headers['Authorization'] = `Bearer ${lotusToken}`;
+    }
+    let clientId = null;
+    let response = await axios.post(lotusApi, {
+      id: 1,
+      jsonrpc: '2.0',
+      method: 'Filecoin.StateLookupID',
+      params: [client, null]
+    }, { headers });
+    if (response.data.result && (response.data.result.startsWith('f0'))) {
+      clientId = response.data.result;
+    } else {
+      this.logger.warn(`Cannot obtain client ID of ${client}`);
+      return;
+    }
+
+    /**
+     * We don't trust filscan's data, can only use the first deal id
+     * as reference to see how many need to track
+     */
+
+    response = await axios.post(url, {
+      id: 1,
+      jsonrpc: '2.0',
+      params: [client, 0, DealTrackingService.FilscanPagination],
+      method: 'filscan.GetMarketDeal'
+    }, {
+      headers: {
+        'content-type': 'application/json'
       }
-      this.logger.debug(`Fetching from ${url}, page ${page}`);
-      response = await axios.post(url, {
-        id: 1,
-        jsonrpc: '2.0',
-        params: [client, offset, DealTrackingService.FilscanPagination],
-        method: 'filscan.GetMarketDeal'
-      }, {
-        headers: {
-          'content-type': 'application/json'
-        }
-      });
-      if (Array.isArray(response.data['result']['deals'])) {
-        const jsonResult = response.data['result'];
-        this.logger.debug(`Received ${offset} out of ${jsonResult['total']} deal entries.`);
-        for (const deal of jsonResult['deals']) {
-          if (deal['dealid'] <= lastDeal) {
-            breakOuter = true;
-            this.logger.info('Reached to the last checked deal.');
+    });
+
+    const maxNumberOfDealsToTrack = response.data['result']['total'] | 0;
+    let latestDealIdFromFilscan = 0;
+    if (Array.isArray(response.data['result']['deals'])) {
+      latestDealIdFromFilscan = response.data['result']['deals'][0]['dealid']; // could be wrong
+    }
+    if (maxNumberOfDealsToTrack > 0 && latestDealIdFromFilscan > 0) {
+      let processedCount = 0;
+      for (let i = latestDealIdFromFilscan; i > lastDeal; i--) {
+        const response = await axios.post(lotusApi, {
+          id: 1,
+          jsonrpc: '2.0',
+          method: 'Filecoin.StateMarketStorageDeal',
+          params: [i, null]
+        }, { headers });
+        if (response.data.result && response.data.result.Proposal.Client === clientId) {
+          this.logger.debug(`Process ${client} ${clientId} ${maxNumberOfDealsToTrack} ${latestDealIdFromFilscan} ${lastDeal}`);
+          processedCount++;
+          if (processedCount >= maxNumberOfDealsToTrack) {
+            this.logger.info(`Reached the maximum number of deals to track according to filscan ${maxNumberOfDealsToTrack}`);
             break;
           }
+          const result = response.data.result;
+          const pieceCid = result.Proposal.PieceCID['/'];
+          const provider = result.Proposal.Provider;
+          const dataCid = result.Proposal.Label;
+          const pieceSize = result.Proposal.PieceSize;
+          const startEpoch = result.Proposal.StartEpoch;
+          const endEpoch = result.Proposal.EndEpoch;
+
           const existingDeal = await Datastore.DealStateModel.findOne({
-            dealId: deal['dealid']
+            dealId: i
           });
           if (existingDeal) { // Deal state will be updated later by updateDealFromLotus
             continue;
           }
           const newlyProposedDeal = await Datastore.DealStateModel.findOne({
-            pieceCid: deal['piece_cid'],
-            provider: deal['provider'],
-            client: deal['client'],
+            pieceCid,
+            provider,
+            client,
             state: 'proposed'
           });
 
@@ -105,42 +148,30 @@ export default class DealTrackingService extends BaseService {
               _id: newlyProposedDeal._id
             }, {
               $set: {
-                dealId: deal['dealid'],
+                dealId: i,
                 state: 'published'
               }
             });
-            this.logger.debug(`Deal ${deal['dealid']} was proposed through singularity. Filling in deal ID.`);
+            this.logger.debug(`Deal ${i} was proposed through singularity. Filling in deal ID.`);
           } else {
-            /* Stop insert outside deals as filscan dealID can be incorrect
             await Datastore.DealStateModel.create({
               client,
-              provider: deal['provider'],
-              dealId: deal['dealid'],
-              dealCid: deal['cid'],
-              pieceCid: deal['piece_cid'],
-              pieceSize: Number.isInteger(deal['piece_size']) ? Number(deal['piece_size']) : 0,
-              startEpoch: deal['start_epoch'],
-              expiration: deal['end_epoch'],
-              duration: deal['end_epoch'] - deal['start_epoch'],
+              provider,
+              dealId: i,
+              // dealCid: deal['cid'],
+              dataCid,
+              pieceCid,
+              pieceSize,
+              startEpoch,
+              expiration: endEpoch,
+              duration: endEpoch - startEpoch,
               state: 'published'
             });
-            this.logger.debug(`Deal ${deal['dealid']} inserted as published.`);
-            */
+            this.logger.debug(`Deal ${i} inserted as published.`);
           }
         }
-        if (jsonResult['deals'].length < DealTrackingService.FilscanPagination) {
-          this.logger.info('Reached to the last page.');
-          break;
-        }
-        if (breakOuter) {
-          break;
-        }
-      } else {
-        this.logger.debug('No result from filscan');
-        break;
       }
-      page += 1;
-    } while (response.data['result']['deals'].length > 0);
+    }
   }
 
   private async markExpiredDeals (client: string): Promise<void> {
