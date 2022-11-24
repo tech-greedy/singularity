@@ -475,7 +475,9 @@ preparation.command('upload-manifest').description('Upload manifest to web3.stor
           headers: {
             Authorization: `Bearer ${process.env.WEB3_STORAGE_TOKEN}`,
             'X-NAME': `${result.piece_cid}.json.zst`
-          }
+          },
+          maxBodyLength: Infinity,
+          maxContentLength: Infinity
         });
       }, {
         retries: 5,
