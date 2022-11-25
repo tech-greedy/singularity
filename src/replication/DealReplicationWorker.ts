@@ -131,19 +131,17 @@ export default class DealReplicationWorker extends BaseService {
    * @returns true is lotus, false is boost
    */
   private async isUsingLotus (provider: string): Promise<boolean> {
-    let useLotus = true;
     // use boost libp2p command to check whether provider supports boost
     const versionQueryCmd = `${this.boostCMD} provider libp2p-info ${provider}`;
     const cmdOut = await exec(versionQueryCmd);
     if (cmdOut?.stdout?.toString()?.includes('/fil/storage/mk/1.2.0')) {
-      useLotus = false;
       this.logger.debug(`SP ${provider} supports boost.`);
+      return false;
     } else if (cmdOut?.stdout?.toString()?.includes('/fil/storage/mk/1.1.0')) {
       this.logger.debug(`SP ${provider} supports lotus.`);
-    } else {
-      throw new Error(JSON.stringify(cmdOut));
+      return true;
     }
-    return useLotus;
+    throw new Error(JSON.stringify(cmdOut));
   }
 
   private static calculatePriceWithSize (price: number, pieceSize: number): string {
@@ -296,6 +294,14 @@ export default class DealReplicationWorker extends BaseService {
     try {
       const providers = DealReplicationWorker.generateProvidersList(replicationRequest.storageProviders);
       const makeDealAll = providers.map(async (provider) => {
+        let useLotus = true;
+        try {
+          useLotus = await this.isUsingLotus(provider);
+        } catch (error) {
+          this.logger.error(`SP ${provider} unknown output from libp2p. Give up on this SP.`, error);
+          return;
+        }
+
         // Find cars that are finished generation
         const cars = await Datastore.GenerationRequestModel.find({
           datasetId: replicationRequest.datasetId,
@@ -307,12 +313,6 @@ export default class DealReplicationWorker extends BaseService {
         if (breakOuter) {
           this.stopCronIfExist(replicationRequest.id);
           return;
-        }
-        let useLotus = true;
-        try {
-          useLotus = await this.isUsingLotus(provider);
-        } catch (error) {
-          this.logger.error(`SP ${provider} unknown output from libp2p. Assume lotus.`, error);
         }
 
         let dealsMadePerSP = 0;
