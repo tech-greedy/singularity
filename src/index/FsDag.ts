@@ -1,4 +1,4 @@
-import {CID} from 'ipfs-core';
+import { CID } from 'ipfs-core';
 
 /**
  * {

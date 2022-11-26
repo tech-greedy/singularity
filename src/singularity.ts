@@ -258,12 +258,20 @@ program.command('daemon')
 const index = program.command('index').description('Manage the dataset index which will help map the dataset path to actual piece');
 index.command('create')
   .argument('<id_or_name>', 'The dataset id or name')
-  .action(async (id) => {
+  .addOption(new Option('-l, --max-links <maxLinks>', 'Maximum number of links in each layer for a dynamic array or map').default(1000).argParser(Number))
+  .addOption(new Option('-n, --max-nodes <maxNodes>', 'The threshold above which should the structure be linked rather than embedded').default(100).argParser(Number))
+  .option('-m, --maxLink', 'The maximum number of links in each layer for a dynamic array or map', '1000')
+  .action(async (id, options) => {
     await initializeConfig(false, false);
     const url: string = config.get('connection.index_service');
     let response!: AxiosResponse;
+    console.log(`Using maxLinks: ${options.maxLinks}, maxNodes: ${options.maxNodes}`);
+    console.log(`Creating index for ${id} ...`);
     try {
-      response = await axios.get(`${url}/create/${id}`);
+      response = await axios.post(`${url}/create/${id}`, {
+        maxLinks: options.maxLinks,
+        maxNodes: options.maxNodes
+      });
     } catch (error) {
       CliUtil.renderErrorAndExit(error);
     }

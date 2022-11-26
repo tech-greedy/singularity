@@ -7,15 +7,13 @@ import Datastore from '../common/Datastore';
 import { ObjectId } from 'mongodb';
 import { create } from 'ipfs-client';
 import { CID, IPFS } from 'ipfs-core';
-import { DirNode, LayeredArray, DynamizeArray, DynamicArray, FileNode, DynamicMap, DynamizeMap } from './FsDag';
+import { DirNode, LayeredArray, DynamizeArray, DynamicArray, FileNode, DynamicMap, DynamizeMap, Source } from './FsDag';
 import path from 'path';
 import config from '../common/Config';
 
 export default class IndexService extends BaseService {
   private app: Express = express();
   public ipfsClient! : IPFS;
-  private static readonly maxLink = 1000;
-  private static readonly pinThreshold = 10000;
 
   public constructor () {
     super(Category.IndexService);
@@ -31,36 +29,37 @@ export default class IndexService extends BaseService {
       res.setHeader('Content-Type', 'application/json');
       next();
     });
-    this.app.get('/create/:id', this.createIndexRequest);
+    this.app.post('/create/:id', this.createIndexRequest);
     this.ipfsClient = create({
       http: config.get('index_service.ipfs_http')
     });
   }
 
-  private dynamizeFileNode (file: FileNode): void {
-    file.realSources = DynamizeArray(file.sources!, IndexService.maxLink);
+  private dynamizeFileNode (file: FileNode, maxLinks: number): void {
+    file.realSources = DynamizeArray(file.sources!, maxLinks);
     delete file.sources;
   }
 
-  private dynamizeDirNode (dir: DirNode) : void {
-    dir.realSources = DynamizeArray(dir.sources!, IndexService.maxLink);
+  private dynamizeDirNode (dir: DirNode, maxLinks: number) : void {
+    dir.realSources = DynamizeArray(dir.sources!, maxLinks);
     delete dir.sources;
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     for (const [_, value] of dir.entries!) {
       if ((<FileNode | DirNode> value).type === 'file') {
-        this.dynamizeFileNode(<FileNode>value);
+        this.dynamizeFileNode(<FileNode>value, maxLinks);
       } else {
-        this.dynamizeDirNode(<DirNode>value);
+        this.dynamizeDirNode(<DirNode>value, maxLinks);
       }
     }
-    dir.realEntries = DynamizeMap(dir.entries!, IndexService.maxLink);
+    dir.realEntries = DynamizeMap(dir.entries!, maxLinks);
     delete dir.entries;
   }
 
-  private async pinDynamicArray<T> (array: DynamicArray<T>, numOfProperties: number): Promise<[node: CID | DynamicArray<T>, count: number]> {
+  private async pinDynamicArray<T> (array: DynamicArray<T>, numOfProperties: number, maxNodes: number): Promise<[node: CID | DynamicArray<T>, count: number]> {
     if (array.length === 0 || !Object.prototype.hasOwnProperty.call(array[0], 'index')) {
       const count = array.length * numOfProperties + 1;
-      if (count > IndexService.pinThreshold) {
+      if (count > maxNodes) {
         const result = await this.ipfsClient.dag.put(array, { pin: true });
         this.logger.info(`Pinned flat array with CID ${result}`, { size: array.length });
         return [result, 1];
@@ -71,12 +70,12 @@ export default class IndexService extends BaseService {
     const layeredArray = <LayeredArray<T>[]>array;
     let total = 1;
     for (let i = 0; i < layeredArray.length; i++) {
-      const [subNode, count] = await this.pinDynamicArray(<DynamicArray<T>>layeredArray[i].array, numOfProperties);
+      const [subNode, count] = await this.pinDynamicArray(<DynamicArray<T>>layeredArray[i].array, numOfProperties, maxNodes);
       total += count;
       layeredArray[i].array = subNode;
     }
 
-    if (total > IndexService.pinThreshold) {
+    if (total > maxNodes) {
       const result = await this.ipfsClient.dag.put(layeredArray, { pin: true });
       this.logger.info(`Pinned layered array with CID ${result}`, { size: layeredArray.length });
       return [result, 1];
@@ -85,23 +84,23 @@ export default class IndexService extends BaseService {
     return [layeredArray, total];
   }
 
-  private async pinEntries (entries: DynamicMap<FileNode | DirNode | CID>)
+  private async pinEntries (entries: DynamicMap<FileNode | DirNode | CID>, maxNodes: number)
     : Promise<[node: DynamicMap<FileNode | DirNode | CID> | CID, count: number]> {
     if (entries instanceof Map) {
       let total = 1;
       for (const [key, value] of entries) {
         if ((<FileNode | DirNode> value).type === 'file') {
-          const [node, count] = await this.pinFileNode(<FileNode>value);
-          total += count;
+          const [node, count] = await this.pinFileNode(<FileNode>value, maxNodes);
+          total += count + 1;
           entries.set(key, node);
         } else {
-          const [node, count] = await this.pinDirNode(<DirNode>value);
-          total += count;
+          const [node, count] = await this.pinDirNode(<DirNode>value, maxNodes);
+          total += count + 1;
           entries.set(key, node);
         }
       }
 
-      if (total > IndexService.pinThreshold) {
+      if (total > maxNodes) {
         const result = await this.ipfsClient.dag.put(entries, { pin: true });
         this.logger.info(`Pinned flat entries map with CID ${result}`, { size: entries.size });
         return [result, 1];
@@ -111,19 +110,20 @@ export default class IndexService extends BaseService {
     }
 
     const layeredMap = entries;
-    let total = 1;
+    let total = 5;
     for (let i = 0; i < layeredMap.length; i++) {
-      const [node, count] = await this.pinEntries(<DynamicMap<FileNode | DirNode | CID>>layeredMap[i].map);
-      total += count;
+      const [node, count] = await this.pinEntries(<DynamicMap<FileNode | DirNode | CID>>layeredMap[i].map, maxNodes);
+      total += count + 1;
       layeredMap[i].map = node;
     }
 
-    if (total > IndexService.pinThreshold) {
+    if (total > maxNodes) {
       const result = await this.ipfsClient.dag.put(layeredMap, { pin: true });
       this.logger.info(`Pinned layered entries map with CID ${result}`, {
         size: layeredMap.length,
         from: layeredMap[0].from,
-        to: layeredMap[layeredMap.length - 1].to});
+        to: layeredMap[layeredMap.length - 1].to
+      });
 
       return [result, 1];
     }
@@ -131,33 +131,36 @@ export default class IndexService extends BaseService {
     return [layeredMap, total];
   }
 
-  private async pinDirNode (dir: DirNode): Promise<[cid: CID, count: number]> {
-    const realSources = DynamizeArray(dir.sources!, IndexService.maxLink);
-    dir.realSources = await this.pinDynamicArray(realSources);
-    const realEntries = DynamizeMap(dir.entries!, IndexService.maxLink);
-    dir.realEntries = await this.pinEntries(realEntries);
-    const result = await this.ipfsClient.dag.put(dir, {
-      pin: true
-    });
-    this.logger.info(`Pinned dir ${dir.name} with CID ${result}`);
-    return result;
+  private async pinDirNode (dir: DirNode, maxNodes: number, forcePin = false): Promise<[cid: DirNode | CID, count: number]> {
+    const [node1, count1] = await this.pinDynamicArray(<DynamicArray<string>>dir.realSources, 1, maxNodes);
+    dir.realSources = node1;
+    const [node2, count2] = await this.pinEntries(<DynamicMap<FileNode | DirNode | CID>>dir.realEntries, maxNodes);
+    dir.realEntries = node2;
+    if (forcePin || count1 + count2 + 7 > maxNodes) {
+      const result = await this.ipfsClient.dag.put(dir, { pin: true });
+      this.logger.info(`Pinned dir node with CID ${result}`);
+      return [result, 1];
+    }
+
+    return [dir, count1 + count2 + 7];
   }
 
-  private async pinFileNode (file: FileNode): Promise<[node: CID | FileNode, count: number]> {
-    file.realSources = DynamizeArray(file.sources!, IndexService.maxLink);
-    delete file.sources;
-    const [node, count] = await this.pinDynamicArray(file.realSources);
-    this.logger.info(`Pinned file sources array ${file.name} with CID ${file.realSources}`);
-    const result = await this.ipfsClient.dag.put(file, {
-      pin: true
-    });
-    this.logger.info(`Pinned file ${file.name} with CID ${result}`);
-    return result;
+  private async pinFileNode (file: FileNode, maxNodes: number): Promise<[node: FileNode | CID, count: number]> {
+    const [node, count] = await this.pinDynamicArray(<DynamicArray<Source>>file.realSources!, 3, maxNodes);
+    file.realSources = node;
+    if (count + 8 > maxNodes) {
+      const result = await this.ipfsClient.dag.put(file, { pin: true });
+      this.logger.info(`Pinned file node with CID ${result}`);
+      return [result, 1];
+    }
+    return [file, count + 8];
   }
 
   private async createIndexRequest (request: Request, response: Response): Promise<void> {
     const id = request.params['id'];
-    this.logger.info(`Creating index for dataset`, { id });
+    const maxLinks = request.body.maxLinks ?? 1000;
+    const maxNodes = request.body.maxNodes ?? 100;
+    this.logger.info(`Creating index for dataset`, { id, maxLinks, maxNodes });
     const found = ObjectId.isValid(id) ? await Datastore.ScanningRequestModel.findById(id) : await Datastore.ScanningRequestModel.findOne({ name: id });
     if (!found) {
       this.sendError(response, ErrorCode.DATASET_NOT_FOUND);
@@ -229,10 +232,10 @@ export default class IndexService extends BaseService {
     }
 
     // PIN to IPFS
-    this.dynamizeDirNode(root);
-    const rootCid = await this.pinDirNode(root);
+    this.dynamizeDirNode(root, maxLinks);
+    const rootCid = await this.pinDirNode(root, maxNodes, true);
     const result: any = {
-      rootCid: rootCid.toString()
+      rootCid: rootCid[0].toString()
     };
     if (unfinishedGenerations > 0) {
       result.warning = `There are still ${unfinishedGenerations} incomplete generation requests`;
