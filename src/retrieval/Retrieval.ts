@@ -57,9 +57,9 @@ export default class Retrieval {
     }
     const node: DirNode | FileNode = dagResult.value;
     if (node.type === 'dir') {
-      return node.sources.map(s => ({ cid: s }));
+      return node.sources!.map(s => ({ cid: s }));
     } else {
-      return node.sources;
+      return node.sources!;
     }
   }
 
@@ -113,7 +113,7 @@ export default class Retrieval {
     const tempDir = pth.resolve(dest, '.fetching');
     const tempPath = pth.resolve(dest, '.fetching', node.name);
     const result: FileNode | DirNode = dagResult.value;
-    const sources: string[] = result.type === 'dir' ? result.sources : result.sources.map(s => s.cid);
+    const sources: string[] = result.type === 'dir' ? result.sources! : result.sources!.map(s => s.cid);
     for (const source of sources) {
       let success = false;
       for (const provider of providers) {
