@@ -214,6 +214,8 @@ export default class Retrieval {
       let success = false;
       for (const provider of providers) {
         console.log(`Checking whether ${cid} can be retrieved from ${provider}`);
+        let command = ['lotus', 'client', 'ls', '--maxPrice', '0', '--miner', provider, cid].join(' ');
+        console.log(command);
         const result = spawnSync('lotus', ['client', 'ls', '--maxPrice', '0', '--miner', provider, cid], { timeout: 10000 });
         if (result.signal || result.status !== 0) {
           console.error(result.stderr.toString());
@@ -225,6 +227,8 @@ export default class Retrieval {
           force: true
         });
         fs.mkdirSync(tempDir, { recursive: true });
+        command = ['lotus', 'client', 'retrieve', '--maxPrice', '0', '--miner', provider, cid, tempPath].join(' ');
+        console.log(command);
         const retrieveResult = spawnSync('lotus', ['client', 'retrieve', '--maxPrice', '0', '--miner', provider, cid, tempPath], { stdio: 'inherit' });
         if (retrieveResult.signal || (retrieveResult.status !== null && retrieveResult.status !== 0)) {
           console.error(retrieveResult.stderr.toString());

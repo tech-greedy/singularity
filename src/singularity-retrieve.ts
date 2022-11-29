@@ -44,11 +44,11 @@ program.command('explain').description('Explain the detailed sources for the cor
 program.command('cp').description('Copy the file from storage provider to local path')
   .argument('<path>', 'The path inside a dataset, i.e. singularity://ipns/dataset.io/path/to/folder')
   .argument('<dest>', 'The destination to save the downloaded file or directory')
-  .requiredOption('-p, --provider [providers...]', 'The storage providers to retrieve the data from')
+  .requiredOption('-p, --providers <providers>', 'The storage providers to retrieve the data from, separated by comma')
   .option('--ipfs-api <ipfs_api>', 'The IPFS API to look for dataset index')
   .action(async (path, dest, options) => {
     const retrieval = new Retrieval(options.ipfsApi || defaultIpfsApi);
-    await retrieval.cp(path, dest, options.provider);
+    await retrieval.cp(path, dest, options.providers.split(','));
     process.exit(0);
   });
 
