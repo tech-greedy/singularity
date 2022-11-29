@@ -253,7 +253,7 @@ export default class Retrieval {
         const relative = pth.relative(tempDir, entry.path);
         const target = pth.join(dest, relative);
         if (entry.directory) {
-          console.log(`mkdir ${target}`);
+          console.log(`mkdir -p ${target}`);
           fs.mkdirSync(target, { recursive: true });
         } else {
           if (!fs.existsSync(target)) {
