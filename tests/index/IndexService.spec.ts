@@ -7,7 +7,7 @@ import ErrorCode from '../../src/index/ErrorCode';
 import { CID } from 'ipfs-core';
 import * as IPFS from 'ipfs-core';
 
-describe('IndexService', () => {
+fdescribe('IndexService', () => {
   let service: IndexService;
   beforeAll(async () => {
     await Utils.initDatabase();
@@ -33,7 +33,7 @@ describe('IndexService', () => {
         path: 'base/path'
       });
       const response = await (supertest(service['app']))
-        .get(`/create/${scanningRequest.id}`);
+        .post(`/create/${scanningRequest.id}`);
       expect(response.status).toEqual(400);
       expect(response.body).toEqual({
         error: ErrorCode.SCANNING_INCOMPLETE
@@ -41,12 +41,12 @@ describe('IndexService', () => {
     })
     it('should throw error if no dataset is provided', async () => {
       const response = await (supertest(service['app']))
-        .get(`/create`);
+        .post(`/create`);
       expect(response.status).toEqual(404);
     })
     it('should throw error if dataset id is invalid', async () => {
       const response = await (supertest(service['app']))
-        .get(`/create/invalid_id`)
+        .post(`/create/invalid_id`)
         .set('Accept', 'application/json');
       expect(response.status).toEqual(400);
       expect(response.body).toEqual({
@@ -55,14 +55,14 @@ describe('IndexService', () => {
     })
     it('should throw error if dataset id does not exist', async () => {
       const response = await (supertest(service['app']))
-        .get(`/create/507f1f77bcf86cd799439011`)
+        .post(`/create/507f1f77bcf86cd799439011`)
         .set('Accept', 'application/json');
       expect(response.status).toEqual(400);
       expect(response.body).toEqual({
         error: ErrorCode.DATASET_NOT_FOUND
       });
     })
-    it('should return rootCid', async () => {
+    fit('should return rootCid', async () => {
       const scanningRequest = await Datastore.ScanningRequestModel.create({
         status: 'completed',
         path: path.join('base', 'path')
@@ -146,80 +146,23 @@ describe('IndexService', () => {
         ]
       });
       const response = await (supertest(service['app']))
-        .get(`/create/${scanningRequest.id}`)
+        .post(`/create/${scanningRequest.id}`)
         .set('Accept', 'application/json');
       expect(response.status).toEqual(200);
-      const expectCid = 'bafyreierxb23v5bfuopejyuofp5tp75ywjwttflq5rvky7x2zutok7gusm';
+      const expectCid = 'bafyreidadk6lzfbmzuz5snvnzl6zc6chk26uw6o3k5kap6kodr3vo7etee';
       expect(response.body).toEqual({
         rootCid: expectCid
       });
       const result = await service['ipfsClient'].dag.get(CID.parse(expectCid));
-      const expectedCidA = CID.parse('bafyreiawgqtrxyps4w34nzpnv42ry32kaiuafqvam4e5ou55kxjf2yyn5a');
-      const expectedCidD = CID.parse('bafyreidvdz5gffokecbuazmlritxmwntk3oucng4auc7oxdqdwd2pgttdu');
-      const expectedResult = {
+      expect(result.value).toEqual({
         name: '',
         type: 'dir',
-        entries: {
-          a: expectedCidA,
-          d: expectedCidD
-        },
-        sources: ['data1', 'data2']
-      };
-      expect(result.value).toEqual(expectedResult);
-      const resultA = await service['ipfsClient'].dag.get(expectedCidA);
-      const resultD = await service['ipfsClient'].dag.get(expectedCidD);
-      const expectedResultA = {
-        name: 'a',
-        type: 'dir',
-        entries: {
-          'b.mp4': {
-            name: 'b.mp4',
-            size: 100,
-            type: 'file',
-            sources: [
-              {
-                to: 100,
-                from: 0,
-                cid: "cid3"
-              }]
-          },
-          'c.mp4': {
-            name: 'c.mp4',
-            size: 100,
-            type: 'file',
-            sources: [{
-                to: 50,
-                from: 0,
-                cid: "cid4"
-              },
-              {
-                to: 100,
-                from: 50,
-                cid: "cid7"
-              }]
-          }
-        },
-        sources: ['cid2', 'cid6']
-      };
-      const expectedResultD = {
-        name: 'd',
-        type: 'dir',
-        entries: {
-          'e.mp4': {
-            name: 'e.mp4',
-            size: 100,
-            type: 'file',
-            sources: [{
-                to: 100,
-                from: 0,
-                cid: 'cid9'
-              }]
-          }
-        },
-        sources: ['cid8']
-      }
-      expect(resultA.value).toEqual(expectedResultA);
-      expect(resultD.value).toEqual(expectedResultD);
+        realSources: ['data1', 'data2'],
+        realEntries: {
+          a: jasmine.anything(),
+          d: jasmine.anything()
+        }
+      })
     })
   })
 })
