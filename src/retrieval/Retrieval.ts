@@ -1,5 +1,5 @@
 import { create } from 'ipfs-client';
-import { DirNode, FileNode, Source } from '../index/FsDag';
+import { DirNode, DynamicArray, DynamicMap, FileNode, LayeredArray, Source } from '../index/FsDag';
 import { CID, IPFS } from 'ipfs-core';
 import * as pth from 'path';
 import { spawnSync } from 'child_process';
@@ -10,17 +10,20 @@ import { rrdirSync } from '../deal-preparation/scanner/rrdir';
 
 export interface FileStat {
   type: 'file' | 'dir',
-  size: number,
+  size?: number,
   name: string
 }
+
 export default class Retrieval {
-  private static getClient (api: string): IPFS {
-    return create({
+  private ipfs: IPFS;
+
+  public constructor (api: string) {
+    this.ipfs = create({
       http: api
     });
   }
 
-  private static async resolve (ipfs: IPFS, path: string): Promise<[CID, string]> {
+  private async resolveRootPath (path: string): Promise<[DirNode, string[]]> {
     if (!path.startsWith('singularity://')) {
       console.error('Unsupported protocol. The path needs to start with singularity://, i.e. singularity://ipns/index.dataset.io/path/to/folder');
       process.exit(1);
@@ -28,117 +31,221 @@ export default class Retrieval {
     const splits = path.slice('singularity:/'.length).split('/');
     const ipns = splits.slice(0, 3).join('/');
     path = splits.slice(3).join('/');
-    const resolved = await ipfs.dag.resolve(ipns);
+    const resolved = await this.ipfs.dag.resolve(ipns);
     const segments = [];
     for (const segment of path.split('/')) {
       if (segment !== '') {
-        segments.push('entries', segment);
+        segments.push(segment);
       }
     }
-    const innerPath = segments.join('/');
-    return [resolved.cid, innerPath];
+    const rootNode: DirNode = (await this.ipfs.dag.get(resolved.cid)).value;
+    return [rootNode, segments];
   }
 
-  public static async show (api: string, path: string): Promise<Source[] | { cid: string }[]> {
-    const ipfs = Retrieval.getClient(api);
-    const [resolved, innerPath] = await Retrieval.resolve(ipfs, path);
-    let dagResult;
-    try {
-      dagResult = await ipfs.dag.get(resolved, {
-        path: innerPath
-      });
-    } catch (error: any) {
-      console.error(error.message);
-      process.exit(1);
-    }
-    if (dagResult.remainderPath !== undefined && dagResult.remainderPath.length > 0) {
-      console.error(`Remainder path cannot be resolved: ${dagResult.remainderPath}`);
-      process.exit(1);
-    }
-    const node: DirNode | FileNode = dagResult.value;
-    if (node.type === 'dir') {
-      return node.sources.map(s => ({ cid: s }));
+  private async resolveDynamicMap<T> (map: DynamicMap<T> | CID): Promise<Record<string, T>> {
+    let resolvedMap: DynamicMap<T>;
+    if (map instanceof CID) {
+      resolvedMap = (await this.ipfs.dag.get(map)).value;
     } else {
-      return node.sources;
+      resolvedMap = map;
     }
+
+    if (!Array.isArray(resolvedMap)) {
+      return resolvedMap;
+    }
+
+    const result: Record<string, T> = {};
+    for (const layer of resolvedMap) {
+      const subMap = await this.resolveDynamicMap(layer.map);
+      for (const key in subMap) {
+        result[key] = subMap[key];
+      }
+    }
+    return result;
   }
 
-  public static async list (api: string, path: string): Promise<FileStat[]> {
-    const ipfs = Retrieval.getClient(api);
-    const [resolved, innerPath] = await Retrieval.resolve(ipfs, path);
-    const dagResult = await ipfs.dag.get(resolved, {
-      path: innerPath
-    });
-    if (dagResult.remainderPath !== undefined && dagResult.remainderPath.length > 0) {
-      console.error(`Remainder path cannot be resolved: ${dagResult.remainderPath}`);
-      process.exit(1);
-    }
-    const index : FileNode | DirNode = dagResult.value;
-    if (index.type === 'file') {
-      return [{
-        type: index.type,
-        size: index.size,
-        name: index.name
-      }];
+  private async resolveDynamicMapKey<T> (map: DynamicMap<T> | CID, key: string): Promise<T | undefined> {
+    let resolvedMap: DynamicMap<T>;
+    if (map instanceof CID) {
+      resolvedMap = (await this.ipfs.dag.get(map)).value;
     } else {
-      const result: FileStat[] = [];
-      const entries: any = index.entries;
-      for (const name in entries) {
-        const entry: FileNode | CID = entries[name];
-        if (entry instanceof CID) {
-          result.push({
-            name, type: 'dir', size: 0
-          });
-        } else {
-          result.push({
-            name, type: 'file', size: entry.size
-          });
+      resolvedMap = map;
+    }
+
+    if (!Array.isArray(resolvedMap)) {
+      return resolvedMap[key];
+    }
+
+    for (const layer of resolvedMap) {
+      if (layer.from > key) {
+        return undefined;
+      }
+      if (layer.from <= key && key <= layer.to) {
+        return this.resolveDynamicMapKey(layer.map, key);
+      }
+    }
+
+    return undefined;
+  }
+
+  private async resolveDynamicArray<T> (array: DynamicArray<T> | CID): Promise<T[]> {
+    let resolvedArray: DynamicArray<T>;
+    if (array instanceof CID) {
+      resolvedArray = (await this.ipfs.dag.get(array)).value;
+    } else {
+      resolvedArray = array;
+    }
+
+    if (resolvedArray.length > 0 &&
+      !Object.prototype.hasOwnProperty.call(resolvedArray[0], 'index')) {
+      return <T[]>resolvedArray;
+    }
+
+    const layeredArray = <LayeredArray<T>[]>resolvedArray;
+    const result = [];
+    for (const layer of layeredArray) {
+      const subArray = await this.resolveDynamicArray(layer.array);
+      result.push(...subArray);
+    }
+    return result;
+  }
+
+  public async explain (path: string): Promise<[Source[] | { cid: string }[], FileStat]> {
+    let [dir, segments] = await this.resolveRootPath(path);
+    for (let i = 0; i < segments.length; i++) {
+      const segment = segments[i];
+      let entry = await this.resolveDynamicMapKey(dir.realEntries!, segment);
+      if (entry === undefined) {
+        console.error(`Path ${path} cannot be resolved - ${segment} cannot be found`);
+        process.exit(1);
+      }
+      if (entry instanceof CID) {
+        entry = (await this.ipfs.dag.get(entry)).value;
+      }
+      entry = <FileNode | DirNode>entry;
+      if (entry.type === 'file') {
+        if (i !== segments.length - 1) {
+          console.error(`Path ${path} cannot be resolved - ${segment} is a file`);
+          process.exit(1);
         }
+        return [await this.resolveDynamicArray(entry.realSources!), {
+          type: 'file',
+          size: entry.size,
+          name: segment
+        }];
+      } else {
+        dir = entry;
       }
-      return result;
     }
+
+    const sources = await this.resolveDynamicArray(dir.realSources!);
+    return [sources.map(source => ({ cid: source })), {
+      type: 'dir',
+      name: pth.basename(path)
+    }];
   }
 
-  public static async cp (api: string, path: string, dest: string, providers: string[]): Promise<void> {
-    const ipfs = Retrieval.getClient(api);
-    const [resolved, innerPath] = await Retrieval.resolve(ipfs, path);
-    const dagResult = await ipfs.dag.get(resolved, {
-      path: innerPath
-    });
-    if (dagResult.remainderPath !== undefined && dagResult.remainderPath.length > 0) {
-      console.error(`Remainder path cannot be resolved: ${dagResult.remainderPath}`);
-      process.exit(1);
+  public async list (path: string, verbose: boolean): Promise<string[] | FileStat[]> {
+    let [dir, segments] = await this.resolveRootPath(path);
+    for (let i = 0; i < segments.length; i++) {
+      const segment = segments[i];
+      let entry = await this.resolveDynamicMapKey(dir.realEntries!, segment);
+      if (entry === undefined) {
+        console.error(`Path ${path} cannot be resolved - ${segment} cannot be found`);
+        process.exit(1);
+      }
+      if (entry instanceof CID) {
+        entry = (await this.ipfs.dag.get(entry)).value;
+      }
+      entry = <FileNode | DirNode>entry;
+      if (entry.type === 'file') {
+        if (i !== segments.length - 1) {
+          console.error(`Path ${path} cannot be resolved - ${segment} is a file`);
+          process.exit(1);
+        }
+        if (!verbose) {
+          return [segment];
+        }
+        return [{
+          type: 'file',
+          size: entry.size,
+          name: segment
+        }];
+      } else {
+        dir = entry;
+      }
     }
-    const node : FileNode | DirNode = dagResult.value;
+
+    const dirEntries = await this.resolveDynamicMap(dir.realEntries!);
+    if (!verbose) {
+      return Array.from(Object.keys(dirEntries));
+    }
+
+    const result: FileStat[] = [];
+    for (const [name, entry] of Object.entries(dirEntries)) {
+      let resolved = entry;
+      if (entry instanceof CID) {
+        resolved = (await this.ipfs.dag.get(entry)).value;
+      }
+      resolved = <FileNode | DirNode>resolved;
+      if (resolved.type === 'file') {
+        result.push({
+          type: 'file',
+          size: resolved.size,
+          name
+        });
+      } else {
+        result.push({
+          type: 'dir',
+          name
+        });
+      }
+    }
+    return result;
+  }
+
+  public async cp (path: string, dest: string, providers: string[]): Promise<void> {
+    const [sources, stat] = await this.explain(path);
+    const cids = sources.map(source => source.cid);
+    const name = stat.name;
     const tempDir = pth.resolve(dest, '.fetching');
-    const tempPath = pth.resolve(dest, '.fetching', node.name);
-    const result: FileNode | DirNode = dagResult.value;
-    const sources: string[] = result.type === 'dir' ? result.sources : result.sources.map(s => s.cid);
-    for (const source of sources) {
+    const tempPath = pth.resolve(dest, '.fetching', name);
+    for (const cid of cids) {
       let success = false;
       for (const provider of providers) {
-        console.log(`Checking whether ${source} can be retrieved from ${provider}`);
-        const result = spawnSync('lotus', ['client', 'ls', '--maxPrice', '0', '--miner', provider, source], { timeout: 10000 });
+        console.log(`Checking whether ${cid} can be retrieved from ${provider}`);
+        let command = ['lotus', 'client', 'ls', '--maxPrice', '0', '--miner', provider, cid].join(' ');
+        console.log(command);
+        const result = spawnSync('lotus', ['client', 'ls', '--maxPrice', '0', '--miner', provider, cid], { timeout: 10000 });
         if (result.signal || result.status !== 0) {
           console.error(result.stderr.toString());
           continue;
         }
-        console.log(`${provider} has the piece ${source}. Start retrieving...`);
-        fs.rmSync(tempDir, { recursive: true, force: true });
+        console.log(`${provider} has the piece ${cid}. Start retrieving...`);
+        fs.rmSync(tempDir, {
+          recursive: true,
+          force: true
+        });
         fs.mkdirSync(tempDir, { recursive: true });
-        const retrieveResult = spawnSync('lotus', ['client', 'retrieve', '--maxPrice', '0', '--miner', provider, source, tempPath], { stdio: 'inherit' });
-        if (retrieveResult.signal || retrieveResult.status !== 0) {
+        command = ['lotus', 'client', 'retrieve', '--maxPrice', '0', '--miner', provider, cid, tempPath].join(' ');
+        console.log(command);
+        const retrieveResult = spawnSync('lotus', ['client', 'retrieve', '--maxPrice', '0', '--miner', provider, cid, tempPath], { stdio: 'inherit' });
+        if (retrieveResult.signal || (retrieveResult.status !== null && retrieveResult.status !== 0)) {
           console.error(retrieveResult.stderr.toString());
           continue;
         }
-        console.log(`Retrieved ${source} from ${provider} to ${tempPath}.`);
+        console.log(`Retrieved ${cid} from ${provider} to ${tempPath}.`);
         success = true;
         break;
       }
 
       if (!success) {
+        console.error(`Failed to retrieve ${cid} from any provider`);
         console.error('Cleaning up temporary files');
-        fs.rmSync(tempDir, { recursive: true, force: true });
+        fs.rmSync(tempDir, {
+          recursive: true,
+          force: true
+        });
         process.exit(1);
       }
 
@@ -146,7 +253,7 @@ export default class Retrieval {
         const relative = pth.relative(tempDir, entry.path);
         const target = pth.join(dest, relative);
         if (entry.directory) {
-          console.log(`mkdir ${target}`);
+          console.log(`mkdir -p ${target}`);
           fs.mkdirSync(target, { recursive: true });
         } else {
           if (!fs.existsSync(target)) {
@@ -160,12 +267,15 @@ export default class Retrieval {
           }
         }
       }
-      fs.rmSync(tempDir, { recursive: true, force: true });
+      fs.rmSync(tempDir, {
+        recursive: true,
+        force: true
+      });
     }
     console.log('Succeeded');
   }
 
-  private static async pipe (r: ReadStream, w: WriteStream) : Promise<void> {
+  private static async pipe (r: ReadStream, w: WriteStream): Promise<void> {
     r.pipe(w);
     return new Promise(function (resolve, reject) {
       r.on('end', resolve);
