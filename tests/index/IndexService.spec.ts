@@ -30,17 +30,17 @@ describe('IndexService', () => {
   });
   describe('pinEntries', () => {
     it('should handle less entries', async () => {
-      const entries: DynamicMap<FileNode | DirNode | CID> = new Map();
-      entries.set('k1', { type: 'file', size: 1, name: 'k1', realSources: []});
-      entries.set('k2', { type: 'file', size: 1, name: 'k2', realSources: []});
+      const entries: DynamicMap<FileNode | DirNode | CID> = {};
+      entries['k1'] = { type: 'file', size: 1, name: 'k1', realSources: []};
+      entries['k2'] = { type: 'file', size: 1, name: 'k2', realSources: []};
       const [node, count] = await service['pinEntries'](entries, 100);
       expect(count).toEqual(21);
       expect(node).toEqual(entries);
     })
     it('should handle more entries', async () => {
-      const entries: DynamicMap<FileNode | DirNode | CID> = new Map();
-      entries.set('k1', { type: 'file', size: 1, name: 'k1', realSources: []});
-      entries.set('k2', { type: 'file', size: 1, name: 'k2', realSources: []});
+      const entries: DynamicMap<FileNode | DirNode | CID> = {};
+      entries['k1'] = { type: 'file', size: 1, name: 'k1', realSources: []};
+      entries['k2'] = { type: 'file', size: 1, name: 'k2', realSources: []};
       const [node, count] = await service['pinEntries'](entries, 10);
       expect(count).toEqual(1);
       expect(<any>node).toEqual(CID.parse('bafyreic2qccr5ps4dxh3lqjpovcw23zfy26oj2lblt6sy5cpjz4sqhdhui'));
@@ -52,9 +52,9 @@ describe('IndexService', () => {
       )
     })
     it('should handle layered map', async () => {
-      const map = new Map();
-      map.set('k1', { type: 'file', size: 1, name: 'k1', realSources: []});
-      map.set('k2', { type: 'file', size: 1, name: 'k2', realSources: []});
+      const map: DynamicMap<FileNode | DirNode | CID> = {};
+      map['k1'] = { type: 'file', size: 1, name: 'k1', realSources: []};
+      map['k2'] = { type: 'file', size: 1, name: 'k2', realSources: []};
       const entries: LayeredMap<FileNode | DirNode | CID>[] = [{
         from: 'k1',
         to: 'k2',

@@ -16,9 +16,9 @@ describe('FsDag', () => {
       map.set('b', 'b');
       map.set('c', 'c');
       let result = DynamizeMap(map, 3)
-      expect(result).toEqual(map);
+      expect(result).toEqual({a: 'a', b: 'b', c: 'c'});
       result = DynamizeMap(map, 4)
-      expect(result).toEqual(map);
+      expect(result).toEqual({a: 'a', b: 'b', c: 'c'});
     });
     it('should return a dynamic map if the map is larger than maxLink', () => {
       const map = new Map<string, string>();

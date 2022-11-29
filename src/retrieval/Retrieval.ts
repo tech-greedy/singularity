@@ -35,14 +35,14 @@ export default class Retrieval {
     const segments = [];
     for (const segment of path.split('/')) {
       if (segment !== '') {
-        segments.push('entries', segment);
+        segments.push(segment);
       }
     }
     const rootNode: DirNode = (await this.ipfs.dag.get(resolved.cid)).value;
     return [rootNode, segments];
   }
 
-  private async resolveDynamicMap<T> (map: DynamicMap<T> | CID): Promise<Map<string, T>> {
+  private async resolveDynamicMap<T> (map: DynamicMap<T> | CID): Promise<Record<string, T>> {
     let resolvedMap: DynamicMap<T>;
     if (map instanceof CID) {
       resolvedMap = (await this.ipfs.dag.get(map)).value;
@@ -54,11 +54,11 @@ export default class Retrieval {
       return resolvedMap;
     }
 
-    const result = new Map<string, T>();
+    const result: Record<string, T> = {};
     for (const layer of resolvedMap) {
       const subMap = await this.resolveDynamicMap(layer.map);
-      for (const [key, value] of subMap.entries()) {
-        result.set(key, value);
+      for (const key in subMap) {
+        result[key] = subMap[key];
       }
     }
     return result;
@@ -73,7 +73,7 @@ export default class Retrieval {
     }
 
     if (!Array.isArray(resolvedMap)) {
-      return resolvedMap.get(key);
+      return resolvedMap[key];
     }
 
     for (const layer of resolvedMap) {
@@ -178,11 +178,11 @@ export default class Retrieval {
 
     const dirEntries = await this.resolveDynamicMap(dir.realEntries!);
     if (!verbose) {
-      return Array.from(dirEntries.keys());
+      return Array.from(Object.keys(dirEntries));
     }
 
     const result: FileStat[] = [];
-    for (const [name, entry] of dirEntries.entries()) {
+    for (const [name, entry] of Object.entries(dirEntries)) {
       let resolved = entry;
       if (entry instanceof CID) {
         resolved = (await this.ipfs.dag.get(entry)).value;

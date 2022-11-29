@@ -51,7 +51,7 @@ export interface LayeredMap<T> {
   map: DynamicMap<T> | CID
 }
 
-export type DynamicMap<T> = Map<string, T> | LayeredMap<T>[];
+export type DynamicMap<T> = Record<string, T> | LayeredMap<T>[];
 
 export interface Source {
   from: number,
@@ -98,7 +98,7 @@ export function DynamizeArray<T> (array: T[], maxLink: number): DynamicArray<T> 
 
 export function DynamizeMap<T> (map: Map<string, T>, maxLink: number): DynamicMap<T> {
   if (map.size <= maxLink) {
-    return map;
+    return Object.fromEntries(map);
   }
 
   let partitionSize = 1;

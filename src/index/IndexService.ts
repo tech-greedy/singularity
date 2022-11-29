@@ -86,17 +86,18 @@ export default class IndexService extends BaseService {
 
   private async pinEntries (entries: DynamicMap<FileNode | DirNode | CID>, maxNodes: number)
     : Promise<[node: DynamicMap<FileNode | DirNode | CID> | CID, count: number]> {
-    if (entries instanceof Map) {
+    if (!Array.isArray(entries)) {
       let total = 1;
-      for (const [key, value] of entries) {
+      for (const key in entries) {
+        const value = entries[key];
         if ((<FileNode | DirNode> value).type === 'file') {
           const [node, count] = await this.pinFileNode(<FileNode>value, maxNodes);
           total += count + 1;
-          entries.set(key, node);
+          entries[key] = node;
         } else {
           const [node, count] = await this.pinDirNode(<DirNode>value, maxNodes);
           total += count + 1;
-          entries.set(key, node);
+          entries[key] = node;
         }
       }
 
