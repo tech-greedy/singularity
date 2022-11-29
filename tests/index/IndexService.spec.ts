@@ -7,7 +7,7 @@ import ErrorCode from '../../src/index/ErrorCode';
 import { CID } from 'ipfs-core';
 import * as IPFS from 'ipfs-core';
 
-fdescribe('IndexService', () => {
+describe('IndexService', () => {
   let service: IndexService;
   beforeAll(async () => {
     await Utils.initDatabase();
@@ -62,7 +62,7 @@ fdescribe('IndexService', () => {
         error: ErrorCode.DATASET_NOT_FOUND
       });
     })
-    fit('should return rootCid', async () => {
+    it('should return rootCid', async () => {
       const scanningRequest = await Datastore.ScanningRequestModel.create({
         status: 'completed',
         path: path.join('base', 'path')
