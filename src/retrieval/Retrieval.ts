@@ -218,8 +218,11 @@ export default class Retrieval {
         console.log(command);
         const result = spawnSync('lotus', ['client', 'ls', '--maxPrice', '0', '--miner', provider, cid], { timeout: 10000 });
         if (result.signal || result.status !== 0) {
-          console.error(result.stderr.toString());
-          continue;
+          if (!result.stdout.toString().includes('BlockstoreFinalized')) {
+            console.error(result.stdout.toString());
+            console.error(result.stderr.toString());
+            continue;
+          }
         }
         console.log(`${provider} has the piece ${cid}. Start retrieving...`);
         fs.rmSync(tempDir, {
