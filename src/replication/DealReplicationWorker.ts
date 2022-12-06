@@ -567,10 +567,11 @@ export default class DealReplicationWorker extends BaseService {
       await sleep(retryTimeout);
       if (errorMsg.includes('proposed provider collateral below minimum')) {
         this.logger.warn(`Keep retry on this error without expoential back off. These can usually resolve itself within timely manner.`);
+        // do not increase retry count, we want to retry this forever
       } else {
         retryTimeout *= 2; // expoential back off
+        retryCount++;
       }
-      retryCount++;
     } while (retryCount < config.get<number>('deal_replication_worker.max_retry_count'));
     return {
       dealCid,
