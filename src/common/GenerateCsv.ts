@@ -19,7 +19,7 @@ export default class GenerateCsv {
         const deals = await Datastore.DealStateModel.find({
           replicationRequestId: id,
           provider: provider,
-          state: { $nin: ['slashed', 'error', 'expired', 'proposal_expired'] }
+          state: { $nin: ['active', 'slashed', 'error', 'expired', 'proposal_expired'] }
         });
         let urlPrefix = replicationRequest.urlPrefix;
         if (!urlPrefix.endsWith('/')) {

@@ -46,10 +46,10 @@ export default abstract class BaseService {
     const childPid = GenerationProcessor.childProcessPid;
     if (childPid) {
       const usage = await pidusage([pid, childPid]);
-      const cpuUsage = usage[pid].cpu;
-      const memoryUsage = usage[pid].memory;
-      const childCpuUsage = usage[childPid].cpu;
-      const childMemoryUsage = usage[childPid].memory;
+      const cpuUsage = usage[pid]?.cpu;
+      const memoryUsage = usage[pid]?.memory;
+      const childCpuUsage = usage[childPid]?.cpu;
+      const childMemoryUsage = usage[childPid]?.memory;
       await Datastore.HealthCheckModel.findOneAndUpdate({ workerId: this.workerId }, {
         $set: {
           pid,
@@ -62,8 +62,8 @@ export default abstract class BaseService {
       });
     } else {
       const usage = await pidusage([pid]);
-      const cpuUsage = usage[pid].cpu;
-      const memoryUsage = usage[pid].memory;
+      const cpuUsage = usage[pid]?.cpu;
+      const memoryUsage = usage[pid]?.memory;
       await Datastore.HealthCheckModel.findOneAndUpdate({ workerId: this.workerId }, {
         $set: {
           pid,
