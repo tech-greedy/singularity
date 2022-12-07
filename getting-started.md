@@ -7,7 +7,7 @@ The tool works in Mac/Linux/Windows platform and is distributed using NPM.
 ```shell
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash
 source ~/.bashrc
-nvm install 16
+nvm install 18
 npm i -g @techgreedy/singularity
 ```
 
