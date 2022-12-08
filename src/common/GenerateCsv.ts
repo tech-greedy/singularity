@@ -19,7 +19,7 @@ export default class GenerateCsv {
         const deals = await Datastore.DealStateModel.find({
           replicationRequestId: id,
           provider: provider,
-          state: { $nin: ['active', 'slashed', 'error', 'expired', 'proposal_expired'] }
+          state: 'proposed'
         });
         let urlPrefix = replicationRequest.urlPrefix;
         if (!urlPrefix.endsWith('/')) {
@@ -37,7 +37,8 @@ export default class GenerateCsv {
               data_cid: deal.dataCid,
               piece_cid: deal.pieceCid,
               start_epoch: deal.startEpoch,
-              full_url: `${urlPrefix}${deal.pieceCid}.car`
+              full_url: `${urlPrefix}${deal.pieceCid}.car`,
+              client: deal.client
             });
           }
           const csv = new ObjectsToCsv(csvRow);
