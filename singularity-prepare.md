@@ -12,8 +12,8 @@ Looking for the daemon version? Try [singularity](./README.md)
 # Install nvm (https://github.com/nvm-sh/nvm#install--update-script)
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash
 source ~/.bashrc
-# Install node v16
-nvm install 16
+# Install node v18
+nvm install 18
 ```
 
 ### Install globally from npm

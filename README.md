@@ -17,8 +17,8 @@ Looking for a complete end-to-end demonstration? Try [Getting Started Guide](./g
 # Install nvm (https://github.com/nvm-sh/nvm#install--update-script)
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash
 source ~/.bashrc
-# Install node v16
-nvm install 16
+# Install node v18
+nvm install 18
 ```
 
 ### Install globally from npm
