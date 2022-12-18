@@ -31,7 +31,7 @@ export default class DealTrackingService extends BaseService {
     const clientStates = await Datastore.DealTrackingStateModel.find({ stateType: 'client', stateValue: 'track' });
     for (const clientState of clientStates) {
       const client = clientState.stateKey;
-      const lastDeal = await Datastore.DealStateModel.find({ client }).sort({ dealId: -1 }).limit(1);
+      const lastDeal = await Datastore.DealStateModel.find({ client, "dealId": { $ne: null} }).sort({ dealId: -1 }).limit(1);
       try {
         await this.insertDealFromFilscan(client, lastDeal.length > 0 ? lastDeal[0].dealId! : 16000000);
       } catch (error) {
