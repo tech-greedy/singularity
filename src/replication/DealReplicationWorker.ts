@@ -415,7 +415,7 @@ export default class DealReplicationWorker extends BaseService {
           }
 
           const startDelay = replicationRequest.startDelay ? replicationRequest.startDelay : 20160;
-          const currentHeight = HeightFromCurrentTime();
+          const currentHeight = await this.currentBlockHeight();
           const startEpoch = startDelay + currentHeight + 60; // 30 min buffer time
           this.logger.debug(`Calculated start epoch startDelay: ${startDelay} + currentHeight: ${currentHeight} + 60 = ${startEpoch}`);
           let dealCmd = '';
@@ -594,5 +594,28 @@ export default class DealReplicationWorker extends BaseService {
         upsert: true
       }
     );
+  }
+
+  private async currentBlockHeight() : Promise<number> {
+    try {
+      return await this.lotusBlockHeight()
+    } catch (error) {
+      this.logger.warn(`get lotus block height failed`, error);
+    }
+    return HeightFromCurrentTime();
+  }
+
+  private async lotusBlockHeight (): Promise<number> {
+    const statusCommand = `${this.lotusCMD} status`
+    const cmdOut = await exec(statusCommand);
+    if (cmdOut.stdout != undefined) {
+      var outString = cmdOut.stdout.toString().trim();
+      const re = new RegExp(/Sync Epoch: ([0-9]+)[^0-9]+.*/);
+      var matchString = outString.match(re)?.[1]
+      if (typeof matchString === 'string') {
+        return parseInt(matchString);
+      }
+    }
+    throw new Error(JSON.stringify(cmdOut));
   }
 }

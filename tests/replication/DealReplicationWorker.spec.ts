@@ -1,6 +1,7 @@
 import DealReplicationWorker from '../../src/replication/DealReplicationWorker';
 import Utils from '../Utils';
 import Datastore from '../../src/common/Datastore';
+import { HeightFromCurrentTime } from '../../src/common/ChainHeight';
 import { sleep } from '../../src/common/Util';
 import createSpyObj = jasmine.createSpyObj;
 import cron from 'node-cron';
@@ -142,6 +143,20 @@ describe('DealReplicationWorker', () => {
     it('should throw error if command fails', async () => {
       spyOn<any>(childprocess, 'exec').and.resolveTo({ stdout: 'unknown' });
       await expectAsync(worker['isUsingLotus']('provider')).toBeRejectedWithError('{"stdout":"unknown"}');
+    })
+  })
+
+  describe('currentBlockHeight', () => {
+    it('should return lotus block height', async () => {
+      const cmdSpy = spyOn<any>(childprocess, 'exec').and.resolveTo({ stdout:
+        'Sync Epoch: 2487255\nEpochs Behind: 0\nPeers to Publish Messages: 0\nPeers to Publish Blocks: 0\n'});
+      await expectAsync(worker['currentBlockHeight']()).toBeResolvedTo(2487255);
+      expect(cmdSpy).toHaveBeenCalledWith('lotus status');
+    })
+    it('should return computed block height if lotus command fails', async () => {
+      const cmdSpy = spyOn<any>(childprocess, 'exec').and.resolveTo({ stdout: 'unknown' });
+      await expectAsync(worker['currentBlockHeight']()).toBeResolvedTo(HeightFromCurrentTime());
+      expect(cmdSpy).toHaveBeenCalledWith('lotus status');
     })
   })
 
