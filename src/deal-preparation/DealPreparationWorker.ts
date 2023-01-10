@@ -8,6 +8,7 @@ import { processGeneration } from './worker/GenerationProcessor';
 import { AbortSignal } from '../common/AbortSignal';
 import Scanner from './scanner/Scanner';
 import MetricEmitter from '../common/metrics/MetricEmitter';
+import {sleep} from "../common/Util";
 
 export default class DealPreparationWorker extends BaseService {
   public readonly trafficMonitor: TrafficMonitor;
@@ -142,11 +143,13 @@ export default class DealPreparationWorker extends BaseService {
   }
 
   private async startHealthCheck (abortSignal?: AbortSignal): Promise<void> {
-    if (abortSignal && await abortSignal()) {
-      return;
+    while (true) {
+      if (abortSignal && await abortSignal()) {
+        return;
+      }
+      await this.healthCheck();
+      await sleep(5000);
     }
-    await this.healthCheck();
-    setTimeout(async () => this.startHealthCheck(abortSignal), 5000);
   }
 
   private async healthCheck (): Promise<void> {
