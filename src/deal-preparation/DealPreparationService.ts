@@ -18,7 +18,7 @@ import handleGetGenerationManifestRequest from './handler/GetGenerationManifestR
 import winston from 'winston';
 import handleMonitorRequest from './handler/MonitorRequestHandler';
 import { AbortSignal } from '../common/AbortSignal';
-import {sleep} from "../common/Util";
+import { sleep } from '../common/Util';
 
 export default class DealPreparationService extends BaseService {
   static AllowedDealSizes: number[] = DealPreparationService.initAllowedDealSizes();

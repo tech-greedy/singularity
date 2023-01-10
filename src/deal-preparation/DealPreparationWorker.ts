@@ -8,7 +8,7 @@ import { processGeneration } from './worker/GenerationProcessor';
 import { AbortSignal } from '../common/AbortSignal';
 import Scanner from './scanner/Scanner';
 import MetricEmitter from '../common/metrics/MetricEmitter';
-import {sleep} from "../common/Util";
+import { sleep } from '../common/Util';
 
 export default class DealPreparationWorker extends BaseService {
   public readonly trafficMonitor: TrafficMonitor;
