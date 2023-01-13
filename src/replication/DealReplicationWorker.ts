@@ -293,6 +293,14 @@ export default class DealReplicationWorker extends BaseService {
     }
     try {
       const providers = DealReplicationWorker.generateProvidersList(replicationRequest.storageProviders);
+      // Find cars that are finished generation
+      const cars = await Datastore.GenerationRequestModel.find({
+        datasetId: replicationRequest.datasetId,
+        status: 'completed'
+      })
+      .sort({
+        pieceCid: 1
+      });
       const makeDealAll = providers.map(async (provider) => {
         let useLotus = true;
         try {
@@ -302,14 +310,6 @@ export default class DealReplicationWorker extends BaseService {
           return;
         }
 
-        // Find cars that are finished generation
-        const cars = await Datastore.GenerationRequestModel.find({
-          datasetId: replicationRequest.datasetId,
-          status: 'completed'
-        })
-          .sort({
-            pieceCid: 1
-          });
         if (breakOuter) {
           this.stopCronIfExist(replicationRequest.id);
           return;
