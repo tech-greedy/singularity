@@ -18,6 +18,7 @@ import handleGetGenerationManifestRequest from './handler/GetGenerationManifestR
 import winston from 'winston';
 import handleMonitorRequest from './handler/MonitorRequestHandler';
 import { AbortSignal } from '../common/AbortSignal';
+import { sleep } from '../common/Util';
 
 export default class DealPreparationService extends BaseService {
   static AllowedDealSizes: number[] = DealPreparationService.initAllowedDealSizes();
@@ -125,11 +126,13 @@ export default class DealPreparationService extends BaseService {
   }
 
   private async startCleanupHealthCheck (abortSignal?: AbortSignal): Promise<void> {
-    if (abortSignal && await abortSignal()) {
-      return;
+    while (true) {
+      if (abortSignal && await abortSignal()) {
+        return;
+      }
+      await sleep(30000);
+      await this.cleanupHealthCheck();
     }
-    await this.cleanupHealthCheck();
-    setTimeout(async () => this.startCleanupHealthCheck(abortSignal), 5000);
   }
 
   private static initAllowedDealSizes (): number[] {
