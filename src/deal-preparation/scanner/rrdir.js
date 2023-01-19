@@ -2,7 +2,7 @@
 
 import { lstatSync, readdirSync, statSync } from 'fs';
 import { lstat, readdir, stat } from 'fs/promises';
-import { sep } from 'path';
+import { sep, dirname } from 'path';
 import picomatch from 'picomatch';
 
 const sepBuffer = Buffer.from(sep);
@@ -69,13 +69,18 @@ export async function * rrdir (dir, opts = {}, { includeMatcher, excludeMatcher,
   for (const dirent of dirents) {
     const path = makePath(dirent, dir, encoding);
     if (opts.startFrom) {
-      if (dirent.isDirectory() && !opts.startFrom.startsWith(path)) {
-        continue;
+      const startDir = dirname(opts.startFrom);
+      if (dirent.isDirectory()) {
+        if (!startDir.startsWith(path)) {
+          continue;
+        }
+      } else {
+        if (path < opts.startFrom) {
+          continue;
+        } else {
+          opts.startFrom = undefined;
+        }
       }
-      if (!dirent.isDirectory() && path < opts.startFrom) {
-        continue;
-      }
-      opts.startFrom = undefined;
     }
     if (excludeMatcher && excludeMatcher(encoding === 'buffer' ? String(path) : path)) continue;
 

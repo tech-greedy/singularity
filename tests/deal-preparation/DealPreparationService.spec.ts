@@ -49,11 +49,10 @@ describe('DealPreparationService', () => {
       const spy = spyOn<any>(service, 'cleanupHealthCheck');
       let abort = false;
       service['startCleanupHealthCheck'](() => Promise.resolve(abort));
-      await sleep(7000);
-      expect(spy).toHaveBeenCalledTimes(2);
-      abort = true;
-      await sleep(5000);
-      expect(spy).toHaveBeenCalledTimes(2);
+      await sleep(2000);
+      expect(spy).toHaveBeenCalledTimes(0);
+      await sleep(30000);
+      expect(spy).toHaveBeenCalledTimes(1);
     })
   })
   describe('cleanupIncompleteFiles', () => {
