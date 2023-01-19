@@ -10,7 +10,7 @@ import fs from 'fs-extra';
 import config from '../common/Config';
 import { AbortSignal } from '../common/AbortSignal';
 import { exec } from 'promisify-child-process';
-import { sleep } from '../common/Util';
+import { shuffle, sleep } from '../common/Util';
 import { HeightFromCurrentTime } from '../common/ChainHeight';
 import GenerateCsv from '../common/GenerateCsv';
 import MetricEmitter from '../common/metrics/MetricEmitter';
@@ -297,11 +297,9 @@ export default class DealReplicationWorker extends BaseService {
       const cars = await Datastore.GenerationRequestModel.find({
         datasetId: replicationRequest.datasetId,
         status: 'completed'
-      })
-      .sort({
-        pieceCid: 1
       });
       const makeDealAll = providers.map(async (provider) => {
+        shuffle(cars); // shuffle the cars list to achieve best importing performance (when sending to mulitple SPs)
         let useLotus = true;
         try {
           useLotus = await this.isUsingLotus(provider);

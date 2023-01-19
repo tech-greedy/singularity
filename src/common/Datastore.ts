@@ -262,6 +262,7 @@ export default class Datastore {
     }, {
       timestamps: true
     });
+    generationRequestSchema.index({ datasetId: 1, status: 1 });
     Datastore.GenerationRequestModel = mongoose.model<GenerationRequest>('GenerationRequest', generationRequestSchema);
   }
 
