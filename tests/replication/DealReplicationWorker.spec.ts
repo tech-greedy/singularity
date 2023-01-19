@@ -146,6 +146,21 @@ describe('DealReplicationWorker', () => {
     })
   })
 
+  describe('checkIsMainnet', () => {
+    it('should return true if lotus height and computed height are similar', async () => {
+      const cmdSpy = spyOn<any>(childprocess, 'exec').and.resolveTo({ stdout:
+        `Sync Epoch: ${HeightFromCurrentTime()}\nEpochs Behind: 0\nPeers to Publish Messages: 0\nPeers to Publish Blocks: 0\n`});
+      await expectAsync(worker['checkIsMainnet']()).toBeResolvedTo(true);
+      expect(cmdSpy).toHaveBeenCalledWith('lotus status');
+    })
+    it('should return false if lotus height differs from computed height', async () => {
+      const cmdSpy = spyOn<any>(childprocess, 'exec').and.resolveTo({ stdout:
+        `Sync Epoch: ${1000000}\nEpochs Behind: 0\nPeers to Publish Messages: 0\nPeers to Publish Blocks: 0\n`});
+      await expectAsync(worker['checkIsMainnet']()).toBeResolvedTo(false);
+      expect(cmdSpy).toHaveBeenCalledWith('lotus status');
+    })
+  })
+
   describe('currentBlockHeight', () => {
     it('should return lotus block height', async () => {
       const cmdSpy = spyOn<any>(childprocess, 'exec').and.resolveTo({ stdout:
@@ -157,6 +172,18 @@ describe('DealReplicationWorker', () => {
       const cmdSpy = spyOn<any>(childprocess, 'exec').and.resolveTo({ stdout: 'unknown' });
       await expectAsync(worker['currentBlockHeight']()).toBeResolvedTo(HeightFromCurrentTime());
       expect(cmdSpy).toHaveBeenCalledWith('lotus status');
+    })
+  })
+
+  // lotusBlockHeightRpc TODO
+  describe('lotusBlockHeightRpc', () => {
+    it('should return lotus block height', async () => {
+      spyOn<any>(axios, 'get').and.resolveTo({ status: 200 });
+      await expectAsync(worker['lotusBlockHeightRpc']()).toBeResolvedTo(1);
+    })
+    it('should return false if url is not reachable', async () => {
+      spyOn<any>(axios, 'get').and.throwError('error');
+      await expectAsync(worker['lotusBlockHeightRpc']()).toBeResolvedTo(2);
     })
   })
 

@@ -2,7 +2,7 @@ import BaseService from '../common/BaseService';
 import Datastore from '../common/Datastore';
 import { Category } from '../common/Logger';
 import ReplicationRequest from '../common/model/ReplicationRequest';
-import axios from 'axios';
+import axios, { AxiosResponse } from 'axios';
 import { create, all } from 'mathjs';
 import GenerationRequest from '../common/model/GenerationRequest';
 import cron, { ScheduledTask } from 'node-cron';
@@ -21,6 +21,7 @@ const math = create(all, mathconfig);
 export default class DealReplicationWorker extends BaseService {
   private readonly lotusCMD: string;
   private readonly boostCMD: string;
+  private queryLotusBlockHeight: boolean;
   // holds reference to all started crons to be updated
   private cronRefArray: Map<string, [schedule: string, taskRef: ScheduledTask]> = new Map<string, [string, ScheduledTask]>();
 
@@ -30,13 +31,14 @@ export default class DealReplicationWorker extends BaseService {
     this.startPollWork = this.startPollWork.bind(this);
     this.lotusCMD = config.get('deal_replication_worker.lotus_cli_cmd');
     this.boostCMD = config.get('deal_replication_worker.boost_cli_cmd');
+    this.queryLotusBlockHeight = false
   }
 
   public async start (): Promise<void> {
     if (!this.enabled) {
       this.logger.warn('Deal Replication Worker is not enabled. Exit now...');
     }
-
+    this.queryLotusBlockHeight = ! await this.checkIsMainnet();
     await this.initialize();
     this.startHealthCheck();
     this.startPollWork();
@@ -415,7 +417,8 @@ export default class DealReplicationWorker extends BaseService {
           }
 
           const startDelay = replicationRequest.startDelay ? replicationRequest.startDelay : 20160;
-          const currentHeight = await this.currentBlockHeight();
+          const currentHeight = this.queryLotusBlockHeight ? await this.currentBlockHeight() : HeightFromCurrentTime();
+
           const startEpoch = startDelay + currentHeight + 60; // 30 min buffer time
           this.logger.debug(`Calculated start epoch startDelay: ${startDelay} + currentHeight: ${currentHeight} + 60 = ${startEpoch}`);
           let dealCmd = '';
@@ -596,6 +599,20 @@ export default class DealReplicationWorker extends BaseService {
     );
   }
 
+  private async checkIsMainnet() : Promise<boolean> {
+    try {
+      const lotusHeight = await this.currentBlockHeight()
+      const computedHeight = HeightFromCurrentTime()
+      const MAINNET_HEIGHT_DIFF_TOLERANCE = 2*60*24;
+      const isMainnet = Math.abs(lotusHeight - computedHeight) < MAINNET_HEIGHT_DIFF_TOLERANCE;
+      this.logger.info(`Mainnet check:${isMainnet} lotusHeight:${lotusHeight}, computedHeight:${computedHeight}`)
+      return isMainnet;
+    } catch (error) {
+      this.logger.warn(`get lotus block height failed`, error);
+    }
+    return false;
+  }
+
   private async currentBlockHeight() : Promise<number> {
     try {
       return await this.lotusBlockHeight()
@@ -618,4 +635,54 @@ export default class DealReplicationWorker extends BaseService {
     }
     throw new Error(JSON.stringify(cmdOut));
   }
+
+  private async lotusBlockHeightRpcOld (): Promise<number> {
+    const url = "https://github.com/frank-ang/"
+    let response!: AxiosResponse;
+    try {
+      this.logger.warn(`### DEBUG ###: calling URL: ${url}`);
+      response = await axios.get(`${url}`);
+      this.logger.warn(`### DEBUG ###: calling URL: ${url} COMPLETED. response: ${JSON.stringify(response)}`);
+      return 1; // something
+    } catch (error) {
+      this.logger.error(`Error calling ${url} : ${JSON.stringify(error)}`);
+      return 2; // error haha.
+    }
+  }
+
+
+  private isValidUrl(urlString: string) {
+    try { 
+      return Boolean(new URL(urlString)); 
+    }
+    catch(e) {
+      return false;
+    }
+  }
+
+  private getLotusNodeUrl() {
+    console.log('getLotusNodeUrl() ...');
+    console.log(`process.env.FULLNODE_API_INFO: ${process.env.FULLNODE_API_INFO}`);
+    if (process.env.FULLNODE_API_INFO && this.isValidUrl(process.env.FULLNODE_API_INFO)) {
+      console.log(`using FULLNODE_API_INFO:${process.env.FULLNODE_API_INFO}`);
+      const fnai = new URL(process.env.FULLNODE_API_INFO)
+      return `${fnai.protocol}://${fnai.hostname}${fnai.port ? ':'+fnai.port : ''}/rpc/v0`
+    }
+    // TODO try localhost.
+    return "https://api.chain.love/rpc/v0";
+  }
+
+  // printf '{ "jsonrpc": "2.0", "id":1, "method": "Filecoin.ChainHead" }' | curl https://api.chain.love/rpc/v0 -s -XPOST -H 'Content-Type: application/json' -d@/dev/stdin  | jq -r '.result.Height'
+  private lotusBlockHeightRpc () {
+    const url = this.getLotusNodeUrl();
+    console.log(`lotusBlockHeightRpc. url: ${url}`)
+    axios.post(url, { "jsonrpc": "2.0", "id":1, "method": "Filecoin.ChainHead" })
+      .then(response => {
+        console.log("Status : " + response.status);
+        console.log("Height : " + response.data.result.Height);
+      }, (error) => {
+        console.log(error);
+      });
+  }
+
 }
