@@ -22,6 +22,7 @@ export default class DealReplicationWorker extends BaseService {
   private readonly lotusCMD: string;
   private readonly boostCMD: string;
   private queryLotusBlockHeight: boolean;
+  private readonly DEFAULT_FULLNODE_API_INFO = 'https://api.chain.love/rpc/v0'
   // holds reference to all started crons to be updated
   private cronRefArray: Map<string, [schedule: string, taskRef: ScheduledTask]> = new Map<string, [string, ScheduledTask]>();
 
@@ -605,10 +606,10 @@ export default class DealReplicationWorker extends BaseService {
       const computedHeight = HeightFromCurrentTime()
       const MAINNET_HEIGHT_DIFF_TOLERANCE = 2*60*24;
       const isMainnet = MAINNET_HEIGHT_DIFF_TOLERANCE > Math.abs(lotusHeight - computedHeight);
-      console.log(`⚠️ checkIsMainnet:${isMainnet} lotusHeight:${lotusHeight}, computedHeight:${computedHeight}, diff:${Math.abs(lotusHeight - computedHeight)}`)
+      this.logger.info(`checkIsMainnet:${isMainnet} lotusHeight:${lotusHeight}, computedHeight:${computedHeight}, diff:${Math.abs(lotusHeight - computedHeight)}`)
       return isMainnet;
     } catch (error) {
-      this.logger.warn(`get lotus block height failed`, error);
+      this.logger.warn('Error while calling lotus block height. Assuming mainnet mode.', error);
     }
     return true;
   }
@@ -622,16 +623,12 @@ export default class DealReplicationWorker extends BaseService {
     return HeightFromCurrentTime();
   }
 
-  /*
-  curl equivalent: 
-  ```printf '{ "jsonrpc": "2.0", "id":1, "method": "Filecoin.ChainHead" }' | curl https://api.chain.love/rpc/v0 -s -XPOST -H 'Content-Type: application/json' -d@/dev/stdin  | jq -r '.result.Height'```
-  */
   private async lotusBlockHeightAPI (): Promise<number> {
     const url = this.getLotusNodeUrl();
-    console.log(`⚠️ Querying block height from Lotus url: ${url}`)
+    this.logger.info(`Querying block height from Lotus url: ${url}`)
     const response = await axios.post(url, { "jsonrpc": "2.0", "id":1, "method": "Filecoin.ChainHead" })
       .then(resp => {
-        console.log(`⚠️Lotus block height:${JSON.stringify(resp.data.result.Height)}`);
+        this.logger.info(`Lotus block height:${JSON.stringify(resp.data.result.Height)}`);
         return resp;
       }).catch(error => {
         throw new Error(`Unable to get height from lotus: ${JSON.stringify(error)}`);
@@ -644,15 +641,14 @@ export default class DealReplicationWorker extends BaseService {
   }
 
   private getLotusNodeUrl() {
-    // console.log(`⚠️ DEBUG: getLotusNodeUrl() ...`);
-    // console.log(`⚠️ process.env.FULLNODE_API_INFO: ${process.env.FULLNODE_API_INFO}`);
     if (process.env.FULLNODE_API_INFO && this.isValidUrl(process.env.FULLNODE_API_INFO)) {
-      console.log(`⚠️ using FULLNODE_API_INFO:${process.env.FULLNODE_API_INFO}`);
+      this.logger.info(`using FULLNODE_API_INFO:${process.env.FULLNODE_API_INFO}`);
       const fnai = new URL(process.env.FULLNODE_API_INFO)
-      return `${fnai.protocol}://${fnai.hostname}${fnai.port ? ':'+fnai.port : ''}/rpc/v0`
+      if (fnai.protocol == 'https' || fnai.protocol == 'http')
+        throw new Error(`unsupported FULLNODE_API_INFO protocol: ${fnai.protocol}`);
+      return process.env.FULLNODE_API_INFO;
     }
-    // TODO try localhost.
-    return 'https://api.chain.love/rpc/v0';
+    return this.DEFAULT_FULLNODE_API_INFO;
   }
 
   private isValidUrl(urlString: string) {

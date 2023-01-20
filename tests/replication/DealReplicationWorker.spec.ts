@@ -146,20 +146,22 @@ describe('DealReplicationWorker', () => {
     })
   })
 
-  // TODO START of Devnet tests
-
   describe('checkIsMainnet', () => {
-    it('should return false, i.e. not mainnet, if lotus height different from computed height by wide margin.', async () => {
+    delete process.env.FULLNODE_API_INFO;
+    it('should return false, i.e. not mainnet, if lotus reported height is different from computed mainnet height by wide margin.', async () => {
       spyOn<any>(axios, 'post').and.resolveTo(
-        Promise.resolve({status: 200, data: { result: { Height: 12345 }}})
+        Promise.resolve({status: 200, data: { result: { Height: 1000 }}})
       )
       await expectAsync(worker['checkIsMainnet']()).toBeResolvedTo(false); // Expected a promise to be resolved to false but it was resolved to true.?
+      expect(axios.post).toHaveBeenCalledTimes(1)
+      expect(axios.post).toHaveBeenCalledOnceWith('https://api.chain.love/rpc/v0', jasmine.anything());
     })
-    it('should return default true isMainnet, if lotus height and computed height are within close range.', async () => {
+    it('should return default true isMainnet, if default lotus endpoint returned height is similar to computed mainnet height', async () => {
       spyOn<any>(axios, 'post').and.resolveTo(
         Promise.resolve({status: 200, data: { result: { Height: HeightFromCurrentTime() }}})
       )
       await expectAsync(worker['checkIsMainnet']()).toBeResolvedTo(true);
+      expect(axios.post).toHaveBeenCalledOnceWith('https://api.chain.love/rpc/v0', jasmine.anything());
     })
     it('should return default true isMainnet, if lotus height NaN.', async () => {
       spyOn<any>(axios, 'post').and.resolveTo(
@@ -169,12 +171,32 @@ describe('DealReplicationWorker', () => {
     })
     it('should return default true isMainnet, if lotus height missing.', async () => {
       spyOn<any>(axios, 'post').and.resolveTo(
-        Promise.resolve({status: 200, data: { result: "nothing" }})
+        Promise.resolve({status: 200, data: { result: "missing height" }})
       )
       await expectAsync(worker['checkIsMainnet']()).toBeResolvedTo(true);
     })
-        // TODO process.env.FULLNODE_API_INFO
-
+    it('should return false not Mainnet if FULLNODE_API_INFO returned height is different from computed mainnet height', async () => {
+      process.env.FULLNODE_API_INFO = 'http://localhost/rpc/v0'
+      spyOn<any>(axios, 'post').and.resolveTo(
+        Promise.resolve({status: 200, data: { result: { Height: 1001 }}})
+      )
+      await expectAsync(worker['checkIsMainnet']()).toBeResolvedTo(false);
+      expect(axios.post).toHaveBeenCalledOnceWith('http://localhost/rpc/v0', jasmine.anything());
+    })
+    it('should return true Mainnet if FULLNODE_API_INFO returned height is similar to computed mainnet height', async () => {
+      process.env.FULLNODE_API_INFO = 'https://api.node.glif.io/rpc/v0'
+      spyOn<any>(axios, 'post').and.resolveTo(
+        Promise.resolve({status: 200, data: { result: { Height: 1002 }}})
+      )
+      await expectAsync(worker['checkIsMainnet']()).toBeResolvedTo(false);
+      expect(axios.post).toHaveBeenCalledOnceWith('https://api.node.glif.io/rpc/v0', jasmine.anything());
+    })
+    it('should return default true isMainnet, on Lotus API call error.', async () => {
+      delete process.env.FULLNODE_API_INFO;
+      spyOn<any>(axios, 'post').and.rejectWith(new Error('Connection timeout'));
+      await expectAsync(worker['checkIsMainnet']()).toBeResolvedTo(true);
+      expect(axios.post).toHaveBeenCalledOnceWith('https://api.chain.love/rpc/v0', jasmine.anything());
+    })
   })
 
   describe('lotusBlockHeightAPI', () => {
@@ -186,7 +208,7 @@ describe('DealReplicationWorker', () => {
       );
       await expectAsync(worker['lotusBlockHeightAPI']()).toBeResolvedTo(12345);
     })
-    it('should return computed chain height, when computed height differs from lotus height.', async () => {
+    it('should return computed chain height, when computed mainnet height differs from lotus height.', async () => {
       spyOn<any>(axios, 'post').and.resolveTo(
         Promise.resolve({
               status: 200, data: { result: { Height: 12345 }}
@@ -195,8 +217,6 @@ describe('DealReplicationWorker', () => {
       await expectAsync(worker['lotusBlockHeightAPI']()).toBeResolvedTo(12345);
     })
   })
-
-  // TODO END of Devnet tests
 
   describe('calculatePriceWithSize', () => {
     it('should calculate price with size', () => {
