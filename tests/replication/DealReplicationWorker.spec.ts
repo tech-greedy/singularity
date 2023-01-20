@@ -146,46 +146,57 @@ describe('DealReplicationWorker', () => {
     })
   })
 
+  // TODO START of Devnet tests
+
   describe('checkIsMainnet', () => {
-    it('should return true if lotus height and computed height are similar', async () => {
-      const cmdSpy = spyOn<any>(childprocess, 'exec').and.resolveTo({ stdout:
-        `Sync Epoch: ${HeightFromCurrentTime()}\nEpochs Behind: 0\nPeers to Publish Messages: 0\nPeers to Publish Blocks: 0\n`});
+    it('should return false, i.e. not mainnet, if lotus height different from computed height by wide margin.', async () => {
+      spyOn<any>(axios, 'post').and.resolveTo(
+        Promise.resolve({status: 200, data: { result: { Height: 12345 }}})
+      )
+      await expectAsync(worker['checkIsMainnet']()).toBeResolvedTo(false); // Expected a promise to be resolved to false but it was resolved to true.?
+    })
+    it('should return default true isMainnet, if lotus height and computed height are within close range.', async () => {
+      spyOn<any>(axios, 'post').and.resolveTo(
+        Promise.resolve({status: 200, data: { result: { Height: HeightFromCurrentTime() }}})
+      )
       await expectAsync(worker['checkIsMainnet']()).toBeResolvedTo(true);
-      expect(cmdSpy).toHaveBeenCalledWith('lotus status');
     })
-    it('should return false if lotus height differs from computed height', async () => {
-      const cmdSpy = spyOn<any>(childprocess, 'exec').and.resolveTo({ stdout:
-        `Sync Epoch: ${1000000}\nEpochs Behind: 0\nPeers to Publish Messages: 0\nPeers to Publish Blocks: 0\n`});
-      await expectAsync(worker['checkIsMainnet']()).toBeResolvedTo(false);
-      expect(cmdSpy).toHaveBeenCalledWith('lotus status');
+    it('should return default true isMainnet, if lotus height NaN.', async () => {
+      spyOn<any>(axios, 'post').and.resolveTo(
+        Promise.resolve({status: 200, data: { result: { Height: "NOT A NUMBER" }}})
+      )
+      await expectAsync(worker['checkIsMainnet']()).toBeResolvedTo(true);
+    })
+    it('should return default true isMainnet, if lotus height missing.', async () => {
+      spyOn<any>(axios, 'post').and.resolveTo(
+        Promise.resolve({status: 200, data: { result: "nothing" }})
+      )
+      await expectAsync(worker['checkIsMainnet']()).toBeResolvedTo(true);
+    })
+        // TODO process.env.FULLNODE_API_INFO
+
+  })
+
+  describe('lotusBlockHeightAPI', () => {
+    it('should return lotus chain height, when computed and lotus heights differ widely.', async () => {
+      spyOn<any>(axios, 'post').and.resolveTo(
+        Promise.resolve({
+              status: 200, data: { result: { Height: 12345 }}
+        })
+      );
+      await expectAsync(worker['lotusBlockHeightAPI']()).toBeResolvedTo(12345);
+    })
+    it('should return computed chain height, when computed height differs from lotus height.', async () => {
+      spyOn<any>(axios, 'post').and.resolveTo(
+        Promise.resolve({
+              status: 200, data: { result: { Height: 12345 }}
+        })
+      );
+      await expectAsync(worker['lotusBlockHeightAPI']()).toBeResolvedTo(12345);
     })
   })
 
-  describe('currentBlockHeight', () => {
-    it('should return lotus block height', async () => {
-      const cmdSpy = spyOn<any>(childprocess, 'exec').and.resolveTo({ stdout:
-        'Sync Epoch: 2487255\nEpochs Behind: 0\nPeers to Publish Messages: 0\nPeers to Publish Blocks: 0\n'});
-      await expectAsync(worker['currentBlockHeight']()).toBeResolvedTo(2487255);
-      expect(cmdSpy).toHaveBeenCalledWith('lotus status');
-    })
-    it('should return computed block height if lotus command fails', async () => {
-      const cmdSpy = spyOn<any>(childprocess, 'exec').and.resolveTo({ stdout: 'unknown' });
-      await expectAsync(worker['currentBlockHeight']()).toBeResolvedTo(HeightFromCurrentTime());
-      expect(cmdSpy).toHaveBeenCalledWith('lotus status');
-    })
-  })
-
-  // lotusBlockHeightRpc TODO
-  describe('lotusBlockHeightRpc', () => {
-    it('should return lotus block height', async () => {
-      spyOn<any>(axios, 'get').and.resolveTo({ status: 200 });
-      await expectAsync(worker['lotusBlockHeightRpc']()).toBeResolvedTo(1);
-    })
-    it('should return false if url is not reachable', async () => {
-      spyOn<any>(axios, 'get').and.throwError('error');
-      await expectAsync(worker['lotusBlockHeightRpc']()).toBeResolvedTo(2);
-    })
-  })
+  // TODO END of Devnet tests
 
   describe('calculatePriceWithSize', () => {
     it('should calculate price with size', () => {

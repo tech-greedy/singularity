@@ -2,7 +2,7 @@ import BaseService from '../common/BaseService';
 import Datastore from '../common/Datastore';
 import { Category } from '../common/Logger';
 import ReplicationRequest from '../common/model/ReplicationRequest';
-import axios, { AxiosResponse } from 'axios';
+import axios from 'axios';
 import { create, all } from 'mathjs';
 import GenerationRequest from '../common/model/GenerationRequest';
 import cron, { ScheduledTask } from 'node-cron';
@@ -38,8 +38,8 @@ export default class DealReplicationWorker extends BaseService {
     if (!this.enabled) {
       this.logger.warn('Deal Replication Worker is not enabled. Exit now...');
     }
-    this.queryLotusBlockHeight = ! await this.checkIsMainnet();
     await this.initialize();
+    this.queryLotusBlockHeight = ! await this.checkIsMainnet();
     this.startHealthCheck();
     this.startPollWork();
   }
@@ -604,85 +604,62 @@ export default class DealReplicationWorker extends BaseService {
       const lotusHeight = await this.currentBlockHeight()
       const computedHeight = HeightFromCurrentTime()
       const MAINNET_HEIGHT_DIFF_TOLERANCE = 2*60*24;
-      const isMainnet = Math.abs(lotusHeight - computedHeight) < MAINNET_HEIGHT_DIFF_TOLERANCE;
-      this.logger.info(`Mainnet check:${isMainnet} lotusHeight:${lotusHeight}, computedHeight:${computedHeight}`)
+      const isMainnet = MAINNET_HEIGHT_DIFF_TOLERANCE > Math.abs(lotusHeight - computedHeight);
+      console.log(`⚠️ checkIsMainnet:${isMainnet} lotusHeight:${lotusHeight}, computedHeight:${computedHeight}, diff:${Math.abs(lotusHeight - computedHeight)}`)
       return isMainnet;
     } catch (error) {
       this.logger.warn(`get lotus block height failed`, error);
     }
-    return false;
+    return true;
   }
 
   private async currentBlockHeight() : Promise<number> {
     try {
-      return await this.lotusBlockHeight()
+      return await this.lotusBlockHeightAPI()
     } catch (error) {
-      this.logger.warn(`get lotus block height failed`, error);
+      this.logger.error(`⚠️ Failed getting lotus block height.`, error); // fail-open.
     }
     return HeightFromCurrentTime();
   }
 
-  private async lotusBlockHeight (): Promise<number> {
-    const statusCommand = `${this.lotusCMD} status`
-    const cmdOut = await exec(statusCommand);
-    if (cmdOut.stdout != undefined) {
-      var outString = cmdOut.stdout.toString().trim();
-      const re = new RegExp(/Sync Epoch: ([0-9]+)[^0-9]+.*/);
-      var matchString = outString.match(re)?.[1]
-      if (typeof matchString === 'string') {
-        return parseInt(matchString);
-      }
+  /*
+  curl equivalent: 
+  ```printf '{ "jsonrpc": "2.0", "id":1, "method": "Filecoin.ChainHead" }' | curl https://api.chain.love/rpc/v0 -s -XPOST -H 'Content-Type: application/json' -d@/dev/stdin  | jq -r '.result.Height'```
+  */
+  private async lotusBlockHeightAPI (): Promise<number> {
+    const url = this.getLotusNodeUrl();
+    console.log(`⚠️ Querying block height from Lotus url: ${url}`)
+    const response = await axios.post(url, { "jsonrpc": "2.0", "id":1, "method": "Filecoin.ChainHead" })
+      .then(resp => {
+        console.log(`⚠️Lotus block height:${JSON.stringify(resp.data.result.Height)}`);
+        return resp;
+      }).catch(error => {
+        throw new Error(`Unable to get height from lotus: ${JSON.stringify(error)}`);
+      });
+    const heightStr = (response && response.data && response.data.result) ? JSON.stringify(response.data.result.Height) : undefined;
+    if (heightStr === undefined || Number.isNaN(Number(heightStr))) {
+        throw new Error(`Unable to get height from lotus. Response:${JSON.stringify(response)}`);
     }
-    throw new Error(JSON.stringify(cmdOut));
-  }
-
-  private async lotusBlockHeightRpcOld (): Promise<number> {
-    const url = "https://github.com/frank-ang/"
-    let response!: AxiosResponse;
-    try {
-      this.logger.warn(`### DEBUG ###: calling URL: ${url}`);
-      response = await axios.get(`${url}`);
-      this.logger.warn(`### DEBUG ###: calling URL: ${url} COMPLETED. response: ${JSON.stringify(response)}`);
-      return 1; // something
-    } catch (error) {
-      this.logger.error(`Error calling ${url} : ${JSON.stringify(error)}`);
-      return 2; // error haha.
-    }
-  }
-
-
-  private isValidUrl(urlString: string) {
-    try { 
-      return Boolean(new URL(urlString)); 
-    }
-    catch(e) {
-      return false;
-    }
+    return Number(heightStr);
   }
 
   private getLotusNodeUrl() {
-    console.log('getLotusNodeUrl() ...');
-    console.log(`process.env.FULLNODE_API_INFO: ${process.env.FULLNODE_API_INFO}`);
+    // console.log(`⚠️ DEBUG: getLotusNodeUrl() ...`);
+    // console.log(`⚠️ process.env.FULLNODE_API_INFO: ${process.env.FULLNODE_API_INFO}`);
     if (process.env.FULLNODE_API_INFO && this.isValidUrl(process.env.FULLNODE_API_INFO)) {
-      console.log(`using FULLNODE_API_INFO:${process.env.FULLNODE_API_INFO}`);
+      console.log(`⚠️ using FULLNODE_API_INFO:${process.env.FULLNODE_API_INFO}`);
       const fnai = new URL(process.env.FULLNODE_API_INFO)
       return `${fnai.protocol}://${fnai.hostname}${fnai.port ? ':'+fnai.port : ''}/rpc/v0`
     }
     // TODO try localhost.
-    return "https://api.chain.love/rpc/v0";
+    return 'https://api.chain.love/rpc/v0';
   }
 
-  // printf '{ "jsonrpc": "2.0", "id":1, "method": "Filecoin.ChainHead" }' | curl https://api.chain.love/rpc/v0 -s -XPOST -H 'Content-Type: application/json' -d@/dev/stdin  | jq -r '.result.Height'
-  private lotusBlockHeightRpc () {
-    const url = this.getLotusNodeUrl();
-    console.log(`lotusBlockHeightRpc. url: ${url}`)
-    axios.post(url, { "jsonrpc": "2.0", "id":1, "method": "Filecoin.ChainHead" })
-      .then(response => {
-        console.log("Status : " + response.status);
-        console.log("Height : " + response.data.result.Height);
-      }, (error) => {
-        console.log(error);
-      });
+  private isValidUrl(urlString: string) {
+    try { 
+      return Boolean(new URL(urlString)); 
+    } catch(e) {
+      return false;
+    }
   }
-
 }
