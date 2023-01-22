@@ -22,7 +22,6 @@ export default class DealReplicationWorker extends BaseService {
   private readonly lotusCMD: string;
   private readonly boostCMD: string;
   private queryLotusBlockHeight: boolean;
-  private readonly DEFAULT_FULLNODE_API_INFO = 'https://api.chain.love/rpc/v0'
   // holds reference to all started crons to be updated
   private cronRefArray: Map<string, [schedule: string, taskRef: ScheduledTask]> = new Map<string, [string, ScheduledTask]>();
 
@@ -606,7 +605,7 @@ export default class DealReplicationWorker extends BaseService {
       const computedHeight = HeightFromCurrentTime()
       const MAINNET_HEIGHT_DIFF_TOLERANCE = 2*60*24;
       const isMainnet = MAINNET_HEIGHT_DIFF_TOLERANCE > Math.abs(lotusHeight - computedHeight);
-      this.logger.info(`checkIsMainnet:${isMainnet} lotusHeight:${lotusHeight}, computedHeight:${computedHeight}, diff:${Math.abs(lotusHeight - computedHeight)}`)
+      this.logger.info(`checkIsMainnet:${isMainnet}, lotusHeight:${lotusHeight}, computedHeight:${computedHeight}, diff:${Math.abs(lotusHeight - computedHeight)}`)
       return isMainnet;
     } catch (error) {
       this.logger.warn('Error while calling lotus block height. Assuming mainnet mode.', error);
@@ -618,7 +617,7 @@ export default class DealReplicationWorker extends BaseService {
     try {
       return await this.lotusBlockHeightAPI()
     } catch (error) {
-      this.logger.error(`⚠️ Failed getting lotus block height.`, error); // fail-open.
+      this.logger.error('Failed getting lotus block height. Using computed height instead.', error);
     }
     return HeightFromCurrentTime();
   }
@@ -626,36 +625,24 @@ export default class DealReplicationWorker extends BaseService {
   private async lotusBlockHeightAPI (): Promise<number> {
     const url = this.getLotusNodeUrl();
     this.logger.info(`Querying block height from Lotus url: ${url}`)
-    const response = await axios.post(url, { "jsonrpc": "2.0", "id":1, "method": "Filecoin.ChainHead" })
-      .then(resp => {
-        this.logger.info(`Lotus block height:${JSON.stringify(resp.data.result.Height)}`);
-        return resp;
-      }).catch(error => {
-        throw new Error(`Unable to get height from lotus: ${JSON.stringify(error)}`);
-      });
+    const response = await axios.post(url, {
+      "jsonrpc": "2.0", "id":1, "method": "Filecoin.ChainHead"
+    }).then(resp => {
+      this.logger.info(`Lotus block height:${JSON.stringify(resp.data.result.Height)}`);
+      return resp;
+    }).catch(error => {
+      throw new Error(`Unable to get height from lotus: ${JSON.stringify(error)}`);
+    });
     const heightStr = (response && response.data && response.data.result) ? JSON.stringify(response.data.result.Height) : undefined;
     if (heightStr === undefined || Number.isNaN(Number(heightStr))) {
-        throw new Error(`Unable to get height from lotus. Response:${JSON.stringify(response)}`);
+      throw new Error(`Unable to get height from lotus. Response:${JSON.stringify(response)}`);
     }
     return Number(heightStr);
   }
 
-  private getLotusNodeUrl() {
-    if (process.env.FULLNODE_API_INFO && this.isValidUrl(process.env.FULLNODE_API_INFO)) {
-      this.logger.info(`using FULLNODE_API_INFO:${process.env.FULLNODE_API_INFO}`);
-      const fnai = new URL(process.env.FULLNODE_API_INFO)
-      if (fnai.protocol == 'https' || fnai.protocol == 'http')
-        throw new Error(`unsupported FULLNODE_API_INFO protocol: ${fnai.protocol}`);
-      return process.env.FULLNODE_API_INFO;
-    }
-    return this.DEFAULT_FULLNODE_API_INFO;
+  private getLotusNodeUrl(): string {
+    // reuse the configured lotus_api
+    return config.get<string>('deal_tracking_service.lotus_api');
   }
 
-  private isValidUrl(urlString: string) {
-    try { 
-      return Boolean(new URL(urlString)); 
-    } catch(e) {
-      return false;
-    }
-  }
 }
