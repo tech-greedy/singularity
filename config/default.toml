@@ -78,6 +78,11 @@ enabled = true
 bind = "0.0.0.0"
 port = 7004
 
+[deal_self_service]
+enabled = true
+bind = "0.0.0.0"
+port = 7005
+
 [deal_replication_worker]
 enabled = true
 min_retry_wait_ms = 30000
