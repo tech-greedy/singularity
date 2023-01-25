@@ -148,7 +148,16 @@ describe('DealSelfService', () => {
           pieceCid: 'pieceCid'
         }).set('Accept', 'application/json');
       expect(response.status).toEqual(200);
-      expect(response.body).toEqual({dealCid: 'dealCid', state: 'proposed', errorMsg: ''});
+      expect(response.body).toEqual({
+        proposalId: 'dealCid',
+        status: 'proposed',
+        errorMessage: '',
+        pieceCid: 'pieceCid',
+        pieceSize: 100,
+        dataCid: 'dataCid',
+        carSize: 100,
+        client: 'client',
+        provider: 'provider'});
       expect(dealSpy).toHaveBeenCalledWith(scanning.id, 'client', 'provider', jasmine.objectContaining({
         dataCid: 'dataCid',
         carSize: 100,
@@ -193,7 +202,17 @@ describe('DealSelfService', () => {
           dataset: 'name',
         }).set('Accept', 'application/json');
       expect(response.status).toEqual(200);
-      expect(response.body).toEqual({dealCid: 'dealCid', state: 'proposed', errorMsg: ''});
+      expect(response.body).toEqual({
+        proposalId: 'dealCid',
+        status: 'proposed',
+        pieceCid: 'pieceCid',
+        pieceSize: 100,
+        dataCid: 'dataCid',
+        carSize: 100,
+        client: 'client',
+        provider: 'provider',
+        errorMessage: ''
+      });
       expect(dealSpy).toHaveBeenCalledWith(scanning.id, 'client', 'provider', jasmine.objectContaining({
         dataCid: 'dataCid',
         carSize: 100,
@@ -227,6 +246,7 @@ describe('DealSelfService', () => {
       });
     })
     it('should return pieceCids', async () => {
+      await Datastore.ScanningRequestModel.create({name: 'name'});
       spyOn<any>(service, 'getPieceCidsToPropose').and.resolveTo([{
         pieceCid: 'pieceCid',
         dataCid: 'dataCid',

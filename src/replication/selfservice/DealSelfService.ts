@@ -254,7 +254,17 @@ export default class DealReplicationService extends BaseService {
         durationDaysNumber,
         policy.verified,
         policy.price);
-      response.end(JSON.stringify(proposal));
+      response.end(JSON.stringify({
+        proposalId: proposal.dealCid,
+        status: proposal.state,
+        errorMessage: proposal.errorMsg,
+        pieceCid: pieceToPropose.pieceCid,
+        pieceSize: pieceToPropose.pieceSize,
+        dataCid: pieceToPropose.dataCid,
+        carSize: pieceToPropose.carSize,
+        client: policy.client,
+        provider
+      }));
     }
 
     private async handleGetPieceCids (request: Request, response: Response) {
@@ -268,7 +278,12 @@ export default class DealReplicationService extends BaseService {
         this.sendError(response, ErrorCode.INVALID_DATASET);
         return;
       }
-      const pieceCids = await this.getPieceCidsToPropose(provider, dataset, undefined);
+      const scanning = await Datastore.findScanningRequest(dataset);
+      if (!scanning) {
+        this.sendError(response, ErrorCode.DATASET_NOT_FOUND);
+        return;
+      }
+      const pieceCids = await this.getPieceCidsToPropose(provider, scanning.id, undefined);
       response.end(JSON.stringify(pieceCids.map((pieceCid) => pieceCid.pieceCid)));
     }
 
