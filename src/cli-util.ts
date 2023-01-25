@@ -6,6 +6,7 @@ export default class CliUtil {
       console.error(`Response: ${error.response.status}`);
       if (error.response.data?.error) {
         console.error(error.response.data.error);
+        console.error(error.response.data.message);
       } else {
         console.error(error.response.data);
       }

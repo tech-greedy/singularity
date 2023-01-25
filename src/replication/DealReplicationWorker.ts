@@ -4,7 +4,6 @@ import { Category } from '../common/Logger';
 import ReplicationRequest from '../common/model/ReplicationRequest';
 import axios from 'axios';
 import { create, all } from 'mathjs';
-import GenerationRequest from '../common/model/GenerationRequest';
 import cron, { ScheduledTask } from 'node-cron';
 import fs from 'fs-extra';
 import config from '../common/Config';
@@ -132,7 +131,7 @@ export default class DealReplicationWorker extends BaseService {
    * @param provider
    * @returns true is lotus, false is boost
    */
-  private async isUsingLotus (provider: string): Promise<boolean> {
+  public async isUsingLotus (provider: string): Promise<boolean> {
     let useLotus = true;
     // use boost libp2p command to check whether provider supports boost
     const versionQueryCmd = `${this.boostCMD} provider libp2p-info ${provider}`;
@@ -184,11 +183,11 @@ export default class DealReplicationWorker extends BaseService {
     }
   }
 
-  private async createDealCmd (
+  public async createDealCmd (
     useLotus: boolean,
     provider: string,
-    replicationRequest: ReplicationRequest,
-    carFile: GenerationRequest,
+    replicationRequest: { isOffline: boolean, maxPrice: number, client: string, isVerfied: boolean, duration: number, urlPrefix: string },
+    carFile: { pieceCid?: string, pieceSize?: number, dataCid?: string, filenameOverride?: string, carSize?: number },
     startEpoch: number): Promise<string> {
     if (useLotus) {
       if (replicationRequest.isOffline) {
@@ -433,7 +432,7 @@ export default class DealReplicationWorker extends BaseService {
             errorMsg,
             state,
             retryTimeout
-          } = await this.makeDeal(dealCmd, carFile.pieceCid!, provider, dealsMadePerSP, useLotus, retryWait);
+          } = await this.makeDeal(dealCmd, carFile.pieceCid!, provider, dealsMadePerSP, useLotus, retryWait, config.get<number>('deal_replication_worker.max_retry_count'));
           retryWait = retryTimeout;
           if (state === 'proposed') {
             dealsMadePerSP++;
@@ -515,13 +514,14 @@ export default class DealReplicationWorker extends BaseService {
     }
   }
 
-  private async makeDeal (
+  public async makeDeal (
     dealCmd: string,
     pieceCid: string,
     provider: string,
     dealsMadePerSP: number,
     useLotus: boolean,
-    retryTimeout: number) {
+    retryTimeout: number,
+    maxRetry: number) {
     const boostResultUUIDMatcher = /deal uuid: (\S+)/;
     this.logger.debug(dealCmd);
     let dealCid = 'unknown';
@@ -569,7 +569,7 @@ export default class DealReplicationWorker extends BaseService {
         retryTimeout *= 2; // expoential back off
       }
       retryCount++;
-    } while (retryCount < config.get<number>('deal_replication_worker.max_retry_count'));
+    } while (retryCount < maxRetry);
     return {
       dealCid,
       errorMsg,
