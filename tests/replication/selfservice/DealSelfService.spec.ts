@@ -454,6 +454,7 @@ describe('DealSelfService', () => {
     })
 
     it('should create the policy model if the request is valid, then list and delete', async () => {
+      await Datastore.DealSelfServicePolicyModel.deleteMany();
       const response = await supertest(service['app'])
         .post('/policy').send({
           ...defaultPolicy
