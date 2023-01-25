@@ -720,7 +720,7 @@ selfservice.command('list')
     await initializeConfig(false, false);
     const url: string = config.get('connection.deal_preparation_service');
     try {
-      const response = await axios.get(`${url}/selfservice`);
+      const response = await axios.get(`${url}/policy`);
       CliUtil.renderResponse(response.data, options.json);
     } catch (error) {
       CliUtil.renderErrorAndExit(error);
