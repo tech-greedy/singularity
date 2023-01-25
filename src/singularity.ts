@@ -38,6 +38,7 @@ import { randomUUID } from 'crypto';
 import MetricEmitter from './common/metrics/MetricEmitter';
 import boxen from 'boxen';
 import wrap from 'word-wrap';
+import DealSelfService from './replication/selfservice/DealSelfService';
 
 const version = packageJson.version;
 const dataCollectionText = boxen(
@@ -228,6 +229,9 @@ program.command('daemon')
         if (config.get('deal_replication_worker.enabled')) {
           workers.push([cluster.fork(), 'deal_replication_worker']);
         }
+        if (config.get('deal_self_service.enabled')) {
+          workers.push([cluster.fork(), 'deal_self_service']);
+        }
       } else if (cluster.isWorker) {
         await Datastore.connect();
         ConfigInitializer.instanceId = (await Datastore.MiscModel.findOne({ key: 'instance' }))!.value;
@@ -247,6 +251,9 @@ program.command('daemon')
               break;
             case 'deal_replication_worker':
               new DealReplicationWorker().start();
+              break;
+            case 'deal_self_service':
+              new DealSelfService().start();
               break;
           }
         });
@@ -701,6 +708,70 @@ preparation.command('remove').description('Remove all records from database for 
 const replication = program.command('replication')
   .alias('repl')
   .description('Start replication for a local dataset');
+
+const selfservice = replication.command('selfservice')
+  .alias('ss')
+  .description('Manage deal making self service policies');
+
+selfservice.command('list')
+  .description('List all deal making self service policies')
+  .option('--json', 'Output with JSON format')
+  .action(async (options) => {
+    await initializeConfig(false, false);
+    const url: string = config.get('connection.deal_preparation_service');
+    try {
+      const response = await axios.get(`${url}/selfservice`);
+      CliUtil.renderResponse(response.data, options.json);
+    } catch (error) {
+      CliUtil.renderErrorAndExit(error);
+    }
+  });
+
+selfservice.command('delete')
+  .description('Delete a deal making self service policy')
+  .argument('<id>', 'Policy id to delete')
+  .action(async (id) => {
+    await initializeConfig(false, false);
+    const url: string = config.get('connection.deal_preparation_service');
+    try {
+      await axios.delete(`${url}/selfservice/${id}`);
+    } catch (error) {
+      CliUtil.renderErrorAndExit(error);
+    }
+  });
+selfservice.command('create')
+  .description('Create a deal making self service policy')
+  .argument('<client>', 'Client address to send deals from')
+  .argument('<provider>', 'Provider address to send deals to')
+  .argument('<dataset>', 'Id or name of the dataset')
+  .option('--minDelay <minDelay>', 'Minimum delay in days for the deal start epoch', '7')
+  .option('--maxDelay <maxDelay>', 'Maximum delay in days for the deal start epoch', '7')
+  .option('-r, --verified <verified>', 'Whether to propose deal as verified. true|false.', 'true')
+  .option('-p, --price <price>', 'Maximum price per epoch per GiB in Fil.', '0')
+  .option('--minDuration <minDuration>', 'Minimum duration in days for the deal', '525')
+  .option('--maxDuration <maxDuration>', 'maxDuration duration in days for the deal', '525')
+  .action(async (client, provider, dataset, options) => {
+    await initializeConfig(false, false);
+    let response!: AxiosResponse;
+    const url: string = config.get('connection.deal_self_service');
+    try {
+      response = await axios.post(`${url}/policy`, {
+        client,
+        provider,
+        dataset,
+        minStartDays: Number(options.minDelay),
+        maxStartDays: Number(options.maxDelay),
+        verified: options.verified === 'true',
+        price: Number(options.price),
+        minDurationDays: Number(options.minDuration),
+        maxDurationDays: Number(options.maxDuration)
+      });
+    } catch (error) {
+      CliUtil.renderErrorAndExit(error);
+    }
+
+    CliUtil.renderResponse(response.data, false);
+  });
 
 replication.command('start')
   .description('Start deal replication for a prepared local dataset')
