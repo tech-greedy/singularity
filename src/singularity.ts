@@ -718,7 +718,7 @@ selfservice.command('list')
   .option('--json', 'Output with JSON format')
   .action(async (options) => {
     await initializeConfig(false, false);
-    const url: string = config.get('connection.deal_preparation_service');
+    const url: string = config.get('connection.deal_self_service');
     try {
       const response = await axios.get(`${url}/policy`);
       CliUtil.renderResponse(response.data, options.json);
@@ -732,9 +732,9 @@ selfservice.command('delete')
   .argument('<id>', 'Policy id to delete')
   .action(async (id) => {
     await initializeConfig(false, false);
-    const url: string = config.get('connection.deal_preparation_service');
+    const url: string = config.get('connection.deal_self_service');
     try {
-      await axios.delete(`${url}/selfservice/${id}`);
+      await axios.delete(`${url}/policy/${id}`);
     } catch (error) {
       CliUtil.renderErrorAndExit(error);
     }
