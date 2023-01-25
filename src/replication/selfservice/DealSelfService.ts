@@ -163,7 +163,6 @@ export default class DealReplicationService extends BaseService {
       response.end();
     }
 
-    /* istanbul ignore next */
     private async handleProposeDeal (request: Request, response: Response) {
       const client = <string | undefined> request.query.client;
       const provider = <string | undefined> request.query.provider;
@@ -313,6 +312,7 @@ export default class DealReplicationService extends BaseService {
       return Datastore.GenerationRequestModel.aggregate(pipeline);
     }
 
+    /* istanbul ignore next */
     private async proposeDeal (
       datasetId: string,
       client: string,
