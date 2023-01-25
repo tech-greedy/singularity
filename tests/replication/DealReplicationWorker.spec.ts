@@ -3,6 +3,7 @@ import Utils from '../Utils';
 import Datastore from '../../src/common/Datastore';
 import { HeightFromCurrentTime } from '../../src/common/ChainHeight';
 import { sleep } from '../../src/common/Util';
+import config from '../../src/common/Config';
 import createSpyObj = jasmine.createSpyObj;
 import cron from 'node-cron';
 import * as childprocess from 'promisify-child-process';
@@ -146,17 +147,40 @@ describe('DealReplicationWorker', () => {
     })
   })
 
-  describe('currentBlockHeight', () => {
-    it('should return lotus block height', async () => {
-      const cmdSpy = spyOn<any>(childprocess, 'exec').and.resolveTo({ stdout:
-        'Sync Epoch: 2487255\nEpochs Behind: 0\nPeers to Publish Messages: 0\nPeers to Publish Blocks: 0\n'});
-      await expectAsync(worker['currentBlockHeight']()).toBeResolvedTo(2487255);
-      expect(cmdSpy).toHaveBeenCalledWith('lotus status');
+  describe('checkIsMainnet', () => {
+    it('should return false, i.e. not mainnet, if lotus reported height is different from computed mainnet height by wide margin.', async () => {
+      const configSpy = spyOn<any>(config, 'get').withArgs('deal_tracking_service.lotus_api').and.returnValue('http://localhost:1234/rpc/v0')
+      spyOn<any>(axios, 'post').and.resolveTo(
+        Promise.resolve({status: 200, data: { result: { Height: 1000 }}})
+      )
+      await expectAsync(worker['checkIsMainnet']()).toBeResolvedTo(false);
+      expect(axios.post).toHaveBeenCalledTimes(1)
+      expect(axios.post).toHaveBeenCalledOnceWith('http://localhost:1234/rpc/v0', jasmine.anything());
+      configSpy.and.callThrough();
     })
-    it('should return computed block height if lotus command fails', async () => {
-      const cmdSpy = spyOn<any>(childprocess, 'exec').and.resolveTo({ stdout: 'unknown' });
-      await expectAsync(worker['currentBlockHeight']()).toBeResolvedTo(HeightFromCurrentTime());
-      expect(cmdSpy).toHaveBeenCalledWith('lotus status');
+    it('should return default true isMainnet, if lotus reported height is similar to computed mainnet height', async () => {
+      spyOn<any>(axios, 'post').and.resolveTo(
+        Promise.resolve({status: 200, data: { result: { Height: HeightFromCurrentTime() }}})
+      )
+      await expectAsync(worker['checkIsMainnet']()).toBeResolvedTo(true);
+      expect(axios.post).toHaveBeenCalledOnceWith('https://api.node.glif.io/rpc/v0', jasmine.anything());
+    })
+    it('should return default true isMainnet, if lotus reported height is NaN.', async () => {
+      spyOn<any>(axios, 'post').and.resolveTo(
+        Promise.resolve({status: 200, data: { result: { Height: "NOT A NUMBER" }}})
+      )
+      await expectAsync(worker['checkIsMainnet']()).toBeResolvedTo(true);
+    })
+    it('should return default true isMainnet, if lotus reported height missing.', async () => {
+      spyOn<any>(axios, 'post').and.resolveTo(
+        Promise.resolve({status: 200, data: { result: "missing height" }})
+      )
+      await expectAsync(worker['checkIsMainnet']()).toBeResolvedTo(true);
+    })
+    it('should return default true isMainnet, on lotus API error.', async () => {
+      spyOn<any>(axios, 'post').and.rejectWith(new Error('Connection timeout'));
+      await expectAsync(worker['checkIsMainnet']()).toBeResolvedTo(true);
+      expect(axios.post).toHaveBeenCalledOnceWith('https://api.node.glif.io/rpc/v0', jasmine.anything());
     })
   })
 
