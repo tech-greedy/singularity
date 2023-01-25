@@ -330,7 +330,7 @@ describe('DealReplicationWorker', () => {
         stderr: 'error'
       })
       const {dealCid, errorMsg, state, retryTimeout} = await worker['makeDeal']('cmd', 'piece_cid', 'provider',
-          10, true, 10);
+          10, true, 10, 3);
       expect(dealCid).toEqual('unknown');
       expect(errorMsg).toEqual('error');
       expect(state).toEqual('error');
@@ -343,7 +343,7 @@ describe('DealReplicationWorker', () => {
             stderr: ''
         })
         const {dealCid, errorMsg, state, retryTimeout} = await worker['makeDeal']('cmd', 'piece_cid', 'provider',
-            10, true, 10);
+            10, true, 10, 3);
         expect(dealCid).toEqual('bafy');
         expect(errorMsg).toEqual('');
         expect(state).toEqual('proposed');
@@ -356,7 +356,7 @@ describe('DealReplicationWorker', () => {
             stderr: 'proposed provider collateral below minimum'
         })
         const {dealCid, errorMsg, state, retryTimeout} = await worker['makeDeal']('cmd', 'piece_cid', 'provider',
-            10, true, 10);
+            10, true, 10, 3);
         expect(dealCid).toEqual('unknown');
         expect(errorMsg).toEqual('proposed provider collateral below minimum');
         expect(state).toEqual('error');
@@ -369,7 +369,7 @@ describe('DealReplicationWorker', () => {
             stderr: 'error'
         })
         const {dealCid, errorMsg, state, retryTimeout} = await worker['makeDeal']('cmd', 'piece_cid', 'provider',
-            10, false, 10);
+            10, false, 10, 3);
         expect(dealCid).toEqual('unknown');
         expect(errorMsg).toEqual('error');
         expect(state).toEqual('error');
@@ -382,7 +382,7 @@ describe('DealReplicationWorker', () => {
             stderr: ''
         })
         const {dealCid, errorMsg, state, retryTimeout} = await worker['makeDeal']('cmd', 'piece_cid', 'provider',
-            10, false, 10);
+            10, false, 10, 3);
         expect(dealCid).toEqual('bafy');
         expect(errorMsg).toEqual('');
         expect(state).toEqual('proposed');
@@ -392,7 +392,7 @@ describe('DealReplicationWorker', () => {
     it('should throw error if exec throws error', async () => {
       spyOn(childprocess, 'exec').and.throwError('error')
       const {dealCid, errorMsg, state, retryTimeout} = await worker['makeDeal']('cmd', 'piece_cid', 'provider',
-          10, false, 10);
+          10, false, 10, 3);
       expect(dealCid).toEqual('unknown');
       expect(errorMsg).toEqual('Error: error');
       expect(state).toEqual('error');
