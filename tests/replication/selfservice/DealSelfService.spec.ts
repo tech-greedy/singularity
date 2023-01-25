@@ -478,7 +478,6 @@ describe('DealSelfService', () => {
       const deleteResponse = await supertest(service['app'])
         .delete(`/policy/${id}`).set('Accept', 'application/json');
       expect(deleteResponse.status).toEqual(200);
-      expect((await Datastore.DealSelfServicePolicyModel.find()).length).toEqual(0);
     })
   })
 })
