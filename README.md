@@ -346,6 +346,113 @@ dataset "CommonCrawl", until all CAR files are dealt.
 singularity repl start -m 10 -c "1 * * * *" CommonCrawl f01234,f05678 f15djc5avdxihgu234231rfrrzbvnnqvzurxe55kja
 ```
 
+## Deal Making Self Service
+
+### Purpose
+
+1. Storage providers have full control of deal making speed
+2. Client no longer needs to spend time to pause or adjust deal making speed
+
+### Policy Management
+
+#### Policy Creation
+
+```shell
+$ singularity repl ss create -h
+Usage: singularity replication selfservice create [options] <client> <provider> <dataset>
+
+Create a deal making self service policy
+
+Arguments:
+  client                       Client address to send deals from
+  provider                     Provider address to send deals to
+  dataset                      Id or name of the dataset
+
+Options:
+  --minDelay <minDelay>        Minimum delay in days for the deal start epoch (default: "7")
+  --maxDelay <maxDelay>        Maximum delay in days for the deal start epoch (default: "7")
+  -r, --verified <verified>    Whether to propose deal as verified. true|false. (default: "true")
+  -p, --price <price>          Maximum price per epoch per GiB in Fil. (default: "0")
+  --minDuration <minDuration>  Minimum duration in days for the deal (default: "525")
+  --maxDuration <maxDuration>  maxDuration duration in days for the deal (default: "525")
+  -h, --help                   display help for command
+```
+
+#### Policy Deletion
+
+```shell
+$ singularity repl ss delete -h
+Usage: singularity replication selfservice delete [options] <id>
+
+Delete a deal making self service policy
+
+Arguments:
+  id          Policy id to delete
+
+Options:
+  -h, --help  display help for command
+```
+
+#### Policy Listing
+
+```shell
+$ singularity repl ss list -h
+Usage: singularity replication selfservice list [options]
+
+List all deal making self service policies
+
+Options:
+  --json      Output with JSON format
+  -h, --help  display help for command
+```
+
+### Self Service API
+
+#### Get Eligible PieceCids
+
+```shell
+curl "http://localhost:7005/pieceCids?provider=f0xxxx&dataset=datasetName"
+```
+
+#### Propose a deal
+
+```shell
+# Without pieceCid
+$ curl "http://localhost:7005/propose?provider=f0xxxx&dataset=datasetName"
+# With pieceCid
+$ curl "http://localhost:7005/propose?provider=f0xxxx&dataset=datasetName&pieceCid=bafyxxxx"
+# All possible options
+$ curl "http://localhost:7005/propose?\
+> provider=f0xxxx&\
+> dataset=datasetName&\
+> pieceCid=bafyxxxx&\
+> startDays=7&\
+> durationDays=525&\
+> client=f0xxxxx"
+```
+
+The logic behind the scene is as follows:
+
+1. Try to find all policies that match the `provider` and `dataset`
+2. Filter all applicable policies by options provided, such as `client`, `startDays`, `durationDays`
+3. Randomly select one of the matching policy (this is possible if multiple client addresses are used for the same dataset)
+4. If pieceCid is provided, then check if the pieceCid belongs to the dataset and has not been proposed
+5. Otherwise, find a pieceCid from the dataset that has not yet been proposed to the provider
+6. Propose the deal and return the proposalId
+
+### Expose the API to provider
+
+To only expose the /pieceCids and /propose API to SP, you can configure `nginx` like below
+
+```
+location /pieceCids {
+    proxy_pass http://localhost:7005;
+}
+location /propose {
+    proxy_pass http://localhost:7005;
+}
+```
+
 ## Configuration
 
 Look for `default.toml` in the initialized repo.
