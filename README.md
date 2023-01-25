@@ -444,7 +444,7 @@ The logic behind the scene is as follows:
 
 To only expose the /pieceCids and /propose API to SP, you can configure `nginx` like below
 
-```
+```nginx
 location /pieceCids {
     proxy_pass http://localhost:7005;
 }
