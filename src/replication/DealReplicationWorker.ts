@@ -30,7 +30,7 @@ export default class DealReplicationWorker extends BaseService {
     this.startPollWork = this.startPollWork.bind(this);
     this.lotusCMD = config.get('deal_replication_worker.lotus_cli_cmd');
     this.boostCMD = config.get('deal_replication_worker.boost_cli_cmd');
-    this.queryLotusBlockHeight = false
+    this.queryLotusBlockHeight = false;
   }
 
   public async start (): Promise<void> {
@@ -38,7 +38,7 @@ export default class DealReplicationWorker extends BaseService {
       this.logger.warn('Deal Replication Worker is not enabled. Exit now...');
     }
     await this.initialize();
-    this.queryLotusBlockHeight = ! await this.checkIsMainnet();
+    this.queryLotusBlockHeight = !await this.checkIsMainnet();
     this.startHealthCheck();
     this.startPollWork();
   }
@@ -599,13 +599,14 @@ export default class DealReplicationWorker extends BaseService {
     );
   }
 
-  private async checkIsMainnet() : Promise<boolean> {
+  private async checkIsMainnet () : Promise<boolean> {
     try {
-      const lotusHeight = await this.currentBlockHeight()
-      const computedHeight = HeightFromCurrentTime()
-      const MAINNET_HEIGHT_DIFF_TOLERANCE = 2*60*24;
+      const lotusHeight = await this.currentBlockHeight();
+      const computedHeight = HeightFromCurrentTime();
+      const MAINNET_HEIGHT_DIFF_TOLERANCE = 2 * 60 * 24;
       const isMainnet = MAINNET_HEIGHT_DIFF_TOLERANCE > Math.abs(lotusHeight - computedHeight);
-      this.logger.info(`checkIsMainnet:${isMainnet}, lotusHeight:${lotusHeight}, computedHeight:${computedHeight}, diff:${Math.abs(lotusHeight - computedHeight)}`)
+      this.logger.info(`checkIsMainnet:${isMainnet}, lotusHeight:${lotusHeight}, \
+        computedHeight:${computedHeight}, diff:${Math.abs(lotusHeight - computedHeight)}`);
       return isMainnet;
     } catch (error) {
       this.logger.warn('Error while calling lotus block height. Assuming mainnet mode.', error);
@@ -613,9 +614,9 @@ export default class DealReplicationWorker extends BaseService {
     return true;
   }
 
-  private async currentBlockHeight() : Promise<number> {
+  private async currentBlockHeight () : Promise<number> {
     try {
-      return await this.lotusBlockHeightAPI()
+      return await this.lotusBlockHeightAPI();
     } catch (error) {
       this.logger.error('Failed getting lotus block height. Using computed height instead.', error);
     }
@@ -624,9 +625,9 @@ export default class DealReplicationWorker extends BaseService {
 
   private async lotusBlockHeightAPI (): Promise<number> {
     const url = this.getLotusNodeUrl();
-    this.logger.info(`Querying block height from Lotus url: ${url}`)
+    this.logger.info(`Querying block height from Lotus url: ${url}`);
     const response = await axios.post(url, {
-      "jsonrpc": "2.0", "id":1, "method": "Filecoin.ChainHead"
+      jsonrpc: '2.0', id: 1, method: 'Filecoin.ChainHead'
     }).then(resp => {
       this.logger.info(`Lotus block height:${JSON.stringify(resp.data.result.Height)}`);
       return resp;
@@ -640,7 +641,7 @@ export default class DealReplicationWorker extends BaseService {
     return Number(heightStr);
   }
 
-  private getLotusNodeUrl(): string {
+  private getLotusNodeUrl (): string {
     // reuse the configured lotus_api
     return config.get<string>('deal_tracking_service.lotus_api');
   }
