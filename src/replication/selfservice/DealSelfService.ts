@@ -212,11 +212,11 @@ export default class DealReplicationService extends BaseService {
       // Register the client for tracking
       await Datastore.DealTrackingStateModel.updateOne({
         stateType: 'client',
-        stateKey: client
+        stateKey: policy.client
       }, {
         $setOnInsert: {
           stateType: 'client',
-          stateKey: client,
+          stateKey: policy.client,
           stateValue: 'track'
         }
       }, {
