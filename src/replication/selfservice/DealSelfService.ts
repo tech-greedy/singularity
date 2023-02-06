@@ -208,6 +208,21 @@ export default class DealReplicationService extends BaseService {
 
       // Use a random policy from applicable policies
       const policy = policies[Math.floor(Math.random() * policies.length)];
+
+      // Register the client for tracking
+      await Datastore.DealTrackingStateModel.updateOne({
+        stateType: 'client',
+        stateKey: client
+      }, {
+        $setOnInsert: {
+          stateType: 'client',
+          stateKey: client,
+          stateValue: 'track'
+        }
+      }, {
+        upsert: true
+      });
+
       let pieceToPropose: {pieceCid: string, dataCid: string, pieceSize: number, carSize: number};
 
       // Check if there is already a deal in progress
