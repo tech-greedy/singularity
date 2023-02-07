@@ -293,12 +293,12 @@ export default class DealReplicationWorker extends BaseService {
     try {
       const providers = DealReplicationWorker.generateProvidersList(replicationRequest.storageProviders);
       // Find cars that are finished generation
-      const cars = await Datastore.GenerationRequestModel.find({
+      let cars = await Datastore.GenerationRequestModel.find({
         datasetId: replicationRequest.datasetId,
         status: 'completed'
       });
       const makeDealAll = providers.map(async (provider) => {
-        shuffle(cars); // shuffle the cars list to achieve best importing performance (when sending to mulitple SPs)
+        cars = shuffle(cars); // shuffle the cars list to achieve best importing performance (when sending to mulitple SPs)
         let useLotus = true;
         try {
           useLotus = await this.isUsingLotus(provider);
