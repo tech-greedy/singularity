@@ -16,6 +16,7 @@ import HealthCheck from './model/HealthCheck';
 import { ObjectId } from 'mongodb';
 import ManifestUploadState from './model/ManifestUploadState';
 import Misc from './model/Misc';
+import DealSelfServicePolicy from './model/DealSelfServicePolicy';
 
 export default class Datastore {
   private static logger = Logger.getLogger(Category.Database);
@@ -43,6 +44,8 @@ export default class Datastore {
   public static ManifestUploadStateModel: mongoose.Model<ManifestUploadState, {}, {}, {}>;
   // eslint-disable-next-line @typescript-eslint/ban-types
   public static MiscModel: mongoose.Model<Misc, {}, {}, {}>;
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  public static DealSelfServicePolicyModel: mongoose.Model<DealSelfServicePolicy, {}, {}, {}>;
 
   private static DB_NAME = 'singularity';
 
@@ -80,6 +83,22 @@ export default class Datastore {
     this.setupOutputFileListSchema();
     this.setupManifestUploadStateSchema();
     this.setupMiscSchema();
+    this.setupDealSelfServicePolicySchema();
+  }
+
+  private static setupDealSelfServicePolicySchema () {
+    const schema = new Schema<DealSelfServicePolicy>({
+      client: Schema.Types.String,
+      provider: Schema.Types.String,
+      datasetName: Schema.Types.String,
+      minStartDays: Schema.Types.Number,
+      maxStartDays: Schema.Types.Number,
+      verified: Schema.Types.Boolean,
+      price: Schema.Types.Number,
+      minDurationDays: Schema.Types.Number,
+      maxDurationDays: Schema.Types.Number
+    });
+    Datastore.DealSelfServicePolicyModel = mongoose.model<DealSelfServicePolicy>('DealSelfServicePolicy', schema);
   }
 
   private static setupMiscSchema () {

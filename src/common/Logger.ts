@@ -12,6 +12,7 @@ export enum Category {
   IndexService = 'index_service',
   DealTrackingService = 'deal_tracking_service',
   DealReplicationService = 'deal_replication_service',
+  DealSelfService = 'deal_self_service',
   DealReplicationWorker = 'deal_replication_worker',
   MetricEmitter = 'metric_emitter',
 }
