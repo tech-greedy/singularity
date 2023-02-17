@@ -1,6 +1,7 @@
 import path from 'path';
 import fs from 'fs-extra';
 import Logger, { Category } from './Logger';
+import { execSync } from 'child_process';
 
 export default class GenerateCar {
   public static path?: string;
@@ -32,9 +33,15 @@ export default class GenerateCar {
           break;
         }
       }
-      // Somehow, win32 has generate-car binary at same PATH as singularity executable
+      // Starting node v18.14.0, the generate-car will be in the PATH so let's just try invoking it directly
       if (!GenerateCar.path) {
-        throw new Error('Cannot find generate-car, please report this as a bug');
+        try {
+          execSync('generate-car -h');
+          return;
+        } catch (error) {
+          logger.error('Unable to find generate-car binary');
+          throw error;
+        }
       }
       logger.info(`Found generate-car at ${GenerateCar.path}`);
     }
