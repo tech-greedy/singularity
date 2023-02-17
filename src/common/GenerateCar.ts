@@ -37,6 +37,7 @@ export default class GenerateCar {
       if (!GenerateCar.path) {
         try {
           execSync('generate-car -h');
+          GenerateCar.path = 'generate-car';
           return;
         } catch (error) {
           logger.error('Unable to find generate-car binary');
