@@ -3,6 +3,7 @@ import fs from 'fs-extra';
 import Logger, { Category } from './Logger';
 import { execSync } from 'child_process';
 
+/* istanbul ignore next */
 export default class GenerateCar {
   public static path?: string;
   public static initialize () {
