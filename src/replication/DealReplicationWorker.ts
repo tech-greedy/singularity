@@ -626,14 +626,15 @@ export default class DealReplicationWorker extends BaseService {
   private async lotusBlockHeightAPI (): Promise<number> {
     const url = this.getLotusNodeUrl();
     this.logger.info(`Querying block height from Lotus url: ${url}`);
-    const response = await axios.post(url, {
-      jsonrpc: '2.0', id: 1, method: 'Filecoin.ChainHead'
-    }).then(resp => {
-      this.logger.info(`Lotus block height:${JSON.stringify(resp.data.result.Height)}`);
-      return resp;
-    }).catch(error => {
+    let response;
+    try {
+      response = await axios.post(url, {
+        jsonrpc: '2.0', id: 1, method: 'Filecoin.ChainHead'
+      });
+      this.logger.info(`Lotus block height:${JSON.stringify(response.data.result.Height)}`);
+    } catch (error) {
       throw new Error(`Unable to get height from lotus: ${JSON.stringify(error)}`);
-    });
+    }
     const heightStr = (response && response.data && response.data.result) ? JSON.stringify(response.data.result.Height) : undefined;
     if (heightStr === undefined || Number.isNaN(Number(heightStr))) {
       throw new Error(`Unable to get height from lotus. Response:${JSON.stringify(response)}`);
