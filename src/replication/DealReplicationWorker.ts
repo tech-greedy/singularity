@@ -20,6 +20,7 @@ const math = create(all, mathconfig);
 export default class DealReplicationWorker extends BaseService {
   private readonly lotusCMD: string;
   private readonly boostCMD: string;
+  private queryLotusBlockHeight: boolean;
   // holds reference to all started crons to be updated
   private cronRefArray: Map<string, [schedule: string, taskRef: ScheduledTask]> = new Map<string, [string, ScheduledTask]>();
 
@@ -29,14 +30,15 @@ export default class DealReplicationWorker extends BaseService {
     this.startPollWork = this.startPollWork.bind(this);
     this.lotusCMD = config.get('deal_replication_worker.lotus_cli_cmd');
     this.boostCMD = config.get('deal_replication_worker.boost_cli_cmd');
+    this.queryLotusBlockHeight = false;
   }
 
   public async start (): Promise<void> {
     if (!this.enabled) {
       this.logger.warn('Deal Replication Worker is not enabled. Exit now...');
     }
-
     await this.initialize();
+    this.queryLotusBlockHeight = !await this.checkIsMainnet();
     this.startHealthCheck();
     this.startPollWork();
   }
@@ -414,7 +416,8 @@ export default class DealReplicationWorker extends BaseService {
           }
 
           const startDelay = replicationRequest.startDelay ? replicationRequest.startDelay : 20160;
-          const currentHeight = HeightFromCurrentTime();
+          const currentHeight = this.queryLotusBlockHeight ? await this.currentBlockHeight() : HeightFromCurrentTime();
+
           const startEpoch = startDelay + currentHeight + 60; // 30 min buffer time
           this.logger.debug(`Calculated start epoch startDelay: ${startDelay} + currentHeight: ${currentHeight} + 60 = ${startEpoch}`);
           let dealCmd = '';
@@ -595,4 +598,53 @@ export default class DealReplicationWorker extends BaseService {
       }
     );
   }
+
+  private async checkIsMainnet () : Promise<boolean> {
+    try {
+      const lotusHeight = await this.currentBlockHeight();
+      const computedHeight = HeightFromCurrentTime();
+      const MAINNET_HEIGHT_DIFF_TOLERANCE = 2 * 60 * 24;
+      const isMainnet = MAINNET_HEIGHT_DIFF_TOLERANCE > Math.abs(lotusHeight - computedHeight);
+      this.logger.info(`checkIsMainnet:${isMainnet}, lotusHeight:${lotusHeight}, \
+        computedHeight:${computedHeight}, diff:${Math.abs(lotusHeight - computedHeight)}`);
+      return isMainnet;
+    } catch (error) {
+      this.logger.warn('Error while calling lotus block height. Assuming mainnet mode.', error);
+    }
+    return true;
+  }
+
+  private async currentBlockHeight () : Promise<number> {
+    try {
+      return await this.lotusBlockHeightAPI();
+    } catch (error) {
+      this.logger.error('Failed getting lotus block height. Using computed height instead.', error);
+    }
+    return HeightFromCurrentTime();
+  }
+
+  private async lotusBlockHeightAPI (): Promise<number> {
+    const url = this.getLotusNodeUrl();
+    this.logger.info(`Querying block height from Lotus url: ${url}`);
+    let response;
+    try {
+      response = await axios.post(url, {
+        jsonrpc: '2.0', id: 1, method: 'Filecoin.ChainHead'
+      });
+      this.logger.info(`Lotus block height:${JSON.stringify(response.data.result.Height)}`);
+    } catch (error) {
+      throw new Error(`Unable to get height from lotus: ${JSON.stringify(error)}`);
+    }
+    const heightStr = (response && response.data && response.data.result) ? JSON.stringify(response.data.result.Height) : undefined;
+    if (heightStr === undefined || Number.isNaN(Number(heightStr))) {
+      throw new Error(`Unable to get height from lotus. Response:${JSON.stringify(response)}`);
+    }
+    return Number(heightStr);
+  }
+
+  private getLotusNodeUrl (): string {
+    // reuse the configured lotus_api
+    return config.get<string>('deal_tracking_service.lotus_api');
+  }
+
 }
