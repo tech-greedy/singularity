@@ -43,8 +43,8 @@ the one pulled by npm.
 
 ```shell
 # Make sure you have go v1.17+ installed
-git clone https://github.com/tech-greedy/go-generate-car.git
-cd go-generate-car
+git clone https://github.com/tech-greedy/generate-car.git
+cd generate-car
 make
 ```
 

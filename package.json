@@ -24,7 +24,7 @@
     "filecoin",
     "singularity"
   ],
-  "license": "MIT",
+  "license": "(Apache-2.0 AND MIT)",
   "bugs": {
     "url": "https://github.com/tech-greedy/singularity/issues"
   },
@@ -72,7 +72,7 @@
     "@gzuidhof/go-npm": "^0.1.13",
     "@iarna/toml": "^2.2.5",
     "@rauschma/stringio": "^1.4.0",
-    "@techgreedy/generate-car": "2.1.2",
+    "@techgreedy/generate-car": "4.0.0",
     "@types/node-cron": "^3.0.1",
     "@xingrz/cppzst": "^2.1.0-alpha.8",
     "async-mutex": "^0.4.0",

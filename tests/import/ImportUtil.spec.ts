@@ -222,11 +222,11 @@ describe('ImportUtil', () => {
     it('should be able to download a file with multithreading', async () => {
       try {
         await expectAsync(ImportUtil['downloadFile'](
-          'https://github.com/tech-greedy/go-generate-car/releases/download/v2.1.2/go-generate-car_2.1.2_linux_amd64.tar.gz',
+          'https://github.com/tech-greedy/generate-car/releases/download/v4.0.0/generate-car_4.0.0_linux_amd64.tar.gz',
           './test_download.gz', 4)).toBeResolved();
         const content = await fs.readFile('./test_download.gz');
         const digest = crypto.createHash('sha256').update(content).digest('hex');
-        expect(digest).toEqual('cc52af0fb9f3e5bbdcb74d519a584a06e21c5055b8da75ae5779dc08321caa2f');
+        expect(digest).toEqual('3e0e36cf67402c2ed26af83748dc94e0b6f8fa112ca9b0715201bc05f4c4cb0c');
       } finally {
         await fs.rm('./test_download.gz', { recursive: true, force: true });
       }
