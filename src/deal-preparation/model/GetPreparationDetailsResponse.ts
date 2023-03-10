@@ -1,7 +1,7 @@
 export interface GenerationRequestSummary {
   id: string,
   index: number,
-  status: 'active' | 'paused' | 'completed' | 'error' | 'created',
+  status: 'active' | 'paused' | 'completed' | 'error' | 'created' | 'dag',
   errorMessage?: string,
   dataCid?: string,
   pieceCid?: string,

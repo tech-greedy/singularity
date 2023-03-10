@@ -21,7 +21,7 @@ async function findLastGeneration (request: ScanningRequest, logger: winston.Log
   let index = 0;
   const lastGeneration = await Datastore.GenerationRequestModel.findOne({
     datasetId: request.id,
-    status: { $ne: 'created' }
+    status: { $nin: ['created', 'dag'] }
   }, {
     _id: 1,
     index: 1

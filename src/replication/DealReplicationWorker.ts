@@ -300,7 +300,7 @@ export default class DealReplicationWorker extends BaseService {
         // Find cars that are finished generation
         const cars = await Datastore.GenerationRequestModel.find({
           datasetId: replicationRequest.datasetId,
-          status: 'completed'
+          status: { $in: ['completed', 'dag'] }
         })
           .sort({
             pieceCid: 1
@@ -498,7 +498,7 @@ export default class DealReplicationWorker extends BaseService {
       const reRead = await Datastore.ReplicationRequestModel.findById(replicationRequest.id);
       const carCount = await Datastore.GenerationRequestModel.count({
         datasetId: reRead?.datasetId,
-        status: 'completed'
+        status: { $in: ['completed', 'dag'] }
       });
       await this.checkAndMarkCompletion(reRead!, carCount);
     } catch (err) {
