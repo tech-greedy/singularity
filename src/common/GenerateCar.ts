@@ -50,7 +50,7 @@ export default class GenerateCar {
           try {
             execSync(`${name} -h`);
             GenerateCar.pathMap.set(name, name);
-            return;
+            continue;
           } catch (error) {
             logger.error('Unable to find generate-car binary');
             throw error;

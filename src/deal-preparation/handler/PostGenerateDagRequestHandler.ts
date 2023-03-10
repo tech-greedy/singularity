@@ -5,7 +5,7 @@ import sendError from './ErrorHandler';
 import ErrorCode from '../model/ErrorCode';
 import { performance } from 'perf_hooks';
 import GenerateCar from '../../common/GenerateCar';
-import { ErrorWithOutput, Output, spawn } from 'promisify-child-process';
+import {ChildProcessPromise, ErrorWithOutput, Output, spawn} from 'promisify-child-process';
 import config from '../../common/Config';
 import path from 'path';
 import fs from 'fs-extra';
@@ -26,17 +26,28 @@ export default async function handlePostGenerateDagRequest (this: DealPreparatio
   }
 
   const checkpoint = performance.now();
-  this.logger.debug(`Spawning generate-car.`, {
-    outPath: found.outDir,
-    dataset: found.name
-  });
-  const p = found.path.startsWith('s3://') ? found.path.slice(4) : found.path;
   const cmd = GenerateCar.generateIpldCarPath();
-  const args = ['-o', found.outDir, '-p', p];
-  const child = spawn(cmd, args, {
-    encoding: 'utf8',
-    maxBuffer: config.getOrDefault('deal_preparation_worker.max_buffer', 1024 * 1024 * 1024)
+  const args = ['-o', found.outDir];
+  this.logger.info(`Spawning generate-ipld-car.`, {
+    outPath: found.outDir,
+    dataset: found.name,
+    args: args,
+    cmd: cmd
   });
+  let child: ChildProcessPromise
+  try {
+    child = spawn(cmd, args, {
+      encoding: 'utf8',
+      maxBuffer: config.getOrDefault('deal_preparation_worker.max_buffer', 1024 * 1024 * 1024)
+    });
+  } catch (error: any) {
+    this.logger.error(`Failed to spawn generate-ipld-car`, {
+      error
+    });
+    response.status(500);
+    response.end(JSON.stringify({ error: 'Failed to spawn generate-ipld-car' }));
+    return;
+  }
   // Start streaming all the files to generate-ipld-car
   for (const generationRequest of await Datastore.GenerationRequestModel.find(
     { datasetId: found.id, status: 'completed' },
@@ -51,9 +62,8 @@ export default async function handlePostGenerateDagRequest (this: DealPreparatio
         if (fileInfo.dir) {
           continue;
         }
-        const filePath = fileInfo.path.startsWith('s3://') ? fileInfo.path.slice(4) : fileInfo.path;
         const row = {
-          Path: filePath,
+          Path: fileInfo.path,
           Size: fileInfo.size,
           Start: fileInfo.start || 0,
           End: fileInfo.end || fileInfo.size,

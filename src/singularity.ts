@@ -229,7 +229,7 @@ program.command('daemon')
         if (config.get('deal_replication_worker.enabled')) {
           workers.push([cluster.fork(), 'deal_replication_worker']);
         }
-        if (config.get('deal_self_service.enabled')) {
+        if (config.getOrDefault('deal_self_service.enabled', false)) {
           workers.push([cluster.fork(), 'deal_self_service']);
         }
       } else if (cluster.isWorker) {

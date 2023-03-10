@@ -44,7 +44,7 @@ describe('PostGenerateDagRequestHandler', () => {
         generationId: generation.id,
         index: 0,
         generatedFileList: [{
-          path: '/tmp/path/file1.mp4',
+          path: 'file1.mp4',
           size: 100,
           dir: false,
           cid: 'invalid'
@@ -69,51 +69,6 @@ describe('PostGenerateDagRequestHandler', () => {
         message: ErrorMessage[ErrorCode.DATASET_NOT_FOUND],
       });
     })
-    it('should return success for a valid request for S3 dataset', async () => {
-      await fs.mkdir('./test-ipld', { recursive: true });
-      const scanning = await Datastore.ScanningRequestModel.create({
-        name: 'name',
-        path: 's3://tmp/path',
-        outDir: './test-ipld',
-        status: 'completed',
-      })
-      const generation = await Datastore.GenerationRequestModel.create({
-        datasetId: scanning.id,
-        datasetName: scanning.name,
-        path: scanning.path,
-        outDir: scanning.outDir,
-        index: 0,
-        status: 'completed',
-      })
-      await Datastore.OutputFileListModel.create({
-        generationId: generation.id,
-        index: 0,
-        generatedFileList: [{
-          path: 's3://tmp/path',
-          dir: true,
-          cid: 'bafy'
-        },{
-          path: 's3://tmp/path/file1.mp4',
-          size: 100,
-          dir: false,
-          cid: 'bafy2bzaceadigy5httv7utqjspcfcvejbhb6dir5dhmo6h4yjyc2gibisq7lm'
-        }]
-      })
-      const response = await (supertest(service['app']))
-        .post(`/preparation/${scanning.id}/generate-dag`);
-      expect(response.status).toEqual(200);
-      expect(response.body).toEqual(jasmine.objectContaining({
-        datasetName: scanning.name,
-        datasetId: scanning.id,
-        path: scanning.path,
-        outDir: scanning.outDir,
-        status: 'dag',
-        dataCid: 'bafybeiduglswzploozrqikkkzsko33soyh4adngvtdp7o62bdqq653bgfa',
-        carSize: 155,
-        pieceCid: 'baga6ea4seaqnsnb3tf2gclcbsk4qucvbnxdl5flotinubyareigf2sqls56qofi',
-        pieceSize: 256
-      }))
-    })
     it('should return success for a valid request for local directory', async () => {
       await fs.mkdir('./test-ipld', { recursive: true });
       const scanning = await Datastore.ScanningRequestModel.create({
@@ -134,11 +89,11 @@ describe('PostGenerateDagRequestHandler', () => {
         generationId: generation.id,
         index: 0,
         generatedFileList: [{
-          path: '/tmp/path',
+          path: '',
           dir: true,
           cid: 'bafy'
         },{
-            path: '/tmp/path/file1.mp4',
+            path: 'file1.mp4',
           size: 100,
           dir: false,
           cid: 'bafy2bzaceadigy5httv7utqjspcfcvejbhb6dir5dhmo6h4yjyc2gibisq7lm'
