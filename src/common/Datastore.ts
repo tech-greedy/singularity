@@ -265,7 +265,7 @@ export default class Datastore {
       pieceSize: Schema.Types.Number,
       filenameOverride: Schema.Types.String,
       tmpDir: Schema.Types.String,
-      skipInaccessibleFiles: Schema.Types.Boolean,
+      skipInaccessibleFiles: Schema.Types.Boolean
     }, {
       timestamps: true
     });

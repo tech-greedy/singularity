@@ -407,7 +407,7 @@ preparation.command('generate-dag-car').alias('dag')
     }
 
     CliUtil.renderResponse(response.data, false);
-    console.log("Once the DAG CAR file is sealed or made available on the network, you may retrieve the dataset using unixfs path with the Root CID:")
+    console.log('Once the DAG CAR file is sealed or made available on the network, you may retrieve the dataset using unixfs path with the Root CID:');
     console.log(response.data.dataCid);
   });
 

@@ -9,10 +9,10 @@ import { ErrorWithOutput, Output, spawn } from 'promisify-child-process';
 import config from '../../common/Config';
 import path from 'path';
 import fs from 'fs-extra';
-import {getNextPowerOfTwo} from "../../common/Util";
-import ScanningRequest from "../../common/model/ScanningRequest";
-import winston from "winston";
-import GenerationRequest from "../../common/model/GenerationRequest";
+import { getNextPowerOfTwo } from '../../common/Util';
+import ScanningRequest from '../../common/model/ScanningRequest';
+import winston from 'winston';
+import GenerationRequest from '../../common/model/GenerationRequest';
 
 interface GenerateIpldCarOutput {
   DataCid :string
@@ -20,7 +20,7 @@ interface GenerateIpldCarOutput {
   PieceSize: number
 }
 
-export async function generateDag(logger: winston.Logger, found: ScanningRequest) :Promise<GenerationRequest> {
+export async function generateDag (logger: winston.Logger, found: ScanningRequest) :Promise<GenerationRequest> {
   const checkpoint = performance.now();
   const cmd = GenerateCar.generateIpldCarPath();
   const args = ['-o', found.outDir];
@@ -33,10 +33,10 @@ export async function generateDag(logger: winston.Logger, found: ScanningRequest
     args: args,
     cmd: cmd
   });
-    const child = spawn(cmd, args, {
-      encoding: 'utf8',
-      maxBuffer: config.getOrDefault('deal_preparation_worker.max_buffer', 1024 * 1024 * 1024)
-    });
+  const child = spawn(cmd, args, {
+    encoding: 'utf8',
+    maxBuffer: config.getOrDefault('deal_preparation_worker.max_buffer', 1024 * 1024 * 1024)
+  });
   // Start streaming all the files to generate-ipld-car
   for (const generationRequest of await Datastore.GenerationRequestModel.find(
     { datasetId: found.id, status: 'completed' },
@@ -97,10 +97,10 @@ export async function generateDag(logger: winston.Logger, found: ScanningRequest
   });
   const carFile = path.join(found.outDir, result.PieceCid + '.car');
   const carFileStat = await fs.stat(carFile);
-  let generationRequest = await Datastore.GenerationRequestModel.findOneAndUpdate(
+  const generationRequest = await Datastore.GenerationRequestModel.findOneAndUpdate(
     { datasetId: found.id, status: 'dag', dataCid: result.DataCid },
     {
-      $setOnInsert:{
+      $setOnInsert: {
         datasetId: found.id,
         datasetName: found.name,
         path: found.path,
@@ -110,7 +110,7 @@ export async function generateDag(logger: winston.Logger, found: ScanningRequest
         carSize: carFileStat.size,
         pieceCid: result.PieceCid,
         pieceSize: result.PieceSize
-      },
+      }
     },
     { upsert: true, new: true }
   );
@@ -143,6 +143,6 @@ export default async function handlePostGenerateDagRequest (this: DealPreparatio
   } catch (error: any) {
     this.logger.error(`Failed to generate the unixfs dag car.`, { error: error.message });
     response.status(500);
-    response.json({error: error.message});
+    response.json({ error: error.message });
   }
 }
