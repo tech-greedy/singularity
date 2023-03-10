@@ -5,7 +5,7 @@ import sendError from './ErrorHandler';
 import ErrorCode from '../model/ErrorCode';
 import { performance } from 'perf_hooks';
 import GenerateCar from '../../common/GenerateCar';
-import {ChildProcessPromise, ErrorWithOutput, Output, spawn} from 'promisify-child-process';
+import { ChildProcessPromise, ErrorWithOutput, Output, spawn } from 'promisify-child-process';
 import config from '../../common/Config';
 import path from 'path';
 import fs from 'fs-extra';
@@ -34,7 +34,7 @@ export default async function handlePostGenerateDagRequest (this: DealPreparatio
     args: args,
     cmd: cmd
   });
-  let child: ChildProcessPromise
+  let child: ChildProcessPromise;
   try {
     child = spawn(cmd, args, {
       encoding: 'utf8',
