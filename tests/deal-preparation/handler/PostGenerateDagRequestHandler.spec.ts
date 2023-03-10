@@ -24,7 +24,7 @@ describe('PostGenerateDagRequestHandler', () => {
   })
 
   describe('POST /preparation/:id/generate-dag', () => {
-    fit('should return 500 if the underlying binary failed with whatever reason', async() => {
+    it('should return 500 if the underlying binary failed with whatever reason', async() => {
       await fs.mkdir('./test-ipld', { recursive: true });
       const scanning = await Datastore.ScanningRequestModel.create({
         name: 'name',
