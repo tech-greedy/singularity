@@ -51,7 +51,7 @@ export default class DealPreparationService extends BaseService {
     this.app.get('/generation-manifest/:dataset/:id', handleGetGenerationManifestRequest.bind(this));
     this.app.get('/generation-manifest/:id', handleGetGenerationManifestRequest.bind(this));
     this.app.get('/monitor', handleMonitorRequest.bind(this));
-    this.app.get('/preparation/:id/generate-dag', handlePostGenerateDagRequest.bind(this));
+    this.app.post('/preparation/:id/generate-dag', handlePostGenerateDagRequest.bind(this));
   }
 
   public async start (): Promise<void> {
