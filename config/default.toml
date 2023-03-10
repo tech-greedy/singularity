@@ -43,6 +43,7 @@ local_path = "./database"
 # MongoDB API
 local_bind = "0.0.0.0"
 local_port = 37000
+force_max_deal_size = true
 
 [deal_preparation_worker]
 enabled = true

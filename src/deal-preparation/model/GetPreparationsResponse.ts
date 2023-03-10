@@ -12,7 +12,8 @@ export interface GetPreparationsResponseItem {
   generationActive: number,
   generationPaused: number,
   generationTotal: number,
-  generationError: number
+  generationError: number,
+  rootCid: string
 }
 
 export type GetPreparationsResponse = GetPreparationsResponseItem[];

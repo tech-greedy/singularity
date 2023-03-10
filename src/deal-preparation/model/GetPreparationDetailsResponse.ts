@@ -24,5 +24,6 @@ export default interface GetPreparationDetailsResponse {
   generationPaused: number,
   generationCompleted: number,
   generationError: number,
-  generationRequests: GenerationRequestSummary[]
+  generationRequests: GenerationRequestSummary[],
+  rootCid: string
 }

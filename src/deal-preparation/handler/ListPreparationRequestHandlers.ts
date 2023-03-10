@@ -20,11 +20,13 @@ export default async function handleListPreparationRequests (this: DealPreparati
   const scanningRequests = await Datastore.ScanningRequestModel.find();
   const result: GetPreparationsResponse = [];
   for (const r of scanningRequests) {
+    const dag = await Datastore.GenerationRequestModel.findOne({ datasetId: r.id, status: 'dag' }, null, { sort: { updatedAt: -1 } });
+    const rootCid = dag?.dataCid ?? '';
     const active = generationStats.find(s => s._id.datasetId === r.id && s._id.status === 'active')?.count ?? 0;
     const paused = generationStats.find(s => s._id.datasetId === r.id && s._id.status === 'paused')?.count ?? 0;
     const completed = generationStats.find(s => s._id.datasetId === r.id && s._id.status === 'completed')?.count ?? 0;
     const error = generationStats.find(s => s._id.datasetId === r.id && s._id.status === 'error')?.count ?? 0;
-    const total = generationStats.filter(s => s._id.datasetId === r.id).reduce((acc, s) => acc + s.count, 0);
+    const total = generationStats.filter(s => s._id.datasetId === r.id && s._id.status !== 'dag').reduce((acc, s) => acc + s.count, 0);
     result.push({
       id: r.id,
       name: r.name,
@@ -39,7 +41,8 @@ export default async function handleListPreparationRequests (this: DealPreparati
       generationActive: active,
       generationPaused: paused,
       generationCompleted: completed,
-      generationError: error
+      generationError: error,
+      rootCid
     });
   }
   response.end(JSON.stringify(result));

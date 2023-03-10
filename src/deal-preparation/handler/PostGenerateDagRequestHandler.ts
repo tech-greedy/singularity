@@ -5,10 +5,14 @@ import sendError from './ErrorHandler';
 import ErrorCode from '../model/ErrorCode';
 import { performance } from 'perf_hooks';
 import GenerateCar from '../../common/GenerateCar';
-import { ChildProcessPromise, ErrorWithOutput, Output, spawn } from 'promisify-child-process';
+import { ErrorWithOutput, Output, spawn } from 'promisify-child-process';
 import config from '../../common/Config';
 import path from 'path';
 import fs from 'fs-extra';
+import {getNextPowerOfTwo} from "../../common/Util";
+import ScanningRequest from "../../common/model/ScanningRequest";
+import winston from "winston";
+import GenerationRequest from "../../common/model/GenerationRequest";
 
 interface GenerateIpldCarOutput {
   DataCid :string
@@ -16,38 +20,23 @@ interface GenerateIpldCarOutput {
   PieceSize: number
 }
 
-export default async function handlePostGenerateDagRequest (this: DealPreparationService, request: Request, response: Response) {
-  const id = request.params['id'];
-  this.logger.info(`Received request to generate the unixfs dag car.`, { id });
-  const found = await Datastore.findScanningRequest(id);
-  if (!found) {
-    sendError(this.logger, response, ErrorCode.DATASET_NOT_FOUND);
-    return;
-  }
-
+export async function generateDag(logger: winston.Logger, found: ScanningRequest) :Promise<GenerationRequest> {
   const checkpoint = performance.now();
   const cmd = GenerateCar.generateIpldCarPath();
   const args = ['-o', found.outDir];
-  this.logger.info(`Spawning generate-ipld-car.`, {
+  if (config.getOrDefault('deal_preparation_service.force_max_deal_size', true)) {
+    args.push('-s', getNextPowerOfTwo(found.maxSize).toString());
+  }
+  logger.info(`Spawning generate-ipld-car.`, {
     outPath: found.outDir,
     dataset: found.name,
     args: args,
     cmd: cmd
   });
-  let child: ChildProcessPromise;
-  try {
-    child = spawn(cmd, args, {
+    const child = spawn(cmd, args, {
       encoding: 'utf8',
       maxBuffer: config.getOrDefault('deal_preparation_worker.max_buffer', 1024 * 1024 * 1024)
     });
-  } catch (error: any) {
-    this.logger.error(`Failed to spawn generate-ipld-car`, {
-      error
-    });
-    response.status(500);
-    response.end(JSON.stringify({ error: 'Failed to spawn generate-ipld-car' }));
-    return;
-  }
   // Start streaming all the files to generate-ipld-car
   for (const generationRequest of await Datastore.GenerationRequestModel.find(
     { datasetId: found.id, status: 'completed' },
@@ -92,17 +81,15 @@ export default async function handlePostGenerateDagRequest (this: DealPreparatio
     code
   } = output;
   if (code !== 0) {
-    this.logger.error(`Failed to generate the unixfs dag car.`, {
+    logger.error(`Failed to generate the unixfs dag car.`, {
       code, stdout, stderr
     });
-    response.status(500);
-    response.end(JSON.stringify({ error: 'Failed to generate the unixfs dag car', code, stderr, stdout }));
-    return;
+    throw new Error(`Failed to generate the unixfs dag car. code: ${code}, stdout: ${stdout}, stderr: ${stderr}`);
   }
 
   const timeSpentInGenerationMs = performance.now() - checkpoint;
   const result: GenerateIpldCarOutput = JSON.parse(stdout?.toString() ?? '');
-  this.logger.info(`Generated the unixfs dag car.`, {
+  logger.info(`Generated the unixfs dag car.`, {
     timeSpentInGenerationMs,
     dataCid: result.DataCid,
     pieceCid: result.PieceCid,
@@ -110,17 +97,52 @@ export default async function handlePostGenerateDagRequest (this: DealPreparatio
   });
   const carFile = path.join(found.outDir, result.PieceCid + '.car');
   const carFileStat = await fs.stat(carFile);
-  const generationRequest = {
-    datasetId: found.id,
-    datasetName: found.name,
-    path: found.path,
-    outDir: found.outDir,
-    status: 'dag',
-    dataCid: result.DataCid,
-    carSize: carFileStat.size,
-    pieceCid: result.PieceCid,
-    pieceSize: result.PieceSize
-  };
-  await Datastore.GenerationRequestModel.create(generationRequest);
-  response.end(JSON.stringify(generationRequest));
+  let generationRequest = await Datastore.GenerationRequestModel.findOneAndUpdate(
+    { datasetId: found.id, status: 'dag', dataCid: result.DataCid },
+    {
+      $setOnInsert:{
+        datasetId: found.id,
+        datasetName: found.name,
+        path: found.path,
+        outDir: found.outDir,
+        status: 'dag',
+        dataCid: result.DataCid,
+        carSize: carFileStat.size,
+        pieceCid: result.PieceCid,
+        pieceSize: result.PieceSize
+      },
+    },
+    { upsert: true, new: true }
+  );
+  return generationRequest;
+}
+
+export default async function handlePostGenerateDagRequest (this: DealPreparationService, request: Request, response: Response) {
+  const id = request.params['id'];
+  this.logger.info(`Received request to generate the unixfs dag car.`, { id });
+  const found = await Datastore.findScanningRequest(id);
+  if (!found) {
+    sendError(this.logger, response, ErrorCode.DATASET_NOT_FOUND);
+    return;
+  }
+
+  try {
+    const generationRequest = await generateDag(this.logger, found);
+    response.json({
+      id: generationRequest.id,
+      datasetId: generationRequest.datasetId,
+      datasetName: generationRequest.datasetName,
+      path: generationRequest.path,
+      outDir: generationRequest.outDir,
+      status: generationRequest.status,
+      dataCid: generationRequest.dataCid,
+      carSize: generationRequest.carSize,
+      pieceCid: generationRequest.pieceCid,
+      pieceSize: generationRequest.pieceSize
+    });
+  } catch (error: any) {
+    this.logger.error(`Failed to generate the unixfs dag car.`, { error: error.message });
+    response.status(500);
+    response.json({error: error.message});
+  }
 }

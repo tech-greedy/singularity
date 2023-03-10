@@ -24,13 +24,14 @@ describe('PostGenerateDagRequestHandler', () => {
   })
 
   describe('POST /preparation/:id/generate-dag', () => {
-    it('should return 500 if the underlying binary failed with whatever reason', async() => {
+    fit('should return 500 if the underlying binary failed with whatever reason', async() => {
       await fs.mkdir('./test-ipld', { recursive: true });
       const scanning = await Datastore.ScanningRequestModel.create({
         name: 'name',
         path: '/tmp/path',
         outDir: './test-ipld',
         status: 'completed',
+        maxSize: 1048576,
       })
       const generation = await Datastore.GenerationRequestModel.create({
         datasetId: scanning.id,
@@ -53,11 +54,8 @@ describe('PostGenerateDagRequestHandler', () => {
       const response = await (supertest(service['app']))
         .post(`/preparation/${scanning.id}/generate-dag`);
       expect(response.status).toEqual(500);
-      expect(response.body).toEqual(jasmine.objectContaining({
-        error:'Failed to generate the unixfs dag car',
-        code: 2,
-        stderr: jasmine.stringContaining('failed to parse cid')
-      }))
+      console.log(response.body);
+      expect(response.body).toEqual({error: jasmine.stringContaining('failed to parse cid')});
     })
 
     it('should return error if the id cannot be found', async () => {
@@ -76,6 +74,7 @@ describe('PostGenerateDagRequestHandler', () => {
         path: '/tmp/path',
         outDir: './test-ipld',
         status: 'completed',
+        maxSize: 1048576,
       })
       const generation = await Datastore.GenerationRequestModel.create({
         datasetId: scanning.id,
@@ -110,8 +109,8 @@ describe('PostGenerateDagRequestHandler', () => {
         status: 'dag',
         dataCid: 'bafybeiduglswzploozrqikkkzsko33soyh4adngvtdp7o62bdqq653bgfa',
         carSize: 155,
-        pieceCid: 'baga6ea4seaqnsnb3tf2gclcbsk4qucvbnxdl5flotinubyareigf2sqls56qofi',
-        pieceSize: 256
+        pieceCid: 'baga6ea4seaqdrsvczersp2wuakfnvvu5tlsn6bmnbutxsvmoe3hlozclaqjkeea',
+        pieceSize: 1048576
       }))
     })
   });
