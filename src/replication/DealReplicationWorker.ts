@@ -74,17 +74,25 @@ export default class DealReplicationWorker extends BaseService {
       status: 'active'
     });
 
+    const stillActiveCron: string[] = [];
     for (const request2Check of activeCronWorks) {
       if (this.cronRefArray.has(request2Check.id)) {
-        const [schedule, taskRef] = this.cronRefArray.get(request2Check.id)!;
+        stillActiveCron.push(request2Check.id);
+        const [schedule] = this.cronRefArray.get(request2Check.id)!;
         if (schedule !== request2Check.cronSchedule) {
           // cron schedule changed from update request
-          taskRef.stop();
-          this.cronRefArray.delete(request2Check.id);
+          this.stopCronIfExist(request2Check.id);
           await Datastore.ReplicationRequestModel.findByIdAndUpdate(
             request2Check.id, { workerId: null }); // will be picked up again by the immediate pollReplicationWork
           this.logger.info(`Cron changed, restarting schedule. (${request2Check.id})`);
         }
+      }
+    }
+
+    // Go through cron again, to delete any non-active jobs
+    for (const [key] of this.cronRefArray) {
+      if (!stillActiveCron.includes(key)) {
+        this.stopCronIfExist(key);
       }
     }
   }
