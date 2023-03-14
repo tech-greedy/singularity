@@ -1,6 +1,6 @@
 {
   "name": "@techgreedy/singularity",
-  "version": "2.1.1",
+  "version": "3.0.0",
   "description": "Large scale client tool with capabilities on onboard PB-scale data to Filecoin network",
   "main": "dist/source/start.js",
   "types": "dist/source/start.d.ts",
@@ -87,8 +87,6 @@
     "express": "^5.0.0-beta.1",
     "express-winston": "^4.2.0",
     "fs-extra": "^10.1.0",
-    "ipfs-client": "^0.7.8",
-    "ipfs-core": "^0.14.2",
     "lodash.clonedeep": "^4.5.0",
     "mathjs": "^10.6.1",
     "minimist": "^1.2.6",
