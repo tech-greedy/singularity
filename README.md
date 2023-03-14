@@ -453,7 +453,8 @@ location /propose {
 
 ## Retrieval
 
-Retrieval is simple via bitswap protocol. You need the storage provider to run [booster-bitswap](https://boost.filecoin.io/bitswap-retrieval).
+The recommended way for Retrieval is via bitswap protocol. 
+You need the storage provider to run [booster-bitswap](https://boost.filecoin.io/bitswap-retrieval).
 
 Then you may use `ipfs get <RootCid>/sub/path/to/file` to retrieve the file or folder. The `ipfs` version needs to be 0.18.0+.
 
