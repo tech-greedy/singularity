@@ -165,57 +165,6 @@ singularity repl start -m 10 -c '0 * * * *' -x 1000 -xp 100 MyData f01111 f1...
 
 This command creates a schedule to send 10 deals each hour for up to 1000 deals in total with up to 100 pending deals.
 
-## Indexing and Retrieval
-
-Each file and folder in the dataset has its own unique CID.
-Usually, when you retrieve the file or folder from storage provider, you need to specify the CID of the file or folder.
-
-However, for most people coming from web2.0, we are used to retrieving resources using URI.
-That's where the index and retrieval module shines.
-
-The index module publishes the mapping from URI path to the CID,
-so end users can retrieve content using URI instead of CID.
-
-### Prerequisites
-
-Install [IPFS](https://docs.ipfs.tech/install/) and start the daemon service
-
-```shell
-ipfs init
-ipfs daemon
-```
-
-The index will be published on IPFS which is required to be run by client and retrievers.
-
-### Create Index
-
-Index creation is as simple as running a single command for a specific dataset.
-
-```shell
-singularity index create MyData
-```
-
-It will return the IPFS path that contains the index,
-and you can choose to publish it with DNSLink to make it more end-user friendly.
-
-```text
-Add or update the TXT record for _dnslink.mydata.net
-  _dnslink.mydata.net  34  IN  TXT "dnslink=/ipfs/bafy..."
-```
-
-### Retrieval
-
-With index published on IPFS, the end user can now browse the dataset from Filecoin network
-
-```shell
-# ls command tells what file or folder is inside the sub path of the dataset
-singularity-retrieve ls -v singualrity://ipns/mydata.net/sub/path
-# show command tells the CID of the file or folder and how to assemble them back 
-singularity-retrieve show singualrity://ipns/mydata.net/sub/path
-# cp command retrieves the data from a specific storage provider to a local path and reassemble them if needed
-singularity-retrieve cp -p f01111 singualrity://ipns/mydata.net/sub/path ./local/path
-```
-
 ## Next Steps
 
 Read more documentation and configuration at [README.md](./README.md)

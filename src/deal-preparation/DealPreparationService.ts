@@ -153,7 +153,7 @@ export default class DealPreparationService extends BaseService {
     for (const scanning of scannings) {
       try {
         const remaining = await Datastore.GenerationRequestModel.findOne({ datasetId: scanning.id, status: { $in: ['active', 'paused'] } });
-        if (remaining) {
+        if (remaining || scanning.status !== 'completed') {
           continue;
         }
         this.logger.info(`Dataset preparation is complete for ${scanning.name}. Starting to generate dag`);
