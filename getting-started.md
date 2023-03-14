@@ -165,11 +165,12 @@ singularity repl start -m 10 -c '0 * * * *' -x 1000 -xp 100 MyData f01111 f1...
 
 This command creates a schedule to send 10 deals each hour for up to 1000 deals in total with up to 100 pending deals.
 
-You can also setup a Deal Making API to grant full control of deal making speed to storage providers. 
+You can also setup a Deal Making API to grant full control of deal making speed to storage providers.
 See [Deal Making API](./README.md#deal-making-self-service) for more details.
 
 ### Retrieval
-Retrieval is as simple as `ipfs get <RootCid>/path/to/file/or/folder`. 
+
+Retrieval is as simple as `ipfs get <RootCid>/path/to/file/or/folder`.
 You can check the `RootCid` from the result of `singularity prep list`.
 
 Note that the storage providers need to setup [booster-bitswap](https://boost.filecoin.io/bitswap-retrieval) and you'll need
