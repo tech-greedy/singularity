@@ -13,14 +13,12 @@ import DealPreparationService from './deal-preparation/DealPreparationService';
 import DealPreparationWorker from './deal-preparation/DealPreparationWorker';
 import axios, { AxiosResponse } from 'axios';
 import CliUtil from './cli-util';
-import IndexService from './index/IndexService';
 import DealTrackingService from './deal-tracking/DealTrackingService';
 import GetPreparationDetailsResponse from './deal-preparation/model/GetPreparationDetailsResponse';
 import fs from 'fs-extra';
 import Logger, { Category } from './common/Logger';
 import { Worker } from 'cluster';
 import cron from 'node-cron';
-import * as IpfsCore from 'ipfs-core';
 import DealReplicationService from './replication/DealReplicationService';
 import DealReplicationWorker from './replication/DealReplicationWorker';
 import GenerateCar from './common/GenerateCar';
@@ -185,7 +183,6 @@ program.command('daemon')
       await initializeConfig(true, true);
       GenerateCar.initialize();
       if (cluster.isPrimary) {
-        let indexService: IndexService;
         await Datastore.init(false);
         await Datastore.connect();
         await migrate();
@@ -212,13 +209,6 @@ program.command('daemon')
           for (let i = 0; i < numWorkers; ++i) {
             workers.push([cluster.fork(), 'deal_preparation_worker']);
           }
-        }
-        if (config.get('index_service.enabled')) {
-          indexService = new IndexService();
-          if (config.get('ipfs.enabled')) {
-            indexService['ipfsClient'] = await IpfsCore.create();
-          }
-          indexService.start();
         }
         if (config.get('deal_tracking_service.enabled')) {
           workers.push([cluster.fork(), 'deal_tracking_service']);
