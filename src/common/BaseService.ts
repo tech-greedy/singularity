@@ -17,7 +17,7 @@ export default abstract class BaseService {
     this.workerId = randomUUID();
     this.type = category.toString();
     this.logger = Logger.getLogger(category);
-    this.enabled = config.get(`${category}.enabled`);
+    this.enabled = config.getOrDefault(`${category}.enabled`, false);
   }
 
   public abstract start (): void;

@@ -273,7 +273,7 @@ async function isGenerationRequestNoLongerActive (id: string) : Promise<boolean>
 
 export async function invokeGenerateCar (logger: winston.Logger, generationId: string | undefined, input: string, outDir: string, p: string)
   : Promise<ChildProcessOutput> {
-  const cmd = GenerateCar.path!;
+  const cmd = GenerateCar.generateCarPath();
   const args = ['-o', outDir, '-p', p];
   const child = spawn(cmd, args, {
     encoding: 'utf8',

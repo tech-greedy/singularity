@@ -34,7 +34,9 @@ export default async function handleGetPreparationRequest (this: DealPreparation
   const paused = generationStats.find(s => s._id.status === 'paused')?.count ?? 0;
   const completed = generationStats.find(s => s._id.status === 'completed')?.count ?? 0;
   const error = generationStats.find(s => s._id.status === 'error')?.count ?? 0;
-  const total = generationStats.reduce((acc, s) => acc + s.count, 0);
+  const total = generationStats.filter(s => s._id.status !== 'dag').reduce((acc, s) => acc + s.count, 0);
+  const dag = await Datastore.GenerationRequestModel.findOne({ datasetId: found.id, status: 'dag' }, null, { sort: { updatedAt: -1 } });
+  const rootCid = dag?.dataCid ?? '';
   const result: GetPreparationDetailsResponse = {
     id: found.id,
     name: found.name,
@@ -50,7 +52,8 @@ export default async function handleGetPreparationRequest (this: DealPreparation
     generationPaused: paused,
     generationCompleted: completed,
     generationError: error,
-    generationRequests: []
+    generationRequests: [],
+    rootCid
   };
 
   const generations = await Datastore.GenerationRequestModel.find({ datasetId: found.id }, { fileList: 0, generatedFileList: 0 });

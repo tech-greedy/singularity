@@ -6,7 +6,7 @@ export default interface GenerationRequest {
   outDir: string,
   index: number,
   workerId?: string,
-  status: 'active' | 'paused' | 'completed' | 'error' | 'created',
+  status: 'active' | 'paused' | 'completed' | 'error' | 'created' | 'dag',
   errorMessage?: string,
   dataCid?: string,
   carSize?: number,

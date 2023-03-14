@@ -229,7 +229,7 @@ program.command('daemon')
         if (config.get('deal_replication_worker.enabled')) {
           workers.push([cluster.fork(), 'deal_replication_worker']);
         }
-        if (config.get('deal_self_service.enabled')) {
+        if (config.getOrDefault('deal_self_service.enabled', false)) {
           workers.push([cluster.fork(), 'deal_self_service']);
         }
       } else if (cluster.isWorker) {
@@ -388,6 +388,27 @@ preparation.command('create').description('Start deal preparation for a local da
     }
 
     CliUtil.renderResponse(response.data, options.json);
+  });
+
+preparation.command('generate-dag-car').alias('dag')
+  .description('Add a CAR file to the dataset that represents the Unixfs folder structure for the dataset. ' +
+    'This will allow bitswap retrieval of the dataset. ' +
+    'Be cautious to use it when the preparation is not done as it may lead to missing files in the final Root CID.')
+  .argument('<dataset>', 'The dataset id or name')
+  .action(async (id) => {
+    await initializeConfig(false, false);
+    const url: string = config.get('connection.deal_preparation_service');
+    let response!: AxiosResponse;
+    console.log('Generating DAG CAR file. Please wait until it finishes.');
+    try {
+      response = await axios.post(`${url}/preparation/${id}/generate-dag`);
+    } catch (error) {
+      CliUtil.renderErrorAndExit(error);
+    }
+
+    CliUtil.renderResponse(response.data, false);
+    console.log('Once the DAG CAR file is sealed or made available on the network, you may retrieve the dataset using unixfs path with the Root CID:');
+    console.log(response.data.dataCid);
   });
 
 preparation.command('status').description('Check the status of a deal preparation request')

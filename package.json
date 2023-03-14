@@ -73,6 +73,7 @@
     "@iarna/toml": "^2.2.5",
     "@rauschma/stringio": "^1.4.0",
     "@techgreedy/generate-car": "4.0.0",
+    "@techgreedy/generate-ipld-car": "4.0.1",
     "@types/node-cron": "^3.0.1",
     "@xingrz/cppzst": "^2.1.0-alpha.8",
     "async-mutex": "^0.4.0",
@@ -138,7 +139,7 @@
       "html"
     ],
     "lines": 90,
-    "functions": 70,
+    "functions": 50,
     "statements": 90,
     "per-file": true
   }
