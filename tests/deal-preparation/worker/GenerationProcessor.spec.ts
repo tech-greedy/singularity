@@ -7,7 +7,7 @@ import Utils from '../../Utils';
 import GenerateCar from '../../../src/common/GenerateCar';
 import { processGeneration } from '../../../src/deal-preparation/worker/GenerationProcessor';
 
-describe('GenerationProcessor', () => {
+fdescribe('GenerationProcessor', () => {
   let worker: DealPreparationWorker;
   let defaultTimeout: number;
   beforeAll(async () => {

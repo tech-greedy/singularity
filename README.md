@@ -7,8 +7,6 @@ New node software for large-scale clients with PB-scale data onboarding to Filec
 
 ## Quick Start
 
-Looking for standalone Deal Preparation? Try [singularity-prepare](./singularity-prepare.md)
-
 Looking for a complete end-to-end demonstration? Try [Getting Started Guide](./getting-started.md)
 
 ### Prerequisite
