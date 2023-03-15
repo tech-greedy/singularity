@@ -7,16 +7,16 @@ import { FileInfo, FileList } from '../../common/model/InputFileList';
 import winston from 'winston';
 import GenerationRequest from '../../common/model/GenerationRequest';
 import { moveFileList, MoveResult, moveS3FileList } from './MoveProcessor';
-import {ChildProcessWithoutNullStreams, spawn} from 'child_process';
+import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
 import GenerateCar from '../../common/GenerateCar';
 import { GeneratedFileList } from '../../common/model/OutputFileList';
 import TrafficMonitor from './TrafficMonitor';
 import DealPreparationWorker from '../DealPreparationWorker';
 import MetricEmitter from '../../common/metrics/MetricEmitter';
 import { JsonStreamStringify } from 'json-stream-stringify';
-import Parser from "stream-json/Parser";
-import Asm from "stream-json/Assembler";
-import {pipeline} from "stream/promises";
+import Parser from 'stream-json/Parser';
+import Asm from 'stream-json/Assembler';
+import { pipeline } from 'stream/promises';
 
 export class GenerationProcessor {
   public static childProcessPid: number | undefined;
@@ -80,14 +80,13 @@ export async function processGeneration (
   let output : GenerateCarOutput;
   try {
     output = await generate(logger, newGenerationWork, fileList, returnValue.tmpDir);
-  } catch (e) {
+  } catch (e: any) {
     logger.error(`${worker.workerId} Encountered an error.`, e);
     await Datastore.GenerationRequestModel.findOneAndUpdate({
       _id: newGenerationWork.id,
       status: 'active'
     }, {
       status: 'error',
-      // @ts-ignore
       errorMessage: e.message,
       workerId: null
     }, { projection: { _id: 1 } });
@@ -99,7 +98,6 @@ export async function processGeneration (
         datasetName: newGenerationWork.datasetName,
         generationId: newGenerationWork.id,
         index: newGenerationWork.index,
-        // @ts-ignore
         errorMessage: e.message
       }
     });
@@ -277,30 +275,29 @@ export async function invokeGenerateCar (logger: winston.Logger, generationId: s
   let stderr = '';
   child.stderr.on('data', (data) => {
     stderr += data;
-  })
+  });
   input.pipe(child.stdin!);
   GenerationProcessor.childProcessPid = child.pid;
   try {
     const parser = new Parser();
     const asm = new Asm();
     const pipe = pipeline(child.stdout!, parser);
-    // @ts-ignore
-    let output : GenerateCarOutput = {};
-    asm.on('done', asm => output = asm.current);
+    let output : GenerateCarOutput | undefined;
+    asm.on('done', asm => { output = asm.current; });
     asm.connectTo(parser);
     await pipe;
-    logger.info('Finished parsing stdout')
-    return output;
+    logger.info('Finished parsing stdout');
+    return output!;
   } catch (e) {
     logger.error(`Error while parsing stdout.`, e);
-     const {code, signal}: {code: number | null, signal: string | null } = await new Promise((resolve, _) => {
+    const { code, signal }: {code: number | null, signal: string | null } = await new Promise((resolve, _reject) => {
       child.once('close', (code, signal) => resolve({ code, signal }));
     });
     logger.error(`Child process exited abnormally.`, {
       code,
       signal,
       stderr
-    })
+    });
     throw new Error(`Child process exited abnormally. ${stderr}`);
   } finally {
     GenerationProcessor.childProcessPid = undefined;
