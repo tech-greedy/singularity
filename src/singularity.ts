@@ -182,6 +182,13 @@ program.command('daemon')
     (async function () {
       await initializeConfig(true, true);
       GenerateCar.initialize();
+      process.on('uncaughtException', (err, origin) => {
+        console.error(err);
+        console.error(origin);
+        if (!err.message.includes('EPIPE') && !err.message.includes('Process exited')) {
+          process.exit(1);
+        }
+      });
       if (cluster.isPrimary) {
         await Datastore.init(false);
         await Datastore.connect();
