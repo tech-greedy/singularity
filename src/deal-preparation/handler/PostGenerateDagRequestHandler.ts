@@ -59,10 +59,7 @@ export async function generateDag (logger: winston.Logger, found: ScanningReques
           Cid: fileInfo.cid
         };
         const rowString = JSON.stringify(row) + '\n';
-        // Wait for drain if the buffer is full
-        if (!child.stdin!.write(rowString)) {
-          await new Promise(resolve => child.stdin!.once('drain', resolve));
-        }
+        child.stdin!.write(rowString);
       }
     }
   }
