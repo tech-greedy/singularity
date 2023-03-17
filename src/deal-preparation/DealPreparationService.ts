@@ -20,6 +20,7 @@ import handleMonitorRequest from './handler/MonitorRequestHandler';
 import { AbortSignal } from '../common/AbortSignal';
 import { sleep } from '../common/Util';
 import handlePostGenerateDagRequest, { generateDag } from './handler/PostGenerateDagRequestHandler';
+import handlePostPreparationAppendRequest from "./handler/PostPreparationAppendRequestHandler";
 
 export default class DealPreparationService extends BaseService {
   static AllowedDealSizes: number[] = DealPreparationService.initAllowedDealSizes();
@@ -52,6 +53,7 @@ export default class DealPreparationService extends BaseService {
     this.app.get('/generation-manifest/:id', handleGetGenerationManifestRequest.bind(this));
     this.app.get('/monitor', handleMonitorRequest.bind(this));
     this.app.post('/preparation/:id/generate-dag', handlePostGenerateDagRequest.bind(this));
+    this.app.post('/preparation/:id/append', handlePostPreparationAppendRequest.bind(this));
   }
 
   public async start (): Promise<void> {
