@@ -20,7 +20,7 @@ import handleMonitorRequest from './handler/MonitorRequestHandler';
 import { AbortSignal } from '../common/AbortSignal';
 import { sleep } from '../common/Util';
 import handlePostGenerateDagRequest, { generateDag } from './handler/PostGenerateDagRequestHandler';
-import handlePostPreparationAppendRequest from "./handler/PostPreparationAppendRequestHandler";
+import handlePostPreparationAppendRequest from './handler/PostPreparationAppendRequestHandler';
 
 export default class DealPreparationService extends BaseService {
   static AllowedDealSizes: number[] = DealPreparationService.initAllowedDealSizes();

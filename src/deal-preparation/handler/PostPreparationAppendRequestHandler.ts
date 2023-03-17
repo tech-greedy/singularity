@@ -3,7 +3,7 @@ import { Request, Response } from 'express';
 import Datastore from '../../common/Datastore';
 import sendError from './ErrorHandler';
 import ErrorCode from '../model/ErrorCode';
-import MetricEmitter from "../../common/metrics/MetricEmitter";
+import MetricEmitter from '../../common/metrics/MetricEmitter';
 
 export default async function handlePostPreparationAppendRequest (this: DealPreparationService, request: Request, response: Response) {
   const id = request.params['id'];
@@ -25,7 +25,7 @@ export default async function handlePostPreparationAppendRequest (this: DealPrep
     status: 'active',
     rescanInitiated: true,
     dagGenerationAttempted: false
-  })
+  });
 
   await MetricEmitter.Instance().emit({
     type: 'data_preparation_appended',

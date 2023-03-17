@@ -120,7 +120,7 @@ export default async function scan (logger: winston.Logger, request: ScanningReq
     await createGenerationRequest(request, index, logger, fileList);
     if (request.rescanInitiated === true) {
       await Datastore.ScanningRequestModel.findByIdAndUpdate(request.id, {
-        rescanInitiated: false,
+        rescanInitiated: false
       });
       request.rescanInitiated = false;
     }
