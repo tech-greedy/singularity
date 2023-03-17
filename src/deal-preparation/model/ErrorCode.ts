@@ -8,6 +8,7 @@ enum ErrorCode {
   MIN_RATIO_INVALID = 'MIN_RATIO_INVALID',
   MAX_RATIO_INVALID = 'MAX_RATIO_INVALID',
   GENERATION_NOT_COMPLETED = 'GENERATION_NOT_COMPLETED',
+  SCANNING_ACTIVE = 'SCANNING_ACTIVE',
 }
 
 export const ErrorMessage = {
@@ -19,7 +20,8 @@ export const ErrorMessage = {
   [ErrorCode.DATASET_GENERATION_REQUEST_NOT_FOUND]: 'The generation request cannot be found by the specified id and/or dataset',
   [ErrorCode.MIN_RATIO_INVALID]: 'The minimum target ratio is not valid. It needs to be between 0.5 and 0.95',
   [ErrorCode.MAX_RATIO_INVALID]: 'The maximum target ratio is not valid. It needs to be between 0.5 and 0.95 and more than minimum target ratio',
-  [ErrorCode.GENERATION_NOT_COMPLETED]: 'The generation request is not complete yet'
+  [ErrorCode.GENERATION_NOT_COMPLETED]: 'The generation request is not complete yet',
+  [ErrorCode.SCANNING_ACTIVE]: 'The scanning request is still active. Only completed scanning request can append new path.'
 };
 
 export default ErrorCode;

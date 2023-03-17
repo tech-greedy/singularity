@@ -639,6 +639,32 @@ async function UpdateGenerationState (dataset: string, generation: string | unde
   return response;
 }
 
+preparation.command('append').description('Append a new directory to an existing dataset. ' +
+  'This will add all entries under the new directory into the dataset. ' +
+  'Just like the "singularity prep create" command, the directory will be considered as the root.\n' +
+  'User is responsible of making sure there are no duplicate entries in the dataset otherwise the file with same path may be corrupted during retrieval.')
+  .option('--json', 'Output with JSON format')
+  .option('--force', 'Skip making client side check of whether dataset path exists.')
+  .argument('<dataset>', 'The dataset id or name')
+  .argument('<newPath>', 'Entries from that directory will be appended to the dataset')
+  .action(async (dataset, p: string, options) => {
+    await initializeConfig(false, false);
+    if (!options.force && !p.startsWith('s3://') && !await fs.pathExists(p)) {
+      console.error(`Dataset path "${p}" does not exist.`);
+      process.exit(1);
+    }
+    const url: string = config.get('connection.deal_preparation_service');
+    let response!: AxiosResponse;
+    try {
+      response = await axios.post(`${url}/preparation/${dataset}/append`, {
+        path: p.startsWith('s3://') ? p : path.resolve(p)
+      });
+    } catch (error) {
+      CliUtil.renderErrorAndExit(error);
+    }
+    CliUtil.renderResponse(response.data, options.json);
+  });
+
 const pause = preparation.command('pause')
   .description('Pause scanning or generation requests');
 const resume = preparation.command('resume')

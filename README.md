@@ -217,6 +217,25 @@ singularity prep resume -h
 singularity prep retry -h
 ```
 
+#### Append more files to a request
+
+Append a new directory to an existing dataset. This will add all entries under the new directory into the dataset.
+Just like the `singularity prep create` command, the directory will be considered as the root.
+User is responsible for making sure there are no duplicate entries in the dataset
+otherwise the file with same path may be corrupted during retrieval.
+
+```shell
+singularity preparation append <dataset> <newPath>
+```
+
+Example:
+
+```shell
+singularity prep create myData /my/data-2020 /my/out
+singularity prep append myData /my/data-2021
+singularity prep append myData /my/data-2022
+```
+
 #### Remove a request
 
 The whole data preparation requests can be removed from database. All generated CAR files can also be deleted by

@@ -300,7 +300,8 @@ export default class Datastore {
       tmpDir: Schema.Types.String,
       scanned: Schema.Types.Number,
       skipInaccessibleFiles: Schema.Types.Boolean,
-      dagGenerationAttempted: Schema.Types.Boolean
+      dagGenerationAttempted: Schema.Types.Boolean,
+      rescanInitiated: Schema.Types.Boolean
     }, {
       timestamps: true
     });
