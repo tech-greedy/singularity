@@ -13,6 +13,8 @@ Automatically import deals to boost for Filecoin storage providers
 The internal tool used by `singularity` to generate car files as well as commp
 - [generate-ipld-car](https://github.com/tech-greedy/generate-car#generate-ipld-car) -
 The internal tool used by `singularity` to regenerate the CAR that captures the unixfs dag of the dataset.
+- [singularity-browser](https://github.com/tech-greedy/singularity-browser) -
+A next.js app for browsing singularity made deals
 
 ## Quick Start
 
