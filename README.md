@@ -5,6 +5,15 @@ New node software for large-scale clients with PB-scale data onboarding to Filec
 ![build workflow](https://github.com/tech-greedy/singularity/actions/workflows/node.js.yml/badge.svg)
 [![npm version](https://badge.fury.io/js/@techgreedy%2Fsingularity.svg)](https://badge.fury.io/js/@techgreedy%2Fsingularity)
 
+## Related Projects
+
+- [singularity-import-boost](https://github.com/tech-greedy/singularity-import) -
+Automatically import deals to boost for Filecoin storage providers
+- [generate-car](https://github.com/tech-greedy/generate-car) -
+The internal tool used by `singularity` to generate car files as well as commp
+- [generate-ipld-car](https://github.com/tech-greedy/generate-car#generate-ipld-car) -
+The internal tool used by `singularity` to regenerate the CAR that captures the unixfs dag of the dataset.
+
 ## Quick Start
 
 Looking for a complete end-to-end demonstration? Try [Getting Started Guide](./getting-started.md)
@@ -53,8 +62,8 @@ make
 
 Then copy the generated binary to override the existing one from the PATH for your node environment, i.e.
 
-* singularity installed globally `/home/user/.nvm/versions/node/v16.xx.x/lib/node_modules/.bin`
-* singularity cloned locally `./node_modules/.bin`
+- singularity installed globally `/home/user/.nvm/versions/node/v16.xx.x/lib/node_modules/.bin`
+- singularity cloned locally `./node_modules/.bin`
 
 Note that the path may change depending on the nodejs version.
 If you cannot find the folder above, try searching for the generate-car
@@ -143,9 +152,9 @@ singularity daemon
 
 Deal preparation contains two parts
 
-* Scanning Request - an initial effort to scan the directory and make plans of how to assign different files and folders
+- Scanning Request - an initial effort to scan the directory and make plans of how to assign different files and folders
   to different chunks
-* Generation Request - subsequent works to generate the car file and compute the commP
+- Generation Request - subsequent works to generate the car file and compute the commP
 
 ```shell
 $ singularity prep -h
