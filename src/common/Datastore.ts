@@ -138,7 +138,10 @@ export default class Datastore {
         type: Schema.Types.String,
         index: 1
       },
-      index: Schema.Types.Number,
+      index: {
+        type: Schema.Types.Number,
+        index: 1
+      },
       generatedFileList: [generatedFileInfoSchema]
     });
     Datastore.OutputFileListModel = mongoose.model<OutputFileList>('OutputFileList', schema);
@@ -156,7 +159,10 @@ export default class Datastore {
         type: Schema.Types.String,
         index: 1
       },
-      index: Schema.Types.Number,
+      index: {
+        type: Schema.Types.Number,
+        index: 1
+      },
       fileList: [fileInfoSchema]
     });
     Datastore.InputFileListModel = mongoose.model<InputFileList>('InputFileList', schema);
@@ -263,7 +269,10 @@ export default class Datastore {
       datasetId: Schema.Types.String,
       datasetName: Schema.Types.String,
       path: Schema.Types.String,
-      index: Schema.Types.Number,
+      index: {
+        type: Schema.Types.Number,
+        index: 1
+      },
       outDir: Schema.Types.String,
       workerId: {
         type: Schema.Types.String,
@@ -303,7 +312,9 @@ export default class Datastore {
       errorMessage: Schema.Types.String,
       tmpDir: Schema.Types.String,
       scanned: Schema.Types.Number,
-      skipInaccessibleFiles: Schema.Types.Boolean
+      skipInaccessibleFiles: Schema.Types.Boolean,
+      dagGenerationAttempted: Schema.Types.Boolean,
+      rescanInitiated: Schema.Types.Boolean
     }, {
       timestamps: true
     });

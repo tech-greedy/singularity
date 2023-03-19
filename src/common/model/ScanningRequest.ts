@@ -14,4 +14,6 @@ export default interface ScanningRequest {
   tmpDir?: string,
   scanned: number,
   skipInaccessibleFiles?: boolean,
+  dagGenerationAttempted?: boolean,
+  rescanInitiated?: boolean,
 }

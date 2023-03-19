@@ -13,14 +13,12 @@ import DealPreparationService from './deal-preparation/DealPreparationService';
 import DealPreparationWorker from './deal-preparation/DealPreparationWorker';
 import axios, { AxiosResponse } from 'axios';
 import CliUtil from './cli-util';
-import IndexService from './index/IndexService';
 import DealTrackingService from './deal-tracking/DealTrackingService';
 import GetPreparationDetailsResponse from './deal-preparation/model/GetPreparationDetailsResponse';
 import fs from 'fs-extra';
 import Logger, { Category } from './common/Logger';
 import { Worker } from 'cluster';
 import cron from 'node-cron';
-import * as IpfsCore from 'ipfs-core';
 import DealReplicationService from './replication/DealReplicationService';
 import DealReplicationWorker from './replication/DealReplicationWorker';
 import GenerateCar from './common/GenerateCar';
@@ -184,8 +182,14 @@ program.command('daemon')
     (async function () {
       await initializeConfig(true, true);
       GenerateCar.initialize();
+      process.on('uncaughtException', (err, origin) => {
+        console.error(err);
+        console.error(origin);
+        if (!err.message.includes('EPIPE') && !err.message.includes('Process exited')) {
+          process.exit(1);
+        }
+      });
       if (cluster.isPrimary) {
-        let indexService: IndexService;
         await Datastore.init(false);
         await Datastore.connect();
         await migrate();
@@ -213,13 +217,6 @@ program.command('daemon')
             workers.push([cluster.fork(), 'deal_preparation_worker']);
           }
         }
-        if (config.get('index_service.enabled')) {
-          indexService = new IndexService();
-          if (config.get('ipfs.enabled')) {
-            indexService['ipfsClient'] = await IpfsCore.create();
-          }
-          indexService.start();
-        }
         if (config.get('deal_tracking_service.enabled')) {
           workers.push([cluster.fork(), 'deal_tracking_service']);
         }
@@ -229,7 +226,7 @@ program.command('daemon')
         if (config.get('deal_replication_worker.enabled')) {
           workers.push([cluster.fork(), 'deal_replication_worker']);
         }
-        if (config.get('deal_self_service.enabled')) {
+        if (config.getOrDefault('deal_self_service.enabled', false)) {
           workers.push([cluster.fork(), 'deal_self_service']);
         }
       } else if (cluster.isWorker) {
@@ -388,6 +385,27 @@ preparation.command('create').description('Start deal preparation for a local da
     }
 
     CliUtil.renderResponse(response.data, options.json);
+  });
+
+preparation.command('generate-dag-car').alias('dag')
+  .description('Add a CAR file to the dataset that represents the Unixfs folder structure for the dataset. ' +
+    'This will allow bitswap retrieval of the dataset. ' +
+    'Be cautious to use it when the preparation is not done as it may lead to missing files in the final Root CID.')
+  .argument('<dataset>', 'The dataset id or name')
+  .action(async (id) => {
+    await initializeConfig(false, false);
+    const url: string = config.get('connection.deal_preparation_service');
+    let response!: AxiosResponse;
+    console.log('Generating DAG CAR file. Please wait until it finishes.');
+    try {
+      response = await axios.post(`${url}/preparation/${id}/generate-dag`);
+    } catch (error) {
+      CliUtil.renderErrorAndExit(error);
+    }
+
+    CliUtil.renderResponse(response.data, false);
+    console.log('Once the DAG CAR file is sealed or made available on the network, you may retrieve the dataset using unixfs path with the Root CID:');
+    console.log(response.data.dataCid);
   });
 
 preparation.command('status').description('Check the status of a deal preparation request')
@@ -620,6 +638,32 @@ async function UpdateGenerationState (dataset: string, generation: string | unde
   }
   return response;
 }
+
+preparation.command('append').description('Append a new directory to an existing dataset. ' +
+  'This will add all entries under the new directory into the dataset. ' +
+  'Just like the "singularity prep create" command, the directory will be considered as the root.\n' +
+  'User is responsible of making sure there are no duplicate entries in the dataset otherwise the file with same path may be corrupted during retrieval.')
+  .option('--json', 'Output with JSON format')
+  .option('--force', 'Skip making client side check of whether dataset path exists.')
+  .argument('<dataset>', 'The dataset id or name')
+  .argument('<newPath>', 'Entries from that directory will be appended to the dataset')
+  .action(async (dataset, p: string, options) => {
+    await initializeConfig(false, false);
+    if (!options.force && !p.startsWith('s3://') && !await fs.pathExists(p)) {
+      console.error(`Dataset path "${p}" does not exist.`);
+      process.exit(1);
+    }
+    const url: string = config.get('connection.deal_preparation_service');
+    let response!: AxiosResponse;
+    try {
+      response = await axios.post(`${url}/preparation/${dataset}/append`, {
+        path: p.startsWith('s3://') ? p : path.resolve(p)
+      });
+    } catch (error) {
+      CliUtil.renderErrorAndExit(error);
+    }
+    CliUtil.renderResponse(response.data, options.json);
+  });
 
 const pause = preparation.command('pause')
   .description('Pause scanning or generation requests');

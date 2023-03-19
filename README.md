@@ -5,9 +5,18 @@ New node software for large-scale clients with PB-scale data onboarding to Filec
 ![build workflow](https://github.com/tech-greedy/singularity/actions/workflows/node.js.yml/badge.svg)
 [![npm version](https://badge.fury.io/js/@techgreedy%2Fsingularity.svg)](https://badge.fury.io/js/@techgreedy%2Fsingularity)
 
-## Quick Start
+## Related Projects
 
-Looking for standalone Deal Preparation? Try [singularity-prepare](./singularity-prepare.md)
+- [singularity-import-boost](https://github.com/tech-greedy/singularity-import) -
+Automatically import deals to boost for Filecoin storage providers
+- [generate-car](https://github.com/tech-greedy/generate-car) -
+The internal tool used by `singularity` to generate car files as well as commp
+- [generate-ipld-car](https://github.com/tech-greedy/generate-car#generate-ipld-car) -
+The internal tool used by `singularity` to regenerate the CAR that captures the unixfs dag of the dataset.
+- [singularity-browser](https://github.com/tech-greedy/singularity-browser) -
+A next.js app for browsing singularity made deals
+
+## Quick Start
 
 Looking for a complete end-to-end demonstration? Try [Getting Started Guide](./getting-started.md)
 
@@ -48,15 +57,15 @@ the one pulled by npm.
 
 ```shell
 # Make sure you have go v1.17+ installed
-git clone https://github.com/tech-greedy/go-generate-car.git
-cd go-generate-car
+git clone https://github.com/tech-greedy/generate-car.git
+cd generate-car
 make
 ```
 
 Then copy the generated binary to override the existing one from the PATH for your node environment, i.e.
 
-* singularity installed globally `/home/user/.nvm/versions/node/v16.xx.x/lib/node_modules/.bin`
-* singularity cloned locally `./node_modules/.bin`
+- singularity installed globally `/home/user/.nvm/versions/node/v16.xx.x/lib/node_modules/.bin`
+- singularity cloned locally `./node_modules/.bin`
 
 Note that the path may change depending on the nodejs version.
 If you cannot find the folder above, try searching for the generate-car
@@ -92,11 +101,10 @@ This is useful if you only need deal preparation but not deal making.
 You can still have deal making enabled, but disabling it will use slightly less system resources.  
 In [default.toml](./config/default.toml) from your repo
 
-1. change `index_service.enabled` to false
-2. change `ipfs.enabled` to false
-3. change `deal_tracking_service.enabled` to false
-4. change `deal_replication_service.enabled` to false
-5. change `deal_replication_worker.enabled` to false
+1. change `ipfs.enabled` to false
+2. change `deal_tracking_service.enabled` to false
+3. change `deal_replication_service.enabled` to false
+4. change `deal_replication_worker.enabled` to false
 
 ### Use External MongoDb database
 
@@ -131,7 +139,6 @@ Commands:
   init              Initialize the configuration directory in SINGULARITY_PATH
                     If unset, it will be initialized at HOME_DIR/.singularity
   daemon            Start a daemon process for deal preparation and deal making
-  index             Manage the dataset index which will help map the dataset path to actual piece
   preparation|prep  Manage deal preparation
   help [command]    display help for command
 ```
@@ -147,9 +154,9 @@ singularity daemon
 
 Deal preparation contains two parts
 
-* Scanning Request - an initial effort to scan the directory and make plans of how to assign different files and folders
+- Scanning Request - an initial effort to scan the directory and make plans of how to assign different files and folders
   to different chunks
-* Generation Request - subsequent works to generate the car file and compute the commP
+- Generation Request - subsequent works to generate the car file and compute the commP
 
 ```shell
 $ singularity prep -h
@@ -219,6 +226,25 @@ You can pause/resume/retry the scanning request or generation requests.
 singularity prep pause -h
 singularity prep resume -h
 singularity prep retry -h
+```
+
+#### Append more files to a request
+
+Append a new directory to an existing dataset. This will add all entries under the new directory into the dataset.
+Just like the `singularity prep create` command, the directory will be considered as the root.
+User is responsible for making sure there are no duplicate entries in the dataset
+otherwise the file with same path may be corrupted during retrieval.
+
+```shell
+singularity preparation append <dataset> <newPath>
+```
+
+Example:
+
+```shell
+singularity prep create myData /my/data-2020 /my/out
+singularity prep append myData /my/data-2021
+singularity prep append myData /my/data-2022
 ```
 
 #### Remove a request
@@ -453,6 +479,20 @@ location /propose {
 }
 ```
 
+## Retrieval
+
+The recommended way for Retrieval is via bitswap protocol.
+You need the storage provider to run [booster-bitswap](https://boost.filecoin.io/bitswap-retrieval).
+
+Then you may use `ipfs get <RootCid>/sub/path/to/file` to retrieve the file or folder. The `ipfs` version needs to be 0.18.0+.
+
+The `RootCid` can be found in `singularity prep list` and will be automatically generated when the dataset is fully prepared.
+
+If you find `RootCid` missing, or you're using an older version of Singularity (before 3.0.0),
+you can regenerate the `RootCid` by running `singularity prep dag <dataset>`.
+This will generate another CAR file that encapsulates the IPLD DAG of the whole dataset.
+You will need to get that new CAR file sealed before you can perform bitswap retrieval.
+
 ## Configuration
 
 Look for `default.toml` in the initialized repo.
@@ -587,8 +627,7 @@ however this currently only works when the tmpDir is used.
 
 ### Does it work on Windows
 
-Only Deal Preparation works and Indexing works on Windows.
-Deal Replication and Retrieval only works in Linux/Mac due to dependency restrictions.
+This software is not extensively tested on Windows.
 
 ### Error - too many open files
 

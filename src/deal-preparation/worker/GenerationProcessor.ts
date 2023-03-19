@@ -7,19 +7,20 @@ import { FileInfo, FileList } from '../../common/model/InputFileList';
 import winston from 'winston';
 import GenerationRequest from '../../common/model/GenerationRequest';
 import { moveFileList, MoveResult, moveS3FileList } from './MoveProcessor';
-import { ChildProcessPromise, ErrorWithOutput, Output, spawn } from 'promisify-child-process';
+import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
 import GenerateCar from '../../common/GenerateCar';
-import config from '../../common/Config';
 import { GeneratedFileList } from '../../common/model/OutputFileList';
 import TrafficMonitor from './TrafficMonitor';
 import DealPreparationWorker from '../DealPreparationWorker';
 import MetricEmitter from '../../common/metrics/MetricEmitter';
+import { JsonStreamStringify } from 'json-stream-stringify';
+import Parser from 'stream-json/Parser';
+import Asm from 'stream-json/Assembler';
+import { pipeline } from 'stream/promises';
 
 export class GenerationProcessor {
   public static childProcessPid: number | undefined;
 }
-
-type ChildProcessOutput = Output;
 
 interface ProcessGenerationOutput {
   tmpDir?: string;
@@ -76,25 +77,17 @@ export async function processGeneration (
   }
   await Datastore.HealthCheckModel.findOneAndUpdate({ workerId: worker.workerId }, { $set: { state: 'generation_generating_car_and_commp' } });
   checkpoint = performance.now();
-  const result = await generate(logger, newGenerationWork, fileList, returnValue.tmpDir);
-  const timeSpentInGenerationMs = performance.now() - checkpoint;
-
-  const {
-    stdout,
-    stderr,
-    code
-  } = result;
-
-  await Datastore.HealthCheckModel.findOneAndUpdate({ workerId: worker.workerId }, { $set: { state: 'generation_parsing_output' } });
-  // Handle the error and update the database
-  if (code !== 0) {
-    logger.error(`${worker.workerId} Encountered an error.`, result);
+  let output : GenerateCarOutput;
+  try {
+    output = await generate(logger, newGenerationWork, fileList, returnValue.tmpDir);
+  } catch (e: any) {
+    logger.error(`${worker.workerId} Encountered an error.`, e);
     await Datastore.GenerationRequestModel.findOneAndUpdate({
       _id: newGenerationWork.id,
       status: 'active'
     }, {
       status: 'error',
-      errorMessage: stderr,
+      errorMessage: e.message,
       workerId: null
     }, { projection: { _id: 1 } });
 
@@ -105,15 +98,15 @@ export async function processGeneration (
         datasetName: newGenerationWork.datasetName,
         generationId: newGenerationWork.id,
         index: newGenerationWork.index,
-        statusCode: code,
-        errorMessage: stderr?.toString()
+        errorMessage: e.message
       }
     });
     return returnValue;
   }
+  const timeSpentInGenerationMs = performance.now() - checkpoint;
+  await Datastore.HealthCheckModel.findOneAndUpdate({ workerId: worker.workerId }, { $set: { state: 'generation_parsing_output' } });
 
   // Parse the output
-  const output: GenerateCarOutput = JSON.parse(stdout?.toString() ?? '');
   const carFile = path.join(newGenerationWork.outDir, output.PieceCid + '.car');
   const carFileStat = await fs.stat(carFile);
   const fileMap = new Map<string, FileInfo>();
@@ -241,21 +234,21 @@ async function moveToTmpdir (
 }
 
 export async function generate (logger: winston.Logger, request: GenerationRequest, fileList: FileList, tmpDir: string | undefined)
-  : Promise<ChildProcessOutput> {
+  : Promise<GenerateCarOutput> {
   logger.debug(`Spawning generate-car.`, {
     outPath: request.outDir,
     parentPath: request.path,
     tmpDir
   });
-  let input: string;
+  let input: JsonStreamStringify;
   if (tmpDir) {
     tmpDir = path.resolve(tmpDir);
-    input = JSON.stringify(fileList.map(file => ({
+    input = new JsonStreamStringify(fileList.map(file => ({
       Path: file.path,
       Size: file.end !== undefined ? file.end - file.start! : file.size
     })));
   } else {
-    input = JSON.stringify(fileList.map(file => ({
+    input = new JsonStreamStringify(fileList.map(file => ({
       Path: file.path,
       Size: file.size,
       Start: file.start,
@@ -263,7 +256,7 @@ export async function generate (logger: winston.Logger, request: GenerationReque
     })));
   }
   const output = await invokeGenerateCar(logger, request.id, input, request.outDir, tmpDir ?? request.path);
-  logger.debug(`Child process finished.`, output);
+  logger.debug('Child process finished.');
   return output;
 }
 
@@ -271,30 +264,47 @@ async function isGenerationRequestNoLongerActive (id: string) : Promise<boolean>
   return (await Datastore.GenerationRequestModel.findById(id))?.status !== 'active';
 }
 
-export async function invokeGenerateCar (logger: winston.Logger, generationId: string | undefined, input: string, outDir: string, p: string)
-  : Promise<ChildProcessOutput> {
-  const cmd = GenerateCar.path!;
+export async function invokeGenerateCar (logger: winston.Logger, generationId: string | undefined, input: JsonStreamStringify, outDir: string, p: string)
+  : Promise<GenerateCarOutput> {
+  const cmd = GenerateCar.generateCarPath();
   const args = ['-o', outDir, '-p', p];
-  const child = spawn(cmd, args, {
-    encoding: 'utf8',
-    maxBuffer: config.getOrDefault('deal_preparation_worker.max_buffer', 1024 * 1024 * 1024)
-  });
+  const child = spawn(cmd, args);
   if (generationId) {
     checkPauseOrRemove(logger, generationId, child);
   }
-  child.stdin!.write(input);
-  child.stdin!.end();
+  let stderr = '';
+  child.stderr.on('data', (data) => {
+    stderr += data;
+  });
+  input.pipe(child.stdin!);
   GenerationProcessor.childProcessPid = child.pid;
   try {
-    return await child;
-  } catch (error: any) {
-    return <ErrorWithOutput>error;
+    const parser = new Parser();
+    const asm = new Asm();
+    const pipe = pipeline(child.stdout!, parser);
+    let output : GenerateCarOutput | undefined;
+    asm.on('done', asm => { output = asm.current; });
+    asm.connectTo(parser);
+    await pipe;
+    logger.info('Finished parsing stdout');
+    return output!;
+  } catch (e) {
+    logger.error(`Error while parsing stdout.`, e);
+    const { code, signal }: {code: number | null, signal: string | null } = await new Promise((resolve, _reject) => {
+      child.once('close', (code, signal) => resolve({ code, signal }));
+    });
+    logger.error(`Child process exited abnormally.`, {
+      code,
+      signal,
+      stderr
+    });
+    throw new Error(`Child process exited abnormally. ${stderr}`);
   } finally {
     GenerationProcessor.childProcessPid = undefined;
   }
 }
 
-async function checkPauseOrRemove (logger: winston.Logger, generationId: string, child: ChildProcessPromise) {
+async function checkPauseOrRemove (logger: winston.Logger, generationId: string, child: ChildProcessWithoutNullStreams) {
   const generation = await Datastore.GenerationRequestModel.findById(generationId);
   if (generation?.status === 'completed') {
     return;

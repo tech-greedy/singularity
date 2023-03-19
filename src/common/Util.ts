@@ -20,3 +20,7 @@ export function shuffle (array: any[]) {
 
   return array;
 }
+
+export function getNextPowerOfTwo (n: number): number {
+  return Math.pow(2, Math.ceil(Math.log2(n)));
+}

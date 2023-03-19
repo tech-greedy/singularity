@@ -21,7 +21,7 @@ async function findLastGeneration (request: ScanningRequest, logger: winston.Log
   let index = 0;
   const lastGeneration = await Datastore.GenerationRequestModel.findOne({
     datasetId: request.id,
-    status: { $ne: 'created' }
+    status: { $nin: ['created', 'dag'] }
   }, {
     _id: 1,
     index: 1
@@ -105,6 +105,9 @@ export default async function scan (logger: winston.Logger, request: ScanningReq
     index,
     lastFileInfo
   } = await findLastGeneration(request, logger);
+  if (request.rescanInitiated === true) {
+    lastFileInfo = undefined;
+  }
   const checkpoint = performance.now();
   for await (const fileList of scanner.scan(request.path, request.minSize, request.maxSize, lastFileInfo, logger, request.skipInaccessibleFiles)) {
     if (!await Datastore.ScanningRequestModel.findById(request.id)) {
@@ -115,6 +118,12 @@ export default async function scan (logger: winston.Logger, request: ScanningReq
       return;
     }
     await createGenerationRequest(request, index, logger, fileList);
+    if (request.rescanInitiated === true) {
+      await Datastore.ScanningRequestModel.findByIdAndUpdate(request.id, {
+        rescanInitiated: false
+      });
+      request.rescanInitiated = false;
+    }
     index++;
     if ((await Datastore.ScanningRequestModel.findById(request.id))?.status === 'paused') {
       logger.info(`The scanning request has been paused. Scanning stopped.`, {

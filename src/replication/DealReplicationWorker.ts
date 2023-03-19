@@ -305,7 +305,7 @@ export default class DealReplicationWorker extends BaseService {
       // Find cars that are finished generation
       let cars = await Datastore.GenerationRequestModel.find({
         datasetId: replicationRequest.datasetId,
-        status: 'completed'
+        status: { $in: ['completed', 'dag'] }
       });
       const makeDealAll = providers.map(async (provider) => {
         cars = shuffle(cars); // shuffle the cars list to achieve best importing performance (when sending to mulitple SPs)
@@ -509,7 +509,7 @@ export default class DealReplicationWorker extends BaseService {
       const reRead = await Datastore.ReplicationRequestModel.findById(replicationRequest.id);
       const carCount = await Datastore.GenerationRequestModel.count({
         datasetId: reRead?.datasetId,
-        status: 'completed'
+        status: { $in: ['completed', 'dag'] }
       });
       await this.checkAndMarkCompletion(reRead!, carCount);
     } catch (err) {

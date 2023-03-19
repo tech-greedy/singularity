@@ -50,7 +50,7 @@ describe('BaseService', () => {
       let aborted = false;
       GenerationProcessor.childProcessPid = process.pid;
       await service.initialize(() => Promise.resolve(aborted));
-      await sleep(100);
+      await sleep(1000);
       const found = await Datastore.HealthCheckModel.findOne();
       expect(found).toEqual(jasmine.objectContaining({
         type: 'deal_preparation_service',

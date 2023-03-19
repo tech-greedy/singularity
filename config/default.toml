@@ -22,9 +22,6 @@ deal_preparation_service = 'http://127.0.0.1:7001'
 deal_replication_service = 'http://127.0.0.1:7004'
 deal_self_service = 'http://127.0.0.1:7005'
 
-# Connection string to index service, used by Singularity CLI
-index_service = 'http://127.0.0.1:7003'
-
 [deal_preparation_service]
 enabled = true
 # API to serve singularity prep commands
@@ -43,6 +40,7 @@ local_path = "./database"
 # MongoDB API
 local_bind = "0.0.0.0"
 local_port = 37000
+force_max_deal_size = true
 
 [deal_preparation_worker]
 enabled = true
@@ -50,18 +48,6 @@ enabled = true
 num_workers = 4
 # Buffer for child spawn
 max_buffer = 1073741824
-
-[index_service]
-enabled = true
-# API to serve singularity index commands
-bind = "0.0.0.0"
-port = 7003
-# If not using the built-in IPFS daemon, use below URI to connect to IPFS API
-ipfs_http = "http://localhost:5001"
-
-[ipfs]
-# Whether to start a built-in IPFS daemon - experimental
-enabled = false
 
 [http_hosting_service]
 enabled = true

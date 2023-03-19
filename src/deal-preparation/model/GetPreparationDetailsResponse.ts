@@ -1,7 +1,7 @@
 export interface GenerationRequestSummary {
   id: string,
   index: number,
-  status: 'active' | 'paused' | 'completed' | 'error' | 'created',
+  status: 'active' | 'paused' | 'completed' | 'error' | 'created' | 'dag',
   errorMessage?: string,
   dataCid?: string,
   pieceCid?: string,
@@ -24,5 +24,6 @@ export default interface GetPreparationDetailsResponse {
   generationPaused: number,
   generationCompleted: number,
   generationError: number,
-  generationRequests: GenerationRequestSummary[]
+  generationRequests: GenerationRequestSummary[],
+  rootCid: string
 }
