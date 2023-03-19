@@ -220,11 +220,20 @@ export default class Datastore {
 
   private static setupDealStateSchema () {
     const dealStateSchema = new Schema<DealState>({
-      client: Schema.Types.String,
+      client: {
+        type: Schema.Types.String,
+        index: true
+      },
       provider: Schema.Types.String,
       dealCid: Schema.Types.String,
-      dataCid: Schema.Types.String,
-      pieceCid: Schema.Types.String,
+      dataCid: {
+        type: Schema.Types.String,
+        index: true
+      },
+      pieceCid: {
+        type: Schema.Types.String,
+        index: true
+      },
       pieceSize: Schema.Types.Number,
       startEpoch: Schema.Types.Number,
       expiration: Schema.Types.Number,
@@ -235,7 +244,10 @@ export default class Datastore {
         type: Schema.Types.String,
         index: true
       },
-      replicationRequestId: Schema.Types.String,
+      replicationRequestId: {
+        type: Schema.Types.String,
+        index: true
+      },
       datasetId: Schema.Types.String,
       dealId: {
         type: Schema.Types.Number,
@@ -278,6 +290,7 @@ export default class Datastore {
     }, {
       timestamps: true
     });
+    generationRequestSchema.index({ datasetId: 1, status: 1 });
     Datastore.GenerationRequestModel = mongoose.model<GenerationRequest>('GenerationRequest', generationRequestSchema);
   }
 

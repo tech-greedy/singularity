@@ -9,7 +9,7 @@ import fs from 'fs-extra';
 import config from '../common/Config';
 import { AbortSignal } from '../common/AbortSignal';
 import { exec } from 'promisify-child-process';
-import { sleep } from '../common/Util';
+import { shuffle, sleep } from '../common/Util';
 import { HeightFromCurrentTime } from '../common/ChainHeight';
 import GenerateCsv from '../common/GenerateCsv';
 import MetricEmitter from '../common/metrics/MetricEmitter';
@@ -74,17 +74,25 @@ export default class DealReplicationWorker extends BaseService {
       status: 'active'
     });
 
+    const stillActiveCron: string[] = [];
     for (const request2Check of activeCronWorks) {
       if (this.cronRefArray.has(request2Check.id)) {
-        const [schedule, taskRef] = this.cronRefArray.get(request2Check.id)!;
+        stillActiveCron.push(request2Check.id);
+        const [schedule] = this.cronRefArray.get(request2Check.id)!;
         if (schedule !== request2Check.cronSchedule) {
           // cron schedule changed from update request
-          taskRef.stop();
-          this.cronRefArray.delete(request2Check.id);
+          this.stopCronIfExist(request2Check.id);
           await Datastore.ReplicationRequestModel.findByIdAndUpdate(
             request2Check.id, { workerId: null }); // will be picked up again by the immediate pollReplicationWork
           this.logger.info(`Cron changed, restarting schedule. (${request2Check.id})`);
         }
+      }
+    }
+
+    // Go through cron again, to delete any non-active jobs
+    for (const [key] of this.cronRefArray) {
+      if (!stillActiveCron.includes(key)) {
+        this.stopCronIfExist(key);
       }
     }
   }
@@ -132,19 +140,17 @@ export default class DealReplicationWorker extends BaseService {
    * @returns true is lotus, false is boost
    */
   public async isUsingLotus (provider: string): Promise<boolean> {
-    let useLotus = true;
     // use boost libp2p command to check whether provider supports boost
     const versionQueryCmd = `${this.boostCMD} provider libp2p-info ${provider}`;
     const cmdOut = await exec(versionQueryCmd);
     if (cmdOut?.stdout?.toString()?.includes('/fil/storage/mk/1.2.0')) {
-      useLotus = false;
       this.logger.debug(`SP ${provider} supports boost.`);
+      return false;
     } else if (cmdOut?.stdout?.toString()?.includes('/fil/storage/mk/1.1.0')) {
       this.logger.debug(`SP ${provider} supports lotus.`);
-    } else {
-      throw new Error(JSON.stringify(cmdOut));
+      return true;
     }
-    return useLotus;
+    throw new Error(JSON.stringify(cmdOut));
   }
 
   private static calculatePriceWithSize (price: number, pieceSize: number): string {
@@ -296,24 +302,24 @@ export default class DealReplicationWorker extends BaseService {
     }
     try {
       const providers = DealReplicationWorker.generateProvidersList(replicationRequest.storageProviders);
+      // Find cars that are finished generation
+      let cars = await Datastore.GenerationRequestModel.find({
+        datasetId: replicationRequest.datasetId,
+        status: { $in: ['completed', 'dag'] }
+      });
       const makeDealAll = providers.map(async (provider) => {
-        // Find cars that are finished generation
-        const cars = await Datastore.GenerationRequestModel.find({
-          datasetId: replicationRequest.datasetId,
-          status: { $in: ['completed', 'dag'] }
-        })
-          .sort({
-            pieceCid: 1
-          });
-        if (breakOuter) {
-          this.stopCronIfExist(replicationRequest.id);
-          return;
-        }
+        cars = shuffle(cars); // shuffle the cars list to achieve best importing performance (when sending to mulitple SPs)
         let useLotus = true;
         try {
           useLotus = await this.isUsingLotus(provider);
         } catch (error) {
-          this.logger.error(`SP ${provider} unknown output from libp2p. Assume lotus.`, error);
+          this.logger.error(`SP ${provider} unknown output from libp2p. Give up on this SP.`, error);
+          return;
+        }
+
+        if (breakOuter) {
+          this.stopCronIfExist(replicationRequest.id);
+          return;
         }
 
         let dealsMadePerSP = 0;
@@ -392,13 +398,18 @@ export default class DealReplicationWorker extends BaseService {
 
           if (!existingRec.isForced) {
             // check if the car has already dealt or have enough replica
+            let alreadyDealt = false;
             const existingDeals = await Datastore.DealStateModel.find({
-              pieceCid: carFile.pieceCid,
+              // due to unknown bug, DealState can have mismatch piece/data CID
+              // 2022-11-20: bug might related to filscan reorg cause incorrect deal ID info
+              $or: [{ pieceCid: carFile.pieceCid }, { dataCid: carFile.dataCid }],
               state: { $nin: ['slashed', 'error', 'expired', 'proposal_expired'] }
             });
-            let alreadyDealt = false;
             for (let k = 0; k < existingDeals.length; k++) {
               const deal = existingDeals[k];
+              if (deal.pieceCid !== carFile.pieceCid) {
+                this.logger.warn(`This dealCID ${deal.dealCid} has mismatch pieceCID or dataCID, means DealID is probably incorrect ${deal.dealId}.`);
+              }
               if (deal.provider === provider) {
                 this.logger.debug(`This pieceCID ${carFile.pieceCid} has already been dealt with ${provider}. ` +
                   `Deal CID ${deal.dealCid}. Moving on to next file.`);
@@ -565,8 +576,10 @@ export default class DealReplicationWorker extends BaseService {
       await sleep(retryTimeout);
       if (errorMsg.includes('proposed provider collateral below minimum')) {
         this.logger.warn(`Keep retry on this error without expoential back off. These can usually resolve itself within timely manner.`);
+        // do not increase retry count, we want to retry this forever
       } else {
         retryTimeout *= 2; // expoential back off
+        retryCount++;
       }
       retryCount++;
     } while (retryCount < maxRetry);
