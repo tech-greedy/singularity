@@ -37,6 +37,7 @@ import MetricEmitter from './common/metrics/MetricEmitter';
 import boxen from 'boxen';
 import wrap from 'word-wrap';
 import DealSelfService from './replication/selfservice/DealSelfService';
+import ManagementUIService from './management-ui/ManagementUIService';
 
 const version = packageJson.version;
 const dataCollectionText = boxen(
@@ -229,6 +230,9 @@ program.command('daemon')
         if (config.getOrDefault('deal_self_service.enabled', false)) {
           workers.push([cluster.fork(), 'deal_self_service']);
         }
+        if (config.getOrDefault('management_ui_service.enabled', false)) {
+          workers.push([cluster.fork(), 'management_ui_service']);
+        }
       } else if (cluster.isWorker) {
         await Datastore.connect();
         ConfigInitializer.instanceId = (await Datastore.MiscModel.findOne({ key: 'instance' }))!.value;
@@ -251,6 +255,9 @@ program.command('daemon')
               break;
             case 'deal_self_service':
               new DealSelfService().start();
+              break;
+            case 'management_ui_service':
+              new ManagementUIService().start();
               break;
           }
         });

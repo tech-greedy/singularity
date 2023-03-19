@@ -15,6 +15,7 @@ export enum Category {
   DealSelfService = 'deal_self_service',
   DealReplicationWorker = 'deal_replication_worker',
   MetricEmitter = 'metric_emitter',
+  ManagementUIService = 'management_ui_service'
 }
 
 const container = new winston.Container();

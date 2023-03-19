@@ -76,3 +76,9 @@ min_retry_wait_ms = 30000
 max_retry_count = 3
 boost_cli_cmd = "boost" #if not in PATH, specify full location here
 lotus_cli_cmd = "lotus" #if not in PATH, specify full location here
+
+[management_ui_service]
+enabled = true
+# For security reason, it's recommended to use port mapping like ssh -L 7006:localhost:7006 to expose it to your local PC (Same idea as boost)
+bind = "127.0.0.1"
+port = 7006
