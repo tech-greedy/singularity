@@ -1,4 +1,4 @@
-import {getNextPowerOfTwo} from "../../src/common/Util";
+import { getNextPowerOfTwo, shuffle, sleep } from '../../src/common/Util';
 
 describe('Util', () => {
   describe('getNextPowerOfTwo', () => {
@@ -12,6 +12,24 @@ describe('Util', () => {
       expect(getNextPowerOfTwo(7)).toBe(8)
       expect(getNextPowerOfTwo(8)).toBe(8)
       expect(getNextPowerOfTwo(9)).toBe(16)
+    })
+  })
+
+  describe('sleep', () => {
+    it('should sleep', async () => {
+      const start = Date.now()
+      await sleep(100)
+      const end = Date.now()
+      expect(end - start).toBeGreaterThanOrEqual(100)
+    })
+  })
+
+  describe('shuffle', () => {
+    it('should shuffle', () => {
+      const array = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+      const shuffled = shuffle(array)
+      expect(shuffled).not.toEqual(array)
+      expect(shuffled.sort()).toEqual(array.sort())
     })
   })
 })

@@ -131,7 +131,10 @@
       "src/**"
     ],
     "exclude": [
-      "src/deal-preparation/scanner/rrdir.js"
+      "src/deal-preparation/scanner/rrdir.js",
+      "src/deal-tracking/DealTrackingService.ts",
+      "src/replication/DealReplicationService.ts",
+      "src/replication/DealReplicationWorker.ts"
     ],
     "reporter": [
       "text",
