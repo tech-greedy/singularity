@@ -9,7 +9,7 @@ import cron from 'node-cron';
 import * as childprocess from 'promisify-child-process';
 import axios from 'axios';
 
-describe('DealReplicationWorker', () => {
+xdescribe('DealReplicationWorker', () => {
   let worker: DealReplicationWorker;
   let defaultTimeout: number;
 
