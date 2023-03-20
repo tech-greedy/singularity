@@ -24,7 +24,7 @@ export async function generateDag (logger: winston.Logger, found: ScanningReques
   const checkpoint = performance.now();
   const cmd = GenerateCar.generateIpldCarPath();
   const args = ['-o', found.outDir];
-  if (config.getOrDefault('deal_preparation_service.force_max_deal_size', true)) {
+  if (config.getOrDefault('deal_preparation_service.force_max_deal_size_for_dag', true)) {
     args.push('-s', getNextPowerOfTwo(found.maxSize).toString());
   }
   logger.info(`Spawning generate-ipld-car.`, {
