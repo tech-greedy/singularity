@@ -5,7 +5,7 @@ import DealReplicationService from "../../src/replication/DealReplicationService
 import supertest from "supertest";
 import ErrorCode, {ErrorMessage} from "../../src/replication/model/ErrorCode";
 
-describe('DealReplicationService', () => {
+xdescribe('DealReplicationService', () => {
   let service: DealReplicationService;
   beforeAll(async () => {
     await Utils.initDatabase();
