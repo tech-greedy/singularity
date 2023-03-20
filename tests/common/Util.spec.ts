@@ -27,8 +27,9 @@ describe('Util', () => {
   describe('shuffle', () => {
     it('should shuffle', () => {
       const array = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+      const arrayCopy = [...array]
       const shuffled = shuffle(array)
-      expect(shuffled).not.toEqual(array)
+      expect(shuffled).not.toEqual(arrayCopy)
       expect(shuffled.sort()).toEqual(array.sort())
     })
   })
