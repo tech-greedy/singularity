@@ -3,9 +3,11 @@ import Utils from '../../Utils';
 import Datastore from '../../../src/common/Datastore';
 import supertest from 'supertest';
 import ErrorCode, { ErrorMessage } from '../../../src/replication/selfservice/model/ErrorCode';
+import axios from 'axios';
 
 describe('DealSelfService', () => {
   let service: DealSelfService
+  let axiosSpy: jasmine.Spy;
   const defaultPolicy = {
     client: 'client',
     provider: 'provider',
@@ -26,6 +28,11 @@ describe('DealSelfService', () => {
     await Datastore.GenerationRequestModel.deleteMany();
     await Datastore.DealStateModel.deleteMany();
     await Datastore.DealSelfServicePolicyModel.deleteMany();
+    axiosSpy = spyOn(axios, 'post').and.returnValue(Promise.resolve({
+      data: {
+        result: '100000000000000'
+      }
+    }));
   });
 
   it('should not throw when start', () => {
@@ -181,6 +188,52 @@ describe('DealSelfService', () => {
         error: ErrorCode.NO_PIECE_TO_PROPOSE,
         message: ErrorMessage[ErrorCode.NO_PIECE_TO_PROPOSE],
       });
+    })
+    it('should work with real verified address', async () => {
+      axiosSpy.and.callThrough();
+      const scanning = await Datastore.ScanningRequestModel.create({name: 'name'});
+      await Datastore.DealSelfServicePolicyModel.create(
+        {provider: 'provider', client: 'f13vtwldyycj32sxhenrd7gmwj72hhatvuoydjxii',
+          minStartDays: 0, maxStartDays: 20, minDurationDays: 200, maxDurationDays: 500,
+          verified: true, price: 0, datasetName: 'name'});
+      await Datastore.GenerationRequestModel.create({
+        datasetId: scanning.id,
+        pieceCid: 'pieceCid',
+        pieceSize: 100,
+        dataCid: 'dataCid',
+        carSize: 100,
+      })
+      await Datastore.DealStateModel.create({
+        provider: 'provider2',
+        pieceCid: 'pieceCid2',
+        state: 'published',
+        pieceSize: 100,
+        client: 'f13vtwldyycj32sxhenrd7gmwj72hhatvuoydjxii',
+      })
+      const dealSpy = spyOn<any>(service, 'proposeDeal').and.resolveTo({dealCid: 'dealCid', state: 'proposed', errorMsg: ''});
+      const response = await supertest(service['app'])
+        .get('/propose').query({
+          provider: 'provider',
+          dataset: 'name',
+        }).set('Accept', 'application/json');
+      expect(response.status).toEqual(200);
+      expect(response.body).toEqual({
+        proposalId: 'dealCid',
+        status: 'proposed',
+        pieceCid: 'pieceCid',
+        pieceSize: 100,
+        dataCid: 'dataCid',
+        carSize: 100,
+        client: 'f13vtwldyycj32sxhenrd7gmwj72hhatvuoydjxii',
+        provider: 'provider',
+        errorMessage: ''
+      });
+      expect(dealSpy).toHaveBeenCalledWith(scanning.id, 'f13vtwldyycj32sxhenrd7gmwj72hhatvuoydjxii', 'provider', jasmine.objectContaining({
+        dataCid: 'dataCid',
+        carSize: 100,
+        pieceCid: 'pieceCid',
+        pieceSize: 100,
+      }), 20, 200, true, 0);
     })
     it('should propose deal if pieceCid is not provided', async () => {
       const scanning = await Datastore.ScanningRequestModel.create({name: 'name'});
