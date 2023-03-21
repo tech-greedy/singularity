@@ -10,9 +10,12 @@ import config from '../../common/Config';
 import DealReplicationWorker from '../DealReplicationWorker';
 import { HeightFromCurrentTime } from '../../common/ChainHeight';
 import MetricEmitter from '../../common/metrics/MetricEmitter';
+import axios, { AxiosRequestHeaders } from 'axios';
 
 export default class DealReplicationService extends BaseService {
     private app: Express = express();
+
+    private datacapCache = new Map<string, [number, number]>();
 
     public constructor () {
       super(Category.DealSelfService);
@@ -200,6 +203,57 @@ export default class DealReplicationService extends BaseService {
         }
         return true;
       });
+
+      const currentTime = new Date().getTime();
+      // Filter the policy that still have enough datacap
+      const predicates = await Promise.all(policies.map(async (policy) => {
+        if (!policy.verified) {
+          return true;
+        }
+        if (!this.datacapCache.has(policy.client) || currentTime - this.datacapCache.get(policy.client)![0] > 600_000) {
+          const lotusApi = config.get<string>('deal_tracking_service.lotus_api');
+          const lotusToken = config.get<string>('deal_tracking_service.lotus_token');
+          const headers: AxiosRequestHeaders = {};
+          if (lotusToken !== '') {
+            headers['Authorization'] = `Bearer ${lotusToken}`;
+          }
+          try {
+            const response = await axios.post(lotusApi, {
+              id: 1,
+              jsonrpc: '2.0',
+              method: 'Filecoin.StateVerifiedClientStatus',
+              params: [policy.client, null]
+            }, { headers });
+            if (response.data.result != null) {
+              this.datacapCache.set(policy.client, [currentTime, Number(response.data.result)]);
+            } else {
+              this.datacapCache.set(policy.client, [currentTime, 0]);
+            }
+          } catch (e) {
+            this.logger.warn(`Failed to get datacap for ${policy.client}`, e);
+          }
+        }
+        // Sum up the deal sizes of pending deals
+        let pending: any = (await Datastore.DealStateModel.aggregate([
+          {
+            $match: {
+              state: { $in: ['proposed', 'published'] },
+              client: policy.client,
+              verified: policy.verified
+            }
+          },
+          {
+            $group: {
+              _id: null,
+              total: { $sum: '$pieceSize' }
+            }
+          }
+        ]));
+        pending = pending[0]?.total ?? 0;
+        return this.datacapCache.has(policy.client) && this.datacapCache.get(policy.client)![1] >= pending + 64 * 1024 * 1024 * 1024;
+      }));
+
+      policies = policies.filter((_, index) => predicates[index]);
 
       if (policies.length === 0) {
         this.sendError(response, ErrorCode.NO_MATCHING_POLICY);
