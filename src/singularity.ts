@@ -792,8 +792,8 @@ selfservice.command('create')
   .option('--maxDelay <maxDelay>', 'Maximum delay in days for the deal start epoch', '7')
   .option('-r, --verified <verified>', 'Whether to propose deal as verified. true|false.', 'true')
   .option('-p, --price <price>', 'Maximum price per epoch per GiB in Fil.', '0')
-  .option('--minDuration <minDuration>', 'Minimum duration in days for the deal', '525')
-  .option('--maxDuration <maxDuration>', 'maxDuration duration in days for the deal', '525')
+  .option('--minDuration <minDuration>', 'Minimum duration in days for the deal', '530')
+  .option('--maxDuration <maxDuration>', 'maxDuration duration in days for the deal', '530')
   .action(async (client, provider, dataset, options) => {
     await initializeConfig(false, false);
     let response!: AxiosResponse;

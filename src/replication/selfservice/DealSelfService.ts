@@ -224,6 +224,7 @@ export default class DealReplicationService extends BaseService {
               method: 'Filecoin.StateVerifiedClientStatus',
               params: [policy.client, null]
             }, { headers });
+            this.logger.info(`Get datacap for ${policy.client}`, response.data);
             if (response.data.result != null) {
               this.datacapCache.set(policy.client, [currentTime, Number(response.data.result)]);
             } else {
@@ -250,6 +251,7 @@ export default class DealReplicationService extends BaseService {
           }
         ]));
         pending = pending[0]?.total ?? 0;
+        this.logger.info(`Datacap for ${policy.client} is ${this.datacapCache.get(policy.client)![1]}, pending ${pending}`);
         return this.datacapCache.has(policy.client) && this.datacapCache.get(policy.client)![1] >= pending + 64 * 1024 * 1024 * 1024;
       }));
 
