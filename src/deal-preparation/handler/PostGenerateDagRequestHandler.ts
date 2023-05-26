@@ -13,6 +13,7 @@ import { getNextPowerOfTwo } from '../../common/Util';
 import ScanningRequest from '../../common/model/ScanningRequest';
 import winston from 'winston';
 import GenerationRequest from '../../common/model/GenerationRequest';
+import stream from 'stream';
 
 interface GenerateIpldCarOutput {
   DataCid :string
@@ -24,7 +25,7 @@ export async function generateDag (logger: winston.Logger, found: ScanningReques
   const checkpoint = performance.now();
   const cmd = GenerateCar.generateIpldCarPath();
   const args = ['-o', found.outDir];
-  if (config.getOrDefault('deal_preparation_service.force_max_deal_size', true)) {
+  if (config.getOrDefault('deal_preparation_service.force_max_deal_size_for_dag', true)) {
     args.push('-s', getNextPowerOfTwo(found.maxSize).toString());
   }
   logger.info(`Spawning generate-ipld-car.`, {
@@ -37,33 +38,36 @@ export async function generateDag (logger: winston.Logger, found: ScanningReques
     encoding: 'utf8',
     maxBuffer: config.getOrDefault('deal_preparation_worker.max_buffer', 1024 * 1024 * 1024)
   });
-  // Start streaming all the files to generate-ipld-car
-  for (const generationRequest of await Datastore.GenerationRequestModel.find(
-    { datasetId: found.id, status: 'completed' },
-    null,
-    { sort: { index: 1 } })) {
-    const generationId = generationRequest.id;
-    for (const outputFileList of await Datastore.OutputFileListModel.find(
-      { generationId },
+  const stdinGenerator = async function * () {
+    // Start streaming all the files to generate-ipld-car
+    for (const generationRequest of await Datastore.GenerationRequestModel.find(
+      { datasetId: found.id, status: 'completed' },
       null,
       { sort: { index: 1 } })) {
-      for (const fileInfo of outputFileList.generatedFileList) {
-        if (fileInfo.dir) {
-          continue;
+      const generationId = generationRequest.id;
+      for (const outputFileList of await Datastore.OutputFileListModel.find(
+        { generationId },
+        null,
+        { sort: { index: 1 } })) {
+        for (const fileInfo of outputFileList.generatedFileList) {
+          if (fileInfo.dir) {
+            continue;
+          }
+          const row = {
+            Path: fileInfo.path,
+            Size: fileInfo.size,
+            Start: fileInfo.start || 0,
+            End: fileInfo.end || fileInfo.size,
+            Cid: fileInfo.cid
+          };
+          const rowString = JSON.stringify(row) + '\n';
+          yield rowString;
         }
-        const row = {
-          Path: fileInfo.path,
-          Size: fileInfo.size,
-          Start: fileInfo.start || 0,
-          End: fileInfo.end || fileInfo.size,
-          Cid: fileInfo.cid
-        };
-        const rowString = JSON.stringify(row) + '\n';
-        child.stdin!.write(rowString);
       }
     }
-  }
-  child.stdin!.end();
+  };
+  const stdinReadable = stream.Readable.from(stdinGenerator(), { encoding: 'utf8' });
+  stdinReadable.pipe(child.stdin!);
 
   let output : Output;
   try {

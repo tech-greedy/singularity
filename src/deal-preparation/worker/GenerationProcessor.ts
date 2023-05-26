@@ -17,6 +17,8 @@ import { JsonStreamStringify } from 'json-stream-stringify';
 import Parser from 'stream-json/Parser';
 import Asm from 'stream-json/Assembler';
 import { pipeline } from 'stream/promises';
+import config from '../../common/Config';
+import { getNextPowerOfTwo } from '../../common/Util';
 
 export class GenerationProcessor {
   public static childProcessPid: number | undefined;
@@ -255,7 +257,13 @@ export async function generate (logger: winston.Logger, request: GenerationReque
       End: file.end
     })));
   }
-  const output = await invokeGenerateCar(logger, request.id, input, request.outDir, tmpDir ?? request.path);
+
+  let targetSize : number | undefined;
+  if (config.getOrDefault('deal_preparation_service.force_max_deal_size_for_generation', false)) {
+    const found = await Datastore.findScanningRequest(request.datasetId);
+    targetSize = getNextPowerOfTwo(found!.maxSize);
+  }
+  const output = await invokeGenerateCar(logger, request.id, input, request.outDir, tmpDir ?? request.path, targetSize);
   logger.debug('Child process finished.');
   return output;
 }
@@ -264,10 +272,14 @@ async function isGenerationRequestNoLongerActive (id: string) : Promise<boolean>
   return (await Datastore.GenerationRequestModel.findById(id))?.status !== 'active';
 }
 
-export async function invokeGenerateCar (logger: winston.Logger, generationId: string | undefined, input: JsonStreamStringify, outDir: string, p: string)
+export async function invokeGenerateCar (logger: winston.Logger, generationId: string | undefined, input: JsonStreamStringify,
+  outDir: string, p: string, targetSize: number| undefined = undefined)
   : Promise<GenerateCarOutput> {
   const cmd = GenerateCar.generateCarPath();
   const args = ['-o', outDir, '-p', p];
+  if (targetSize) {
+    args.push('-s', targetSize.toString());
+  }
   const child = spawn(cmd, args);
   if (generationId) {
     checkPauseOrRemove(logger, generationId, child);

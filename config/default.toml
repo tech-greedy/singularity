@@ -31,6 +31,8 @@ minDealSizeRatio = 0.55
 maxDealSizeRatio = 0.95
 # Whether to cleanup temporary CAR files
 enable_cleanup = true
+force_max_deal_size_for_generation = false
+force_max_deal_size_for_dag = true
 
 [database]
 # Start a built-in MongoDB server shipped with this software
@@ -40,7 +42,6 @@ local_path = "./database"
 # MongoDB API
 local_bind = "0.0.0.0"
 local_port = 37000
-force_max_deal_size = true
 
 [deal_preparation_worker]
 enabled = true

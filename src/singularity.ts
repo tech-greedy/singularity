@@ -394,6 +394,28 @@ preparation.command('create').description('Start deal preparation for a local da
     CliUtil.renderResponse(response.data, options.json);
   });
 
+preparation.command('add-piece').description('Manually add a generated piece to a dataset for deal making')
+  .argument('<dataset>', 'The dataset id or name')
+  .argument('<piece_cid>', 'The piece CID')
+  .argument('<piece_size>', 'The piece Size')
+  .option('--root-cid <root_cid>', 'The root CID of the CAR file', 'bafkqaaa')
+  .action(async (id, pieceCid, pieceSize, options) => {
+    await initializeConfig(false, false);
+    const url: string = config.get('connection.deal_preparation_service');
+    let response!: AxiosResponse;
+    try {
+      response = await axios.post(`${url}/preparation/${id}/add-piece`, {
+        pieceCid: pieceCid,
+        pieceSize: pieceSize,
+        rootCid: options.rootCid
+      });
+    } catch (error) {
+      CliUtil.renderErrorAndExit(error);
+    }
+
+    CliUtil.renderResponse(response.data, false);
+  });
+
 preparation.command('generate-dag-car').alias('dag')
   .description('Add a CAR file to the dataset that represents the Unixfs folder structure for the dataset. ' +
     'This will allow bitswap retrieval of the dataset. ' +
@@ -799,8 +821,8 @@ selfservice.command('create')
   .option('--maxDelay <maxDelay>', 'Maximum delay in days for the deal start epoch', '7')
   .option('-r, --verified <verified>', 'Whether to propose deal as verified. true|false.', 'true')
   .option('-p, --price <price>', 'Maximum price per epoch per GiB in Fil.', '0')
-  .option('--minDuration <minDuration>', 'Minimum duration in days for the deal', '525')
-  .option('--maxDuration <maxDuration>', 'maxDuration duration in days for the deal', '525')
+  .option('--minDuration <minDuration>', 'Minimum duration in days for the deal', '530')
+  .option('--maxDuration <maxDuration>', 'maxDuration duration in days for the deal', '530')
   .action(async (client, provider, dataset, options) => {
     await initializeConfig(false, false);
     let response!: AxiosResponse;

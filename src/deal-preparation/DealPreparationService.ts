@@ -21,6 +21,8 @@ import { AbortSignal } from '../common/AbortSignal';
 import { sleep } from '../common/Util';
 import handlePostGenerateDagRequest, { generateDag } from './handler/PostGenerateDagRequestHandler';
 import handlePostPreparationAppendRequest from './handler/PostPreparationAppendRequestHandler';
+import sendError from "./handler/ErrorHandler";
+import ErrorCode from "./model/ErrorCode";
 
 export default class DealPreparationService extends BaseService {
   static AllowedDealSizes: number[] = DealPreparationService.initAllowedDealSizes();
@@ -54,6 +56,30 @@ export default class DealPreparationService extends BaseService {
     this.app.get('/monitor', handleMonitorRequest.bind(this));
     this.app.post('/preparation/:id/generate-dag', handlePostGenerateDagRequest.bind(this));
     this.app.post('/preparation/:id/append', handlePostPreparationAppendRequest.bind(this));
+    this.app.post('/preparation/:id/add-piece', async (request, response) => {
+      const id = request.params.id;
+
+      this.logger.info(`Received request to get details of dataset preparation request.`, { id });
+      const found = await Datastore.findScanningRequest(id);
+      if (!found) {
+        sendError(this.logger, response, ErrorCode.DATASET_NOT_FOUND);
+        return;
+      }
+      await Datastore.GenerationRequestModel.create({
+        datasetId: id,
+        datasetName: found.name,
+        path: found.path,
+        outDir: found.outDir,
+        tmpDir: found.tmpDir,
+        status: 'completed',
+        skipInaccessibleFiles: true,
+        dataCid: request.body.rootCid,
+        pieceCid: request.body.pieceCid,
+        pieceSize: parseInt(request.body.pieceSize)
+      });
+
+      response.end();
+    });
   }
 
   public async start (): Promise<void> {

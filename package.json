@@ -1,6 +1,6 @@
 {
   "name": "@techgreedy/singularity",
-  "version": "3.0.1",
+  "version": "3.0.3",
   "description": "Large scale client tool with capabilities on onboard PB-scale data to Filecoin network",
   "main": "dist/source/start.js",
   "types": "dist/source/start.d.ts",
@@ -137,7 +137,10 @@
       "src/**"
     ],
     "exclude": [
-      "src/deal-preparation/scanner/rrdir.js"
+      "src/deal-preparation/scanner/rrdir.js",
+      "src/deal-tracking/DealTrackingService.ts",
+      "src/replication/DealReplicationService.ts",
+      "src/replication/DealReplicationWorker.ts"
     ],
     "reporter": [
       "text",
