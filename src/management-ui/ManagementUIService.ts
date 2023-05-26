@@ -1,10 +1,12 @@
 import BaseService from '../common/BaseService';
+import express, { Express } from 'express';
 import { Category } from '../common/Logger';
 import config from '../common/Config';
 import next from 'next';
-import http from 'http';
 
 export default class ManagementUIService extends BaseService {
+
+  private server: Express = express();
 
   public constructor () {
     super(Category.ManagementUIService);
@@ -13,7 +15,7 @@ export default class ManagementUIService extends BaseService {
     }
   }
 
-  public start () {
+  public async start () {
     const bind = config.get<string>('management_ui_service.bind');
     const port = config.get<number>('management_ui_service.port');
 
@@ -22,11 +24,11 @@ export default class ManagementUIService extends BaseService {
     const handle = app.getRequestHandler();
 
     app.prepare().then(() => {
-      const server = http.createServer((req, res) => {
-        handle(req, res);
-      });
-
-      server.listen(port, bind, () => {
+      this.server.get('*', (req, res) => {
+        return handle(req, res)
+      })
+    
+      this.server.listen(port, bind, () => {
         this.logger.info(`Management UI started listening at http://${bind}:${port}/mgmt`);
       });
     });
