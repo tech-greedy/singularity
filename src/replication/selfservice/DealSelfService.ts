@@ -170,7 +170,8 @@ export default class DealReplicationService extends BaseService {
       const client = <string | undefined> request.query.client;
       const provider = <string | undefined> request.query.provider;
       const dataset = <string | undefined> request.query.dataset;
-      const startDays = <string | undefined> request.query.startDays;
+      let startDays = <string | undefined> request.query.startDays;
+      const startEpoch = <string | undefined> request.query.startEpoch;
       const durationDays = <string | undefined> request.query.durationDays;
       const pieceCid = <string | undefined> request.query.pieceCid;
       if (provider === undefined) {
@@ -189,6 +190,10 @@ export default class DealReplicationService extends BaseService {
       let policies: DealSelfServicePolicy[] = await Datastore.DealSelfServicePolicyModel.find({
         provider, datasetName: scanningRequest.name
       });
+      const currentEpoch = HeightFromCurrentTime();
+      if (startEpoch !== undefined) {
+        startDays = ((parseInt(startEpoch) - currentEpoch) / 2880).toString();
+      }
 
       // Find the policy that matches the request
       policies = policies.filter((policy) => {
@@ -315,13 +320,13 @@ export default class DealReplicationService extends BaseService {
         pieceToPropose = pieceCids[0];
       }
 
-      const startDaysNumber = startDays === undefined ? policy.maxStartDays : Number(startDays);
+      const startEpochNumber = startEpoch === undefined ? Math.floor(policy.maxStartDays * 2880 + currentEpoch) : parseInt(startEpoch);
       const durationDaysNumber = durationDays === undefined ? policy.minDurationDays : Number(durationDays);
       const proposal = await this.proposeDeal(
         scanningRequest.id,
         policy.client, provider,
         pieceToPropose,
-        startDaysNumber,
+        startEpochNumber,
         durationDaysNumber,
         policy.verified,
         policy.price);
@@ -404,7 +409,7 @@ export default class DealReplicationService extends BaseService {
       client: string,
       provider: string,
       generation: {pieceCid: string, dataCid: string, pieceSize: number, carSize: number},
-      startDaysNumber: number,
+      startEpoch: number,
       durationDaysNumber: number,
       verified: boolean,
       price: number): Promise<{
@@ -426,10 +431,7 @@ export default class DealReplicationService extends BaseService {
         isOffline: true,
         maxPrice: price,
         duration: durationDaysNumber * 2880,
-        startDelay: startDaysNumber * 2880
       };
-      const currentHeight = HeightFromCurrentTime();
-      const startEpoch = startDaysNumber * 2880 + currentHeight;
 
       let dealCmd = '';
       try {

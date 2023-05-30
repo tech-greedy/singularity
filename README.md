@@ -453,6 +453,7 @@ $ curl "http://localhost:7005/propose?\
 > dataset=datasetName&\
 > pieceCid=bafyxxxx&\
 > startDays=7&\
+> startEpoch=22222&\
 > durationDays=525&\
 > client=f0xxxxx"
 ```
