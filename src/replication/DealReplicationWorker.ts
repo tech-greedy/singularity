@@ -21,6 +21,7 @@ export default class DealReplicationWorker extends BaseService {
   private readonly lotusCMD: string;
   private readonly boostCMD: string;
   private queryLotusBlockHeight: boolean;
+  private carSizeRequired: boolean = false; // After boost 1.7.2, car size must not be present for offline deals. https://github.com/filecoin-project/boost/pull/1421
   // holds reference to all started crons to be updated
   private cronRefArray: Map<string, [schedule: string, taskRef: ScheduledTask]> = new Map<string, [string, ScheduledTask]>();
 
@@ -39,6 +40,7 @@ export default class DealReplicationWorker extends BaseService {
     }
     await this.initialize();
     this.queryLotusBlockHeight = !await this.checkIsMainnet();
+    this.carSizeRequired = await this.checkIsBoostVersionEqualOrLessThan172();
     this.startHealthCheck();
     this.startPollWork();
   }
@@ -220,7 +222,8 @@ export default class DealReplicationWorker extends BaseService {
       if (replicationRequest.isOffline) {
         propose = `offline-deal`;
       }
-      return `${this.boostCMD} ${propose} --provider=${provider}  --commp=${carFile.pieceCid} --car-size=${carFile.carSize} ` +
+      const carSizeStr = (this.carSizeRequired && replicationRequest.isOffline) ? `--car-size=${carFile?.carSize || 1}` : '';
+      return `${this.boostCMD} ${propose} --provider=${provider}  --commp=${carFile.pieceCid} ${carSizeStr} ` +
         `--piece-size=${carFile.pieceSize} --payload-cid=${carFile.dataCid} --storage-price=${priceInAttoWithoutSize} --start-epoch=${startEpoch} ` +
         `--verified=${replicationRequest.isVerfied} --wallet=${replicationRequest.client} --duration=${replicationRequest.duration}`;
     }
@@ -625,6 +628,51 @@ export default class DealReplicationWorker extends BaseService {
       this.logger.warn('Error while calling lotus block height. Assuming mainnet mode.', error);
     }
     return true;
+  }
+
+  /**
+   * Can compare boost versions like 1.7.0 > 1.6.1
+   * @param version1 
+   * @param version2 
+   * @returns 
+   */
+  private compareVersions(version1: string, version2: string): number {
+    const parts1: number[] = version1.split('.').map(Number);
+    const parts2: number[] = version2.split('.').map(Number);
+
+    for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+      const part1 = parts1[i] || 0;
+      const part2 = parts2[i] || 0;
+
+      if (part1 < part2) {
+        return -1;
+      } else if (part1 > part2) {
+        return 1;
+      }
+    }
+
+    return 0;
+  }
+
+  private async checkIsBoostVersionEqualOrLessThan172(): Promise<boolean> {
+    try {
+      const cmdOut = await exec(`${this.boostCMD} -v`);
+      const versionStr = cmdOut?.stdout?.toString();
+      if(versionStr) {
+        const regex = /(\d+\.\d+\.\d+)/;
+        const match = regex.exec(versionStr);
+  
+        if (match && match.length > 0) {
+          const version = match[0];
+          this.logger.info(`Boost version: ${version}`);
+          return this.compareVersions(version, '1.7.2') <= 0;
+        }
+      }
+      this.logger.warn('Error while getting boost version. Assuming false. ' + versionStr);
+    } catch (error) {
+      this.logger.warn('Error while getting boost version. Assuming false.', error);
+    }
+    return false;
   }
 
   private async currentBlockHeight () : Promise<number> {
