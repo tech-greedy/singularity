@@ -33,7 +33,7 @@ export default class DealTrackingService extends BaseService {
       const client = clientState.stateKey;
       const lastDeal = await Datastore.DealStateModel.find({ client, dealId: { $ne: null } }).sort({ dealId: -1 }).limit(1);
       try {
-        await this.insertDealFromFilscan(client, lastDeal.length > 0 ? lastDeal[0].dealId! : 16000000);
+        await this.insertDealFromFilscan(client, lastDeal.length > 0 ? lastDeal[0].dealId! : 45000000);
       } catch (error) {
         this.logger.error('Encountered an error when importing deals from filescan', error);
       }
@@ -47,7 +47,7 @@ export default class DealTrackingService extends BaseService {
     }
   }
 
-  private static readonly FilscanPagination = 25;
+  // private static readonly FilscanPagination = 25;
 
   /**
    * Read from filscan api for PublishStorageDeal status
@@ -57,10 +57,10 @@ export default class DealTrackingService extends BaseService {
    */
   private async insertDealFromFilscan (client: string, lastDeal: number): Promise<void> {
     this.logger.debug('updating deals from filscan', { client, lastDeal });
-    let url = 'https://api.filscan.io:8700/rpc/v1';
-    if (client.startsWith('t')) {
-      url = 'https://calibration.filscan.io:8700/rpc/v1';
-    }
+    // let url = 'https://api.filscan.io:8700/rpc/v1';
+    // if (client.startsWith('t')) {
+    //   url = 'https://calibration.filscan.io:8700/rpc/v1';
+    // }
 
     /**
      * Find the corresponding f012345 client ID of the client address
@@ -86,29 +86,31 @@ export default class DealTrackingService extends BaseService {
     }
 
     /**
-     * We don't trust filscan's data, can only use the first deal id
+     * We don't trust filfox's data, can only use the first deal id
      * as reference to see how many need to track
      */
 
-    response = await axios.post(url, {
-      id: 1,
-      jsonrpc: '2.0',
-      params: [client, 0, DealTrackingService.FilscanPagination],
-      method: 'filscan.GetMarketDeal'
-    }, {
+    response = await axios.get('https://filfox.info/api/v1/deal/list?address=' + client, {
       headers: {
         'content-type': 'application/json'
       }
     });
 
-    const maxNumberOfDealsToTrack = response.data['result']['total'] | 0;
+    const maxNumberOfDealsToTrack = response.data['totalCount'] | 0;
     let latestDealIdFromFilscan = 0;
-    if (Array.isArray(response.data['result']['deals'])) {
-      latestDealIdFromFilscan = response.data['result']['deals'][0]['dealid']; // could be wrong
+    if (Array.isArray(response.data['deals'])) {
+      latestDealIdFromFilscan = response.data['deals'][0]['id']; // could be wrong
     }
+    this.logger.info(`Found ${maxNumberOfDealsToTrack} deals for ${client} from filfox, latest deal id is ${latestDealIdFromFilscan}, 
+    last deal from db is ${lastDeal}, the diff is ${latestDealIdFromFilscan - lastDeal}`);
+
     if (maxNumberOfDealsToTrack > 0 && latestDealIdFromFilscan > 0) {
       let processedCount = 0;
       for (let i = latestDealIdFromFilscan; i > lastDeal; i--) {
+        // log every 1000 deals
+        if (i % 1000 === 0) {
+          this.logger.info(`Count down ${i} to reach ${lastDeal}`);
+        }
         const response = await axios.post(lotusApi, {
           id: 1,
           jsonrpc: '2.0',

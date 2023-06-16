@@ -21,8 +21,8 @@ import { AbortSignal } from '../common/AbortSignal';
 import { sleep } from '../common/Util';
 import handlePostGenerateDagRequest, { generateDag } from './handler/PostGenerateDagRequestHandler';
 import handlePostPreparationAppendRequest from './handler/PostPreparationAppendRequestHandler';
-import sendError from "./handler/ErrorHandler";
-import ErrorCode from "./model/ErrorCode";
+import sendError from './handler/ErrorHandler';
+import ErrorCode from './model/ErrorCode';
 
 export default class DealPreparationService extends BaseService {
   static AllowedDealSizes: number[] = DealPreparationService.initAllowedDealSizes();
