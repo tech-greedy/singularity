@@ -90,7 +90,7 @@ export default class DealTrackingService extends BaseService {
      * as reference to see how many need to track
      */
 
-    response = await axios.get("https://filfox.info/api/v1/deal/list?address=" + client, {
+    response = await axios.get('https://filfox.info/api/v1/deal/list?address=' + client, {
       headers: {
         'content-type': 'application/json'
       }
@@ -102,7 +102,7 @@ export default class DealTrackingService extends BaseService {
       latestDealIdFromFilscan = response.data['deals'][0]['id']; // could be wrong
     }
     this.logger.info(`Found ${maxNumberOfDealsToTrack} deals for ${client} from filfox, latest deal id is ${latestDealIdFromFilscan}, 
-    last deal from db is ${lastDeal}, the diff is ${latestDealIdFromFilscan - lastDeal}`)
+    last deal from db is ${lastDeal}, the diff is ${latestDealIdFromFilscan - lastDeal}`);
 
     if (maxNumberOfDealsToTrack > 0 && latestDealIdFromFilscan > 0) {
       let processedCount = 0;
