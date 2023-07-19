@@ -23,6 +23,7 @@ import handlePostGenerateDagRequest, { generateDag } from './handler/PostGenerat
 import handlePostPreparationAppendRequest from './handler/PostPreparationAppendRequestHandler';
 import sendError from './handler/ErrorHandler';
 import ErrorCode from './model/ErrorCode';
+import cors from 'cors';
 
 export default class DealPreparationService extends BaseService {
   static AllowedDealSizes: number[] = DealPreparationService.initAllowedDealSizes();
@@ -36,6 +37,7 @@ export default class DealPreparationService extends BaseService {
       return;
     }
     this.app.use(Logger.getExpressLogger(Category.DealPreparationService));
+    this.app.use(cors());
     this.app.use(bodyParser.urlencoded({ extended: false }));
     this.app.use(bodyParser.json());
     this.app.use(function (_req, res, next) {

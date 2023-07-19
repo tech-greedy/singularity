@@ -10,6 +10,7 @@ import { GetReplicationsResponse, GetReplicationsResponseItem } from './model/Ge
 import UpdateReplicationRequest from './model/UpdateReplicationRequest';
 import config from '../common/Config';
 import { AbortSignal } from '../common/AbortSignal';
+import cors from 'cors';
 
 export default class DealReplicationService extends BaseService {
 
@@ -27,6 +28,7 @@ export default class DealReplicationService extends BaseService {
       return;
     }
     this.app.use(Logger.getExpressLogger(Category.DealReplicationService));
+    this.app.use(cors());
     this.app.use(bodyParser.urlencoded({ extended: false }));
     this.app.use(bodyParser.json());
     this.app.use(function (_req, res, next) {
