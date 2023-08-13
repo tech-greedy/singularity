@@ -18,7 +18,8 @@ export interface GetReplicationsResponseItem {
     dealsProposalExpired?: number,
     dealsExpired?: number,
     dealsSlashed?: number,
-    dealsError?: number
+    dealsError?: number,
+    createdAt: string,
   }
 
 export type GetReplicationsResponse = GetReplicationsResponseItem[];

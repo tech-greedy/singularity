@@ -23,5 +23,7 @@ export default interface ReplicationRequest {
   notes?: string, // any notes or tag want to store along the replication request, for tracking purpose
   csvOutputDir?: string, // folder to print CSV to, undefined to skip the CSV
   isForced: boolean,
-  errorMessage?: string
+  errorMessage?: string,
+  createdAt: Date,
+  updatedAt: Date,
 }

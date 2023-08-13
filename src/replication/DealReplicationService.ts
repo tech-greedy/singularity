@@ -130,7 +130,8 @@ export default class DealReplicationService extends BaseService {
         cronMaxDeals: r.cronMaxDeals,
         cronMaxPendingDeals: r.cronMaxPendingDeals,
         fileListPath: r.fileListPath,
-        notes: r.notes
+        notes: r.notes,
+        createdAt: r.createdAt.toLocaleString(),
       };
       if (verbose) {
         await this.fillReplicationDealStats(obj);
