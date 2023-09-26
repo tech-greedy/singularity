@@ -7,7 +7,7 @@ New node software for large-scale clients with PB-scale data onboarding to Filec
 
 ⛔️ DEPRECATION WARNING
 
-The V1 Singularity will be deprecated soon in favor of [Singularity V2](https://github.com/data-preservation-programs/singularity). 
+The V1 Singularity is deprecated in favor of [Singularity V2](https://github.com/data-preservation-programs/singularity). 
 
 Check [how they are different](https://data-programs.gitbook.io/singularity/overview/v1-or-v2) and [development progress](https://github.com/orgs/data-preservation-programs/projects/3)
 
